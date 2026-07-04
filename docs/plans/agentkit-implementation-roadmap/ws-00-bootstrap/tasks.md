@@ -12,6 +12,7 @@ Goal: a compilable Go module with a Cobra root command, version command, CI, and
 
 Create:
 - `go.mod` — module `github.com/MiviaLabs/mivia-agentkit`, Go 1.22+.
+- `go.sum` — module checksums for Cobra and transitive CLI dependencies.
 - `cmd/mivia-agent/main.go` — calls `cli.Execute()` (package `cli`), prints any error and exits non-zero.
 
 Spec:
@@ -42,9 +43,11 @@ Tests that must pass:
 - `TestRootCommandShowsHelp`
 - `TestVersionCommandPrintsVersion`
 - `TestUnknownCommandExitsNonZero`
+- `TestUnknownCommandDoesNotWriteDuplicateError`
 
 Mutation proof:
 - Change `Version` print to omit the version string; `TestVersionCommandPrintsVersion` must fail.
+- Remove Cobra `SilenceErrors` from the root command; `TestUnknownCommandDoesNotWriteDuplicateError` must fail.
 
 ## T3 — Project metadata + .gitignore
 
@@ -86,6 +89,9 @@ Tests that must pass:
 - `TestTemplatesDirExists` — assert `templates/README.md` is readable.
 - `TestTemplatesSubdirsExist` — assert each named subdirectory exists.
 
+Create tests in:
+- `internal/templates/templates_test.go` — template skeleton filesystem checks.
+
 Mutation proof:
 - Delete `templates/README.md`; `TestTemplatesDirExists` must fail.
 
@@ -119,3 +125,11 @@ WS0 is ☑ when:
 - [ ] CI green on a feature branch
 - [ ] mutation proof executed + reverted
 - [ ] status updated in `00-overview.md`
+
+## Completion — 2026-07-04
+
+- Tests: 6 passing.
+- Mutation proofs: version output omission fail-then-revert ok; root `SilenceErrors` removal fail-then-revert ok; template README deletion fail-then-revert ok.
+- Files: 23 created.
+- Residual risk: none.
+- Follow-ups: none.

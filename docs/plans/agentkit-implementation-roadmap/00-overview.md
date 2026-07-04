@@ -43,7 +43,7 @@ Phase 0                  Phase 1                       Phase 2
 
 | WS | Folder | Title | Phase | Depends on | Status |
 |---|---|---|---|---|---|
-| 0 | [`ws-00-bootstrap/`](ws-00-bootstrap/tasks.md) | Repo bootstrap | 0 | — | ☐ |
+| 0 | [`ws-00-bootstrap/`](ws-00-bootstrap/tasks.md) | Repo bootstrap | 0 | — | ☑ |
 | 1 | [`ws-01-manifest-git-pathpolicy/`](ws-01-manifest-git-pathpolicy/tasks.md) | Manifest, Git state, path policy, global config | 1 | WS0 | ☐ |
 | 2 | [`ws-02-templates-init/`](ws-02-templates-init/tasks.md) | Templates + `init` | 1 | WS1 | ☐ |
 | 3 | [`ws-03-doctor-audit/`](ws-03-doctor-audit/tasks.md) | `doctor` + `audit` | 1 | WS2 | ☐ |

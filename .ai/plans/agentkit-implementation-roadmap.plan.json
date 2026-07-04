@@ -249,11 +249,13 @@
         ],
         "files_edit": [
           "go.mod",
+          "go.sum",
           "cmd/mivia-agent/main.go",
           "internal/cli/root.go",
           "internal/cli/version.go",
           "internal/version/version.go",
           "internal/cli/cli_test.go",
+          "internal/templates/templates_test.go",
           "README.md",
           ".gitignore",
           "templates/README.md",
@@ -269,6 +271,7 @@
           "internal/cli/cli_test.go::TestRootCommandShowsHelp",
           "internal/cli/cli_test.go::TestVersionCommandPrintsVersion",
           "internal/cli/cli_test.go::TestUnknownCommandExitsNonZero",
+          "internal/cli/cli_test.go::TestUnknownCommandDoesNotWriteDuplicateError",
           "internal/templates/templates_test.go::TestTemplatesDirExists",
           "internal/templates/templates_test.go::TestTemplatesSubdirsExist"
         ],
@@ -279,13 +282,15 @@
           "go run ./cmd/mivia-agent version",
           "test -f templates/README.md"
         ],
-        "mutation": "Change the version command to omit the version string; internal/cli/cli_test.go::TestVersionCommandPrintsVersion must fail. Delete templates/README.md; internal/templates/templates_test.go::TestTemplatesDirExists must fail.",
+        "mutation": "Change the version command to omit the version string; internal/cli/cli_test.go::TestVersionCommandPrintsVersion must fail. Remove Cobra SilenceErrors from the root command; internal/cli/cli_test.go::TestUnknownCommandDoesNotWriteDuplicateError must fail. Delete templates/README.md; internal/templates/templates_test.go::TestTemplatesDirExists must fail.",
         "outputs": [
           "go.mod",
+          "go.sum",
           "cmd/mivia-agent/main.go",
           "internal/cli/root.go",
           "internal/cli/version.go",
           "internal/version/version.go",
+          "internal/templates/templates_test.go",
           "templates/README.md",
           ".github/workflows/ci.yml"
         ]
@@ -1001,6 +1006,21 @@
       "source": "semgrep/agent-standards.yml",
       "gap": "Markdown-only agent-plan drift was only checked at docs/plans root",
       "correction": "extended the Semgrep include path and fixture to cover nested docs/plans/agentkit-implementation-roadmap agent-plan files"
+    },
+    {
+      "source": ".ai/plans/agentkit-implementation-roadmap.plan.json",
+      "gap": "WS0 listed internal/templates/templates_test.go in tests but omitted it from files_edit and outputs",
+      "correction": "added internal/templates/templates_test.go to WS0 files_edit and outputs, and mirrored the test-file location in ws-00-bootstrap/tasks.md"
+    },
+    {
+      "source": ".ai/plans/agentkit-implementation-roadmap.plan.json",
+      "gap": "WS0 uses Cobra but omitted go.sum from files_edit and outputs",
+      "correction": "added go.sum to WS0 files_edit and outputs, and mirrored it in ws-00-bootstrap/tasks.md"
+    },
+    {
+      "source": "internal/cli/root.go",
+      "gap": "WS0 unknown-command path let Cobra and main both write the same error",
+      "correction": "added TestUnknownCommandDoesNotWriteDuplicateError to the WS0 test contract and enabled Cobra SilenceErrors"
     }
   ],
   "stop_conditions": [
