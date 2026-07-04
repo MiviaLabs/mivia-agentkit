@@ -44,7 +44,7 @@ Phase 0                  Phase 1                       Phase 2
 | WS | Folder | Title | Phase | Depends on | Status |
 |---|---|---|---|---|---|
 | 0 | [`ws-00-bootstrap/`](ws-00-bootstrap/tasks.md) | Repo bootstrap | 0 | — | ☐ |
-| 1 | [`ws-01-manifest-git-pathpolicy/`](ws-01-manifest-git-pathpolicy/tasks.md) | Manifest, Git state, path policy | 1 | WS0 | ☐ |
+| 1 | [`ws-01-manifest-git-pathpolicy/`](ws-01-manifest-git-pathpolicy/tasks.md) | Manifest, Git state, path policy, global config | 1 | WS0 | ☐ |
 | 2 | [`ws-02-templates-init/`](ws-02-templates-init/tasks.md) | Templates + `init` | 1 | WS1 | ☐ |
 | 3 | [`ws-03-doctor-audit/`](ws-03-doctor-audit/tasks.md) | `doctor` + `audit` | 1 | WS2 | ☐ |
 | 4 | [`ws-04-preflight-stamp/`](ws-04-preflight-stamp/tasks.md) | Preflight + quality stamp | 2 | WS1 | ☐ |
@@ -71,7 +71,7 @@ Numbering follows the product plan, not execution order. **Execute by phase, not
 ## Phase exit gates (from PRD §14)
 
 - **Phase 0:** `go test ./...` green; `--help` works.
-- **Phase 1:** FR-1.1–1.3, 2.1, 2.3, 5.4, 6.1, 6.2, 7.5 green; idempotency + path-policy mutation proofs.
+- **Phase 1:** FR-1.1–1.3, 2.1, 2.3, 5.4, 6.1, 6.2, 7.5, 10.1–10.3, 10.6 green; idempotency + path-policy mutation proofs.
 - **Phase 2:** FR-2.4, 3.1–3.5, 7.4 green; approval-enforcement + scrubbing tests.
 - **Phase 3:** FR-4.1–4.5, 5.1–5.3, 6.3 green; loop-bound + stamp-before-protect + consensus-threshold mutation proofs.
 - **Phase 4:** FR-2.2, 6.4, 7.1, 7.2, 8.1–8.3 green; strict-requires-AGT doctor failure.

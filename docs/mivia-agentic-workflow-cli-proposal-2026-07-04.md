@@ -22,13 +22,13 @@ Earlier drafts framed `mivia-agent` as a manifest + deterministic-gate generator
 4. **Adapter set** — Codex, Claude Code, Gemini CLI, and Crush (Charmbracelet). The "pi agent" reference from earlier discussion is removed.
 5. **Governance backbone** — policy enforcement, structured decisions, and tamper-evident audit logging are delegated to the Microsoft Agent Governance Toolkit (AGT) Go SDK, wrapped behind an internal `policy` interface with a no-op fallback so the binary still ships standalone.
 
-Everything else — `.ai/` canonical model, thin root/vendor adapters, quality stamp under `.git/`, idempotent init, no network in MVP, no live connectors by default — is unchanged.
+Everything else — `.ai/` canonical model, `~/.agents/` global config layer, thin root/vendor adapters, quality stamp under `.git/`, idempotent init, no network in MVP, no live connectors by default — is unchanged.
 
 ## Objective
 
 Build a standalone Mivia-branded CLI that configures any Git repository for high-rigor agentic software workflows **and orchestrates those workflows across multiple agent CLIs**.
 
-The CLI installs and validates a generic agent-control surface (instructions, skills, hooks, quality gates, contract matrices, loop definitions, review policies) and a thin, swappable adapter layer for agent tools. It executes loops by invoking adapters headlessly, routes artifacts between them, and lets deterministic local gates decide whether risky work can finish.
+The CLI installs and validates a generic agent-control surface (instructions, skills, hooks, quality gates, contract matrices, loop definitions, review policies) and a thin, swappable adapter layer for agent tools. It reads a global user config from `~/.agents/` (the emerging universal agent directory) and layers it under the project-level `.ai/` surface. It executes loops by invoking adapters headlessly, routes artifacts between them, and lets deterministic local gates decide whether risky work can finish.
 
 Core promise:
 
@@ -54,11 +54,50 @@ Primary commands:
 
 The generated target-repo model:
 
-- `.ai/` is canonical.
+- `.ai/` is canonical (project-level).
+- `~/.agents/` provides global user-level config that is layered under `.ai/`.
 - Root and vendor files are thin adapters.
 - Hooks call `mivia-agent`, not repo-local ad hoc scripts.
 - CI calls `mivia-agent doctor --json`, then optionally `mivia-agent run`.
 - No live connector or credential setup is enabled by default.
+
+## Config Hierarchy (`~/.agents/` + `.ai/`)
+
+The agent config follows a two-layer model:
+
+| Layer | Location | Scope | Ownership | When read |
+|---|---|---|---|---|
+| **Global** | `~/.agents/` | Per-user, all repos | User (never committed) | Every command; layered first (lowest priority) |
+| **Project** | `.ai/` + root adapters | Per-repo | Team (committed to repo) | Every command; layered second (highest priority) |
+
+### Global layer (`~/.agents/`)
+
+The `~/.agents/` directory is the emerging universal config layer for AI coding agents (see [dot-agents.com](https://dot-agents.com/) and [AGENTS.md Issue #91](https://github.com/agentsmd/agents.md/issues/91)). Different tools currently fragment global config across `~/.claude/`, `~/.codex/`, `.cursor/`, etc. `mivia-agent` reads from `~/.agents/` and unifies them.
+
+What `mivia-agent` reads from `~/.agents/`:
+
+- `~/.agents/rules/` — global rules (operating doctrine, security/privacy, quality). These are layered under the project-level `.ai/rules/` — project rules win on conflict.
+- `~/.agents/skills/` — global skills available in every repo (e.g. personal coding preferences, organization-wide audit skills). Project-level skills of the same name override.
+- `~/.agents/mivia.yaml` — mivia-agent-specific global preferences:
+  ```yaml
+  version: 1
+  defaults:
+    profile: standard          # default profile when --profile is omitted
+    adapters:                  # default adapter set when --adapter is omitted
+      codex:   { enabled: true,  role: orchestrable }
+      claude:  { enabled: true,  role: orchestrable }
+      copilot: { enabled: false, role: guidance }
+  ``` 
+
+The global layer is **never written by `init`**. It is user-managed. `mivia-agent` reads it but does not modify it. If `~/.agents/` does not exist, `mivia-agent` silently proceeds with project-level config only — no errors, no warnings.
+
+### Layering rules
+
+1. **Project wins on conflict.** If `.ai/rules/00-operating-doctrine.md` exists, it overrides `~/.agents/rules/00-operating-doctrine.md`. If only the global version exists, it is used.
+2. **Skills merge by name.** If `~/.agents/skills/deep-bug-audit/SKILL.md` exists and `.ai/skills/deep-bug-audit/SKILL.md` does not, the global skill is available. If both exist, the project version wins.
+3. **Manifest fields merge.** Global `mivia.yaml` `defaults` provide fallback values for fields not set in the project's `mivia-agent.yaml`. Explicit project values always override.
+4. **No secret leakage.** The global layer is subject to the same path policy and secret-scrubbing rules as the project layer.
+5. **`doctor` validates both.** `doctor` checks for conflicts between global and project config (e.g. a global rule that contradicts a project rule) and reports them as warnings.
 
 ## Distribution Model
 
@@ -80,6 +119,7 @@ These are **not** `.ai/` files. They are the raw material that `init` renders (w
 
 - **The binary ships alone.** A user installs via `brew install mivialabs/tap/mivia-agent`, downloads a release binary, or `go install`; no companion data directory, no `.ai/` bundle, no config file, no separate `templates/` directory on disk. The binary just works.
 - **`.ai/` does not exist until `init` creates it.** The `.ai/` canonical surface (rules, skills, workflows, contracts, review policies) is **generated** by `init` into the target repository. It does not come from the user's machine or from the internet — it comes from the templates embedded in the binary, which in turn came from the agentkit source repo's `templates/` directory.
+- **`~/.agents/` is optional and user-managed.** `mivia-agent` reads `~/.agents/rules/`, `~/.agents/skills/`, and `~/.agents/mivia.yaml` if they exist, layering them under `.ai/`. It never writes to `~/.agents/`. If absent, commands work with project-level config only.
 - **`mivia-agent` itself does not have an `.ai/`.** The binary is a tool that generates `.ai/` for other repos. It does not require or create `.ai/` for its own build/runtime. (Developers working on the agentkit repo may run `init` on it for dogfooding, but the binary never needs it.)
 - **`update` refreshes from the binary, not the internet.** When a user gets a newer `mivia-agent` binary, `update` compares the new embedded templates against the repo's existing managed blocks — no network, no download.
 - **Adapters invoke CLIs that the user already has installed.** `mivia-agent run --workflow research` requires `codex` and/or `claude` on PATH — but `mivia-agent` does not install them or verify their versions beyond the `adapters` command's `Detect` probe. The binary is the orchestrator; the CLIs are the worker processes.
@@ -88,11 +128,13 @@ These are **not** `.ai/` files. They are the raw material that `init` renders (w
 
 ```
 1. User installs binary (brew / release download / go install)
-2. User cd's into their repo
-3. User runs: mivia-agent init --profile standard --adapter codex --adapter claude --write
-4. .ai/ is generated in that repo from the binary's embedded templates
-5. User's existing CLIs (codex, claude, etc.) are detected via adapters command
-6. Everything works — no internet, no external data, no companion files
+2. User optionally sets up ~/.agents/ with global rules/skills/preferences
+3. User cd's into their repo
+4. User runs: mivia-agent init --profile standard --adapter codex --adapter claude --write
+5. .ai/ is generated in that repo from the binary's embedded templates
+6. Global ~/.agents/ config is layered under .ai/ (user's rules/skills/preferences applied as defaults)
+7. User's existing CLIs (codex, claude, etc.) are detected via adapters command
+8. Everything works — no internet, no external data, no companion files
 ```
 
 ## Non-Goals
@@ -238,7 +280,7 @@ mivia-agent.yaml
 .ai/workflows/bug-audit-loop.yaml
 .ai/quality/contracts/project-runtime.yaml
 .ai/quality/review-policies/default.yaml
-.agents/skills.json
+.agents/skills.json        # skill registry (for tools that read it; references .ai/skills/ + ~/.agents/skills/)
 .codex/hooks.json
 .claude/settings.json
 .claude/skills/airtight-feature-delivery/SKILL.md
@@ -376,6 +418,14 @@ governance:
 mcp:
   enabled: false
   servers: []
+
+# Global config layer — mivia-agent reads ~/.agents/ but never writes it.
+# If ~/.agents/mivia.yaml exists, its defaults are layered under this
+# manifest (explicit values here always win). ~/.agents/rules/ and
+# ~/.agents/skills/ are layered under .ai/rules/ and .ai/skills/.
+global:
+  layer: ~/.agents
+  merge: project_wins   # global provides defaults; explicit project values override
 ```
 
 ## Loops, Routing, And Review
@@ -551,6 +601,7 @@ mivia-agentkit/
   internal/
     cli/
     config/
+    globalconfig/      # ~/.agents/ reading + layering under project config
     detect/
     render/
     templates/
@@ -658,6 +709,7 @@ Checks (additions to the original list in **bold**):
 - **Every review step has a valid consensus mode and `min_reviewers` that is satisfiable by the enabled reviewers.**
 - **`governance.provider` is `noop` or `agt`; if `agt`, the AGT dependency is importable.**
 - **Every orchestrable adapter passes `Detect()` as headless-capable, OR is explicitly marked guidance-only.**
+- **Global config (`~/.agents/`) is readable (if present) and does not conflict with project config; report warnings on conflicts.**
 
 Exit codes:
 
@@ -684,6 +736,7 @@ Findings (additions in **bold**):
 - **Consensus policy weaker than profile requires (e.g. `first-pass` under strict).**
 - **Reviewer fan-out where `min_reviewers` exceeds the number of enabled headless adapters.**
 - **Governance provider `noop` under strict profile.**
+- **Global rule conflicts with project rule (same file name, divergent content).**
 
 ### `mivia-agent preflight`
 
@@ -805,22 +858,24 @@ Unchanged. Create `go.mod`, `cmd/mivia-agent/main.go`, `internal/cli/root.go`, `
 
 Tests: `TestRootCommandShowsHelp`, `TestVersionCommandPrintsVersion`.
 
-### WS1 - Manifest, Git State, And Path Policy
+### WS1 - Manifest, Git State, Path Policy, And Global Config
 
-Unchanged, plus manifest fields for `adapters` (with roles), `routing`, `loops`, and `governance`. Tests must cover the new fields:
+Unchanged, plus manifest fields for `adapters` (with roles), `routing`, `loops`, `governance`, and `global` layer. Global config (`~/.agents/`) reading is added: parse `~/.agents/mivia.yaml` if present and merge defaults under the project manifest. Tests must cover the new fields:
 
 - `TestManifestDefaultsIncludeRoutingAndLoopDefaults`
 - `TestManifestRejectsUnknownAdapterRole`
 - `TestManifestRejectsBudgetBoundInMVP`
 - `TestManifestRejectsExpertProfileInMVP`
+- `TestGlobalConfigMergesUnderProjectManifest` (global defaults layered, explicit project values win)
+- `TestGlobalConfigAbsentSilentlyIgnored` (no `~/.agents/` → no error, no warnings)
 
-### WS2 - Template System And Init
+### WS2 - Template System, Init, And Global Layer
 
-Unchanged, plus render `templates/workflows/*` and `templates/review-policies/*`.
+Unchanged, plus render `templates/workflows/*` and `templates/review-policies/*`. Init reads global `~/.agents/rules/` and `~/.agents/skills/` and layers them into the effective config (project wins on conflict). `.agents/skills.json` in the target repo includes both global and project skills.
 
 ### WS3 - Doctor And Audit
 
-Unchanged, plus the new doctor checks and audit findings listed in those sections.
+Unchanged, plus the new doctor checks and audit findings listed in those sections (including global config conflict detection).
 
 ### WS4 - Preflight Stamp
 
@@ -1144,6 +1199,7 @@ Exact scope:
 - Add Git root/state and diff hash support.
 - Add path safety policy.
 - Add embedded starter templates (core, adapters, workflows, review-policies).
+- Implement global config reading from ~/.agents/ (rules, skills, mivia.yaml defaults); layer under project config.
 - Implement init --dry-run/--write for starter profile.
 - Implement doctor for starter profile.
 
@@ -1154,6 +1210,8 @@ Tests first:
 - TestManifestRejectsUnknownAdapterRole
 - TestManifestRejectsBudgetBoundInMVP
 - TestManifestRejectsExpertProfileInMVP
+- TestGlobalConfigMergesUnderProjectManifest
+- TestGlobalConfigAbsentSilentlyIgnored
 - TestGitStateDetectsChangedTrackedAndUntrackedFiles
 - TestDiffHashChangesWhenFileChanges
 - TestPathPolicyRejectsTraversalAndSecretPaths
@@ -1169,6 +1227,7 @@ Constraints:
 - No hidden local paths.
 - Do not implement adapters, orchestrator, consensus, policy providers, hooks,
   preflight stamp, import, update, plugins, or release yet.
+- Implement ~/.agents/ reading but do not write to it; silently ignore if absent.
 - Preserve user-owned files; never overwrite without explicit force.
 
 Verification:
@@ -1210,7 +1269,7 @@ Exact scope:
 - Implement the DAG/loop orchestrator with iteration bounds (reject budget).
 - Implement consensus (majority/unanimous/weighted/first-pass + tie-breakers).
 - Implement mivia-agent run (--workflow, --dry-run, --json) and mivia-agent review.
-- Implement runstore under .ai/runs/<id>/ with trace.jsonl.
+- Implement runstore under .ai/runs/<id>/ with trace.jsonl. Global config layering applies to loop/workflow resolution.
 - Implement mivia-agent adapters (Detect + headless capability report).
 
 Tests first:

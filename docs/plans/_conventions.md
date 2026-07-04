@@ -80,6 +80,9 @@ When a WS is done, append to its `tasks.md`:
 ## Glossary used in tasks
 
 - **Manifest** — `mivia-agent.yaml` at the repo root.
+- **Global manifest** — `~/.agents/mivia.yaml` (optional, user-managed, layered under project manifest).
+- **Global rules/skills** — `~/.agents/rules/` and `~/.agents/skills/` (optional, layered under `.ai/` equivalents).
+- **Config hierarchy** — two-layer: global (`~/.agents/`, per-user, lowest priority) → project (`.ai/`, per-repo, highest priority).
 - **Stamp** — `.git/mivia-agent-quality-stamp.json`.
 - **Adapter** — `internal/adapter.Adapter` implementation (WS9).
 - **Loop** — a named workflow in the manifest or `.ai/workflows/*.yaml` (WS10).
@@ -93,6 +96,7 @@ When a WS is done, append to its `tasks.md`:
 cmd/mivia-agent/         main entry
 internal/cli/            cobra commands
 internal/config/         manifest
+internal/globalconfig/   ~/.agents/ reading + layering under project config
 internal/detect/         language/tooling detection
 internal/gitstate/       git root, HEAD, changed files, diff hash
 internal/pathpolicy/     path allow/deny

@@ -1,10 +1,10 @@
-# WS2 — Templates + `init`
+# WS2 — Templates + `init` + Global Layer
 
 - **Phase:** 1
 - **Depends on:** WS1
-- **PRD:** FR-1.1, FR-1.2, FR-1.3, FR-6.1, FR-6.2
-- **Plan:** WS2, "Generated Target Repo Files", "Manifest"
-- **Exit gate (Phase 1, partial):** `init --dry-run` writes nothing; `init --write` creates the expected file set; idempotent; refuses to overwrite user files.
+- **PRD:** FR-1.1, FR-1.2, FR-1.3, FR-6.1, FR-6.2, FR-10.1, FR-10.6
+- **Plan:** WS2, "Generated Target Repo Files", "Manifest", "Config Hierarchy"
+- **Exit gate (Phase 1, partial):** `init --dry-run` writes nothing; `init --write` creates the expected file set; idempotent; refuses to overwrite user files; `.agents/skills.json` includes both global and project skills.
 
 Goal: populate the template source directory (skeleton created in WS0 T4), embed templates into the binary, render the full target-repo file set for a profile+adapter mix, support dry-run and write, preserve user content, keep init idempotent.
 
@@ -69,12 +69,14 @@ Mutation proof:
 
 Create:
 - `internal/cli/init.go` — `initCmd *cobra.Command`, flags `--repo`, `--profile`, `--adapter` (repeated), `--with-loop` (repeated), `--dry-run`, `--write`, `--force`, `--json`.
-- `internal/render/init.go` — `PlanInit(cfg InitConfig) (RenderPlan, error)`; the orchestration: detect root, load/merge manifest, build plan.
-- `internal/render/init_integration_test.go` — end-to-end over temp repos.
+- `internal/render/init.go` — `PlanInit(cfg InitConfig) (RenderPlan, error)`; the orchestration: read global config (WS1 `globalconfig.Read()`), load/merge manifest (`globalconfig.Layer()`), detect root, build plan.
+- `internal/render/init_integration_test.go` — end-to-end over temp repos, including with and without `~/.agents/` present.
 
 Spec:
 - `--dry-run`: compute the plan, print intended writes (path + would-create/would-skip/would-conflict), write nothing. Exit 0 if no conflicts, non-zero on conflict.
 - `--write`: render all, write each file. Before writing an existing user-owned file without the managed block, refuse unless `--force`. For managed-block files, only update the block (see T4).
+- Global config from `~/.agents/` is read and layered under the project manifest before rendering. Global rules/skills are included in the effective config (project wins on conflict).
+- `.agents/skills.json` in the target repo lists both global and project skills (merged, project wins on name conflict).
 - After `--write`, call `doctor` (WS3) to validate. (For now, doctor is a stub the test skips if WS3 not present; wire fully in WS3.)
 - Idempotent: `init --write` then `init --write` (same options) → no diff in the repo.
 - `--adapter` accepts `codex|claude|copilot|gemini|crush`. Validate against manifest; unknown → error.
@@ -88,6 +90,9 @@ Tests that must pass:
 - `TestInitForceOverwritesUserOwnedFile`
 - `TestInitRejectsUnknownAdapter`
 - `TestInitReportJSONShape`
+- `TestInitIncludesGlobalSkillsInSkillsJson` (global skill from `~/.agents/skills/` appears in `.agents/skills.json`)
+- `TestInitProjectSkillOverridesGlobalSkill` (same name in both → project version wins in `.agents/skills.json`)
+- `TestInitGlobalConfigAbsentNoError` (`~/.agents/` missing → init succeeds normally)
 
 Mutation proof:
 - Remove the overwrite guard; `TestInitRefusesToOverwriteUserOwnedFile` must fail (it will overwrite).

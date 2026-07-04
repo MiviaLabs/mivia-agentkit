@@ -2,8 +2,8 @@
 
 - **Phase:** 1
 - **Depends on:** WS2
-- **PRD:** FR-2.1, FR-2.3, FR-5.4, FR-6.1, FR-6.2; §11 (command surface)
-- **Plan:** WS3, "doctor" and "audit" check lists (the augmented version with loop/consensus/governance checks)
+- **PRD:** FR-2.1, FR-2.3, FR-5.4, FR-6.1, FR-6.2, FR-10.5; §11 (command surface)
+- **Plan:** WS3, "doctor" and "audit" check lists (the augmented version with loop/consensus/governance/global checks)
 - **Exit gate (Phase 1, partial):** `doctor` passes on a fresh `init`; fails on each broken-wiring class; `audit` reports the listed finding categories.
 
 Goal: a read-only validator that knows the full expected file set + wiring invariants, and a quality-gap reporter.
@@ -50,6 +50,8 @@ Spec — each check is a `Finding` (or nil when ok):
 - `loops.known_adapters` — every step references an enabled adapter of valid role (uses WS1).
 - `consensus.satisfiable` — every review step's `min_reviewers` ≤ count of enabled headless-capable adapters (note: headless-capability itself is WS9; here we approximate "enabled orchestrable adapters" and tighten in WS9).
 - `governance.provider_known` — `governance.provider` ∈ `{noop, agt}`.
+- `global.readable` — if `~/.agents/` exists, it is readable and parses (warn on parse errors).
+- `global.no_rule_conflict` — if a rule file exists in both `~/.agents/rules/` and `.ai/rules/` with the same name, content divergence is a warning (not an error — project wins, but the user should know).
 
 Tests that must pass (over temp repos initialized by WS2):
 - `TestDoctorPassesFreshInit`
@@ -60,6 +62,8 @@ Tests that must pass (over temp repos initialized by WS2):
 - `TestDoctorFailsLoopReferencingUnknownAdapter`
 - `TestDoctorFailsConsensusMinReviewersUnsatisfiable`
 - `TestDoctorFailsUnknownGovernanceProvider`
+- `TestDoctorWarnsGlobalRuleConflict` (same rule name in global and project with different content → warn severity)
+- `TestDoctorPassesWithNoGlobalConfig` (no `~/.agents/` → no error, no warning)
 
 Mutation proof:
 - Remove the hook-target check; `TestDoctorFailsHookNotCallingMiviaAgent` must fail.
@@ -85,6 +89,7 @@ Spec — audit is advisory (always exits 0 unless `--strict`); reports:
 - `consensus.weaker_than_profile_requires` (e.g. `first-pass` under strict, or majority under strict for a protect-bound loop)
 - `consensus.min_reviewers_exceeds_enabled`
 - `governance.noop_under_strict`
+- `global.rule_conflict_with_project` (same rule file name in `~/.agents/rules/` and `.ai/rules/` with divergent content)
 
 Tests that must pass:
 - `TestAuditReportsDuplicatedAdapterPolicy`
@@ -92,6 +97,7 @@ Tests that must pass:
 - `TestAuditReportsNoReviewBeforeProtect`
 - `TestAuditReportsWeakConsensusUnderStrict`
 - `TestAuditReportsEditedManagedFileOutsideBlocks`
+- `TestAuditReportsGlobalRuleConflictWithProject`
 
 Mutation proof:
 - Make `duplicated_in_adapters` a substring match (instead of verbatim block); `TestAuditReportsDuplicatedAdapterPolicy` must still catch the fixture but a near-duplicate should slip past — adjust the assertion to prove the strictness.

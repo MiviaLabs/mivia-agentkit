@@ -8,7 +8,7 @@
 
 ## 1. Summary
 
-Mivia AgentKit (`mivia-agent`) is a standalone, Mivia-branded CLI that prepares any Git repository for high-rigor agentic software workflows **and orchestrates those workflows across multiple agent CLIs**. It installs a generic agent-control surface (instructions, skills, hooks, quality gates, contract matrices, loop definitions, review policies) plus a thin, swappable adapter layer for agent tools. It then executes workflows by invoking those adapters headlessly, routing artifacts between them, running cross-CLI consensus review, and letting deterministic local gates decide whether risky work can finish.
+Mivia AgentKit (`mivia-agent`) is a standalone, Mivia-branded CLI that prepares any Git repository for high-rigor agentic software workflows **and orchestrates those workflows across multiple agent CLIs**. It installs a generic agent-control surface (instructions, skills, hooks, quality gates, contract matrices, loop definitions, review policies) plus a thin, swappable adapter layer for agent tools. It reads a global user config from `~/.agents/` (the emerging universal agent directory) and layers it under the project-level `.ai/` surface. It then executes workflows by invoking those adapters headlessly, routing artifacts between them, running cross-CLI consensus review, and letting deterministic local gates decide whether risky work can finish.
 
 In MVP, governance runs in a no-op provider that allows all actions but still records them; the Microsoft Agent Governance Toolkit (AGT) is wired as an opt-in, interface-backed provider with full enforcement targeted at the strict profile post-MVP.
 
@@ -28,7 +28,7 @@ Teams adopt coding-agent CLIs (Codex, Claude Code, Gemini CLI, Crush, Copilot) o
 
 A single distributable binary that:
 
-- Configures a repo for any mix of agent CLIs from one canonical source of truth (`.ai/`).
+- Configures a repo for any mix of agent CLIs from one canonical source of truth (`.ai/`), layered with global user config from `~/.agents/`.
 - Orchestrates loops across those CLIs — produce → consensus-review → iterate — headlessly and boundedly.
 - Makes every CLI behind a swappable `Adapter` interface, so adding a tool is one adapter, not a rewrite.
 - Gates risky work behind a local quality stamp and (opt-in) a real governance engine, with a no-op fallback so the binary still ships standalone.
@@ -38,6 +38,7 @@ A single distributable binary that:
 ### Goals
 
 - One command (`init`) installs the full control surface for any adapter mix.
+- Global user config (`~/.agents/rules/`, `~/.agents/skills/`, `~/.agents/mivia.yaml`) is layered under project config — project wins on conflict; absence is silently ignored.
 - One command (`run`) executes named loops by orchestrating adapters headlessly, with bounded iterations and consensus review.
 - One command (`review`) runs a one-off cross-CLI consensus review.
 - Deterministic gates (quality stamp + policy decisions) block protected actions: commit, push, PR, deploy, release, live-smoke.
@@ -76,6 +77,8 @@ A single distributable binary that:
 ## 7. Key concepts
 
 - **`.ai/`** — canonical agent-control surface (rules, skills, workflows, quality contracts, review policies). Root/vendor files are thin adapters pointing here.
+- **`~/.agents/`** — global user-level agent config directory (the emerging universal standard; see [dot-agents.com](https://dot-agents.com/)). `mivia-agent` reads `~/.agents/rules/`, `~/.agents/skills/`, and `~/.agents/mivia.yaml` if present, layering them under the project-level `.ai/` surface. It never writes to `~/.agents/`. Absence is silently ignored — no errors, no warnings.
+- **Config hierarchy** — two layers: global (`~/.agents/`, per-user, lowest priority) and project (`.ai/` + root adapters, per-repo, highest priority). Project values always win on conflict; global provides defaults for unset values.
 - **Adapter** — swappable interface (`Detect`/`Run`/`Review`) wrapping one CLI. `orchestrable` adapters can be invoked headlessly by `run`; `guidance` adapters (Copilot) only receive instruction files.
 - **Loop** — named, bounded workflow of steps. `bound: iterations` (MVP) or `bound: budget` (post-MVP). Has `exit_when` gate and `on_exhausted` policy.
 - **Routing** — how artifacts flow between steps: sequential handoff, parallel fan-out, or conditional edges on gate outcomes.
@@ -159,9 +162,19 @@ Traceability column: **WS** = implementation workstream, **Ph** = release phase 
 | FR-9.1 | `import` detects existing agent configs and produces a read-only migration plan into `.ai/`. | WS7 | 5 |
 | FR-9.2 | `import` detects existing loop/workflow definitions in common formats and proposes mappings into `.ai/workflows/`. | WS7 | 5 |
 
+### FR-10 Global config (`~/.agents/`)
+| ID | Requirement | WS | Ph |
+|---|---|---|---|
+| FR-10.1 | `mivia-agent` reads `~/.agents/rules/` and `~/.agents/skills/` if present and layers them under `.ai/rules/` and `.ai/skills/`. Project rules/skills of the same name override global ones. | WS1 | 1 |
+| FR-10.2 | `mivia-agent` reads `~/.agents/mivia.yaml` if present and merges its `defaults` (profile, adapter set) under the project manifest. Explicit project values always win. | WS1 | 1 |
+| FR-10.3 | Absence of `~/.agents/` is silently ignored — no error, no warning. | WS1 | 1 |
+| FR-10.4 | `mivia-agent` never writes to `~/.agents/`. | all | — |
+| FR-10.5 | `doctor` reports warnings when a global rule conflicts with a project rule of the same name (same file name, divergent content). | WS3 | 1 |
+| FR-10.6 | `.agents/skills.json` in the target repo includes both global and project skills. | WS2 | 1 |
+
 ## 9. Non-functional requirements
 
-- **NFR-1 Portability:** single static Go binary, Linux/macOS/Windows. No required service/container/cloud. All templates, loop definitions, and skill content are embedded in the binary at build time (`//go:embed`). The binary ships alone — no companion data directory, no `.ai/` bundle, no config file on disk. A user installs via Homebrew, downloads a release binary, or `go install`, then runs `init` in their repo to generate `.ai/` from the embedded templates. `update` refreshes from the newer binary's embedded templates, not from the internet. The binary does not create or require `.ai/` for its own runtime. See plan "Distribution Model" section.
+- **NFR-1 Portability:** single static Go binary, Linux/macOS/Windows. No required service/container/cloud. All templates, loop definitions, and skill content are embedded in the binary at build time (`//go:embed`). The binary ships alone — no companion data directory, no `.ai/` bundle, no config file on disk. A user installs via Homebrew, downloads a release binary, or `go install`, then runs `init` in their repo to generate `.ai/` from the embedded templates. The binary optionally reads global config from `~/.agents/` but never requires it and never writes to it. `update` refreshes from the newer binary's embedded templates, not from the internet. The binary does not create or require `.ai/` for its own runtime. See plan "Distribution Model" and "Config Hierarchy" sections.
 - **NFR-2 Dependency-light:** `cobra`, `yaml.v3`, `go-cmd`, `oklog/run`; AGT optional and lazy. No durable-workflow runtime.
 - **NFR-3 Performance:** `init`/`doctor`/`audit`/`preflight` complete in well under a second on a typical repo. `run` latency is bounded by adapter turn/time budgets.
 - **NFR-4 Security:** secrets never persisted; non-interactive approval enforced on every adapter `Run`; protected actions gated.
@@ -219,7 +232,7 @@ bound (iterations) hit        ──▶ on_exhausted: fail | warn | proceed
 
 Tracked qualitatively for v0.1; instrumented lightly via the JSONL trace.
 
-1. `init` → `doctor` passes on a fresh empty repo for every supported adapter mix (mix = any subset of {codex, claude, copilot, gemini, crush}).
+1. `init` → `doctor` passes on a fresh empty repo for every supported adapter mix (mix = any subset of {codex, claude, copilot, gemini, crush}), with and without `~/.agents/` global config present.
 2. `init --write` is provably idempotent (`TestInitWriteIsIdempotent`).
 3. `preflight` writes a valid stamp that goes stale on any change to HEAD, diff hash, or changed-files set (`TestCheckStampRejectsStaleDiffHash`, `TestCheckStampRejectsChangedFilesMismatch`).
 4. Hooks deny protected actions without a fresh stamp (`TestProtectedActionRequiresFreshStamp`).
@@ -237,7 +250,7 @@ Each phase ships only when its exit gate is green (tests + mutation proofs).
 | Phase | Scope (from plan) | Exit gate |
 |---|---|---|
 | 0 | Repo bootstrap | `go test ./...`; `--help` works. |
-| 1 | Init + Doctor (manifest incl. routing/loops/governance fields, templates, path policy, git state) | FR-1.1–1.3, FR-2.1/2.3/2.4(stamp schema), FR-5.4, FR-6.1/6.2, FR-7.5; idempotency + path-policy mutation proofs. |
+| 1 | Init + Doctor (manifest incl. routing/loops/governance/global fields, templates, path policy, git state, ~/.agents/ layering) | FR-1.1–1.3, FR-2.1/2.3/2.4(stamp schema), FR-5.4, FR-6.1/6.2, FR-7.5, FR-10.1–10.3/10.6; idempotency + path-policy mutation proofs. |
 | 2 | Adapter system (Codex, Claude headless) + Preflight + `adapters` | FR-2.4, FR-3.1–3.5, FR-7.4; approval-enforcement + scrubbing tests. |
 | 3 | Orchestrator + Consensus + `run`/`review` (Gemini; Crush gated on headless) | FR-4.1–4.5, FR-5.1–5.3, FR-6.3; loop-bound + stamp-before-protect + consensus-threshold mutation proofs. |
 | 4 | Governance (noop + AGT interface), Hooks, Strict profile, Copilot templates | FR-2.2, FR-6.4, FR-7.1/7.2, FR-8.1–8.3; strict-requires-agt doctor failure test. |
@@ -270,6 +283,7 @@ Each phase ships only when its exit gate is green (tests + mutation proofs).
 ## 17. Out of scope (explicitly rejected for MVP)
 
 - `pi agent` integration — removed.
+- Writing to `~/.agents/` — `mivia-agent` reads it only; managing global config is the user's responsibility.
 - `bound: budget` loops and the `expert` profile — rejected until Phase 6.
 - Dagger / Temporal / Kubernetes / any external workflow runtime — not used.
 - Live connectors (Jira, Slack, GitHub data) — not enabled by default.
@@ -288,5 +302,7 @@ Each phase ships only when its exit gate is green (tests + mutation proofs).
 - **Protected action** — commit, push, PR, deploy, release, or live-smoke.
 - **AGT** — Microsoft Agent Governance Toolkit (MIT-licensed, Go SDK); deterministic policy + audit.
 - **`.ai/`** — canonical agent-control surface; all other config files are thin adapters to it.
+- **`~/.agents/`** — global user-level agent config directory (emerging universal standard). `mivia-agent` reads it for rules, skills, and defaults; never writes to it; absence is silently ignored.
+- **Config hierarchy** — two-layer model: global (`~/.agents/`, per-user, lowest priority) → project (`.ai/`, per-repo, highest priority). Project values always win.
 - **WS** — implementation workstream (see plan).
 - **Ph** — release phase (see §14).

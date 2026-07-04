@@ -1,12 +1,12 @@
-# WS1 — Manifest, Git State, Path Policy
+# WS1 — Manifest, Git State, Path Policy, Global Config
 
 - **Phase:** 1
 - **Depends on:** WS0
-- **PRD:** FR-1.1, FR-4.2, FR-7.5; §7 (concepts), §8 (manifest fields)
-- **Plan:** WS1, "Manifest" section
-- **Exit gate (Phase 1, partial):** manifest parse/validate, git state, diff hash, path policy all green; mutation proofs for traversal rejection and diff hashing.
+- **PRD:** FR-1.1, FR-4.2, FR-7.5, FR-10.1, FR-10.2, FR-10.3, FR-10.4; §7 (concepts), §8 (manifest fields)
+- **Plan:** WS1, "Manifest" section, "Config Hierarchy" section
+- **Exit gate (Phase 1, partial):** manifest parse/validate, git state, diff hash, path policy, global config reading all green; mutation proofs for traversal rejection and diff hashing.
 
-Goal: parse `mivia-agent.yaml` (including the new routing/loops/governance fields), detect git state + stable diff hash, and enforce a path allow/deny policy. No file writing yet (that's WS2).
+Goal: parse `mivia-agent.yaml` (including the new routing/loops/governance/global fields), read `~/.agents/` global config and layer it under the project manifest, detect git state + stable diff hash, and enforce a path allow/deny policy. No file writing yet (that's WS2).
 
 ## T1 — Manifest types + defaults
 
@@ -15,7 +15,7 @@ Create:
 - `internal/config/manifest_test.go`
 
 Spec:
-- Struct fields mirror the manifest in plan "Manifest" section: `Version`, `Profile`, `TemplateVersion`, `Project`, `Adapters` (map of `name -> {Enabled, Role}`), `Routing` (default producer/reviewers, `Consensus{Mode,Weights,TieBreaker,MinReviewers}`, `OnReviewFail`, `MaxIterations`), `Loops` (map), `Commands`, `ProtectedActions`, `Quality`, `Paths`, `Governance{Provider,AuditLog,PolicyDecisions}`, `MCP`.
+- Struct fields mirror the manifest in plan "Manifest" section: `Version`, `Profile`, `TemplateVersion`, `Project`, `Adapters` (map of `name -> {Enabled, Role}`), `Routing` (default producer/reviewers, `Consensus{Mode,Weights,TieBreaker,MinReviewers}`, `OnReviewFail`, `MaxIterations`), `Loops` (map), `Commands`, `ProtectedActions`, `Quality`, `Paths`, `Governance{Provider,AuditLog,PolicyDecisions}`, `Global{Layer,Merge}`, `MCP`.
 - `Defaults()` returns the `standard` profile defaults from the plan (Codex+Claude orchestrable, Copilot guidance, Gemini/Crush disabled, `routing.default_reviewers=[codex,claude]`, `mode=majority`, `min_reviewers=2`, `tie_breaker=strict`, `on_review_fail=iterate`, `max_iterations=3`, `governance.provider=noop`).
 - `Validate()` returns errors for: unknown `Profile`, unknown adapter `Role` (must be `orchestrable|guidance`), `Loop` with no `bound`, `bound: budget` in MVP, `expert` profile in MVP, consensus `Mode` not in the allowed set.
 - Unknown fields: fail closed (strict YAML decode; reject unknown keys) — surface a clear error.
@@ -123,17 +123,54 @@ Mutation proof:
 - Disable traversal rejection; `TestPathPolicyRejectsTraversal` must fail.
 - Skip symlink resolution; `TestPathPolicyRejectsSymlinkEscape` must fail.
 
+## T6 — Global config (`~/.agents/`) reading + layering
+
+Create:
+- `internal/globalconfig/globalconfig.go` — `type GlobalConfig struct{...}`, `Read() (GlobalConfig, error)`, `Layer(global GlobalConfig, project Manifest) Manifest`.
+- `internal/globalconfig/globalconfig_test.go`
+
+Spec:
+- `Read()` checks for `~/.agents/` directory existence. If absent, returns a zero `GlobalConfig` with no error (FR-10.3).
+- If present, reads:
+  - `~/.agents/mivia.yaml` — parse into `GlobalConfig.Defaults` (profile, adapter defaults). Unknown fields → error (fail closed).
+  - `~/.agents/rules/` — list `*.md` files, read each into a map of `filename → content`.
+  - `~/.agents/skills/` — list `*/SKILL.md` files, read each into a map of `name → content`.
+- `Layer()` merges `global` defaults under `project` manifest: for each field in `GlobalConfig.Defaults`, if the project manifest's corresponding field is at its zero/empty value, fill it from global. Explicit project values always win.
+- `Layer()` also returns the effective rules map (global + project merged, project wins on conflict) and skills map (same merge logic).
+- `mivia-agent` never writes to `~/.agents/` (FR-10.4) — no write methods exist in this package.
+- `Read()` applies the same path policy to `~/.agents/` paths: reject symlinks outside home dir, reject forbidden patterns. The `repoRoot` for path policy is `os.UserHomeDir()`.
+
+Tests that must pass:
+- `TestGlobalConfigReadAbsentReturnsZeroNoError`
+- `TestGlobalConfigReadParsesMiviaYaml`
+- `TestGlobalConfigReadParsesRulesDir`
+- `TestGlobalConfigReadParsesSkillsDir`
+- `TestGlobalConfigLayerProjectWinsOnConflict`
+- `TestGlobalConfigLayerFillsEmptyProjectFields`
+- `TestGlobalConfigRejectsSymlinkEscape` (symlink under `~/.agents/` pointing outside home → error)
+- `TestGlobalConfigRejectsUnknownYAMLField`
+
+Mutation proof:
+- Make `Read()` return an error when `~/.agents/` is absent; `TestGlobalConfigReadAbsentReturnsZeroNoError` must fail.
+- Make `Layer()` give global priority; `TestGlobalConfigLayerProjectWinsOnConflict` must fail.
+
+Notes:
+- This package is read-only. It never writes. That's a design invariant — assert it in tests if possible (grep for `os.WriteFile`, `os.MkdirAll` in the package).
+- The `Read()` function resolves `~/.agents/` via `os.UserHomeDir()` — use that, not `$HOME` (which may be unset in some environments).
+
 ## Verification
 
 ```bash
-go test ./internal/config/... ./internal/gitstate/... ./internal/pathpolicy/... -count=1
-go vet ./internal/config/... ./internal/gitstate/... ./internal/pathpolicy/...
-grep -rnE 'http\.|net\.Dial' ./internal/config ./internal/gitstate ./internal/pathpolicy || echo "no network"
+go test ./internal/config/... ./internal/gitstate/... ./internal/pathpolicy/... ./internal/globalconfig/... -count=1
+go vet ./internal/config/... ./internal/gitstate/... ./internal/pathpolicy/... ./internal/globalconfig/...
+grep -rnE 'http\.|net\.Dial' ./internal/config ./internal/gitstate ./internal/pathpolicy ./internal/globalconfig || echo "no network"
+grep -rnE 'os\.WriteFile|os\.MkdirAll' ./internal/globalconfig || echo "no writes (read-only invariant)"
 ```
 
 WS1 is ☑ when:
 - [ ] all listed tests pass
-- [ ] mutation proofs executed and reverted (5 total)
+- [ ] mutation proofs executed and reverted (7 total: 2 manifest, 1 loop, 1 detect root, 2 diff hash, 2 path policy, 2 global config)
 - [ ] `go vet` clean
 - [ ] no network calls
+- [ ] `globalconfig` package is verified read-only (no write calls)
 - [ ] status updated in `00-overview.md`
