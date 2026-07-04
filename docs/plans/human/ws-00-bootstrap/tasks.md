@@ -54,7 +54,7 @@ Create:
 - `.gitignore` — Go defaults: `/dist/`, `/bin/`, `*.test`, `coverage.out`, `.ai/runs/` (run artifacts never committed).
 
 Spec:
-- README links to PRD and to `docs/plans/00-overview.md`.
+- README links to PRD and to `docs/plans/human/00-overview.md`.
 - `.gitignore` excludes generated run artifacts.
 
 Dependencies: none.
@@ -104,22 +104,9 @@ Notes:
 
 ## Verification
 
-Create:
-- `.github/workflows/ci.yml` — Go test + vet on push/PR.
-
-Spec:
-- Matrix: latest stable Go on ubuntu-latest (macOS/windows optional but recommended for the cross-platform binary claim).
-- Steps: checkout, setup-go, `go vet ./...`, `go test ./... -count=1`.
-- Caches the module directory.
-
-Notes:
-- Do not add release workflow here (WS8).
-
-## Verification
-
 ```bash
 go test ./... -count=1
-go vet ./... -count=1
+go vet ./...
 go run ./cmd/mivia-agent --help
 go run ./cmd/mivia-agent version
 test -f templates/README.md && echo "templates/README.md exists"

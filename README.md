@@ -2,7 +2,7 @@
 
 Mivia AgentKit is a greenfield Go CLI project for managing a local agent-control surface across Codex, Claude Code, GitHub Copilot, and future agent adapters.
 
-The repo is currently in docs and agent-infrastructure setup. Go product code should start only from the scoped workstream tasks under `docs/plans/`.
+The repo is currently in docs and agent-infrastructure setup. Go product code should start only from the scoped workstream tasks under `docs/plans/human/`.
 
 ## Quick Start
 
@@ -28,4 +28,4 @@ make help
 - [Agent hooks](docs/agent-hooks.md) - agent hook surfaces, triggers, policies, and audit-loop behavior
 - [Agent planning](docs/agent-planning.md) - DAG planning skill, machine plan contract, and implementation hooks
 - [Product requirements](docs/prd/0001-mivia-agentkit.md) - product requirements
-- [Workstream roadmap](docs/plans/00-overview.md) - workstream roadmap
+- [Workstream roadmap](docs/plans/human/00-overview.md) - human workstream roadmap

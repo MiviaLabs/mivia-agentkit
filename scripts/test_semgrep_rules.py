@@ -142,7 +142,7 @@ def create_bad_fixture(root: Path) -> None:
         """,
     )
     write(
-        root / "docs" / "plans" / "bad-agent-plan.md",
+        root / "docs" / "plans" / "human" / "bad-agent-plan.md",
         """
         # Bad Agent Plan
 

@@ -146,6 +146,7 @@ rules:
     paths:
       include:
         - /docs/plans/*agent*plan*.md
+        - /docs/plans/**/*agent*plan*.md
         - /docs/agent-planning.md
     pattern-regex: '(?i)(free-form plan only|markdown plan only|without machine plan|no machine-readable plan)'
 

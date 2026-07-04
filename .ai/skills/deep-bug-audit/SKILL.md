@@ -17,7 +17,7 @@ triggers:
 - `.ai/rules/00-operating-doctrine.md`
 - `.ai/rules/10-security-privacy.md`
 - `.ai/rules/20-agent-quality.md`
-- The relevant `docs/plans/ws-XX/tasks.md`
+- The relevant `docs/plans/human/ws-XX/tasks.md`
 
 ## Method
 

@@ -641,7 +641,7 @@ def verify_git_hooks() -> None:
         "make verify",
         "make help",
         "[Product requirements](docs/prd/0001-mivia-agentkit.md)",
-        "[Workstream roadmap](docs/plans/00-overview.md)",
+        "[Workstream roadmap](docs/plans/human/00-overview.md)",
     ]:
         require(needle in readme, f"README.md: missing {needle}")
 

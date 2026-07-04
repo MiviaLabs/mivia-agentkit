@@ -17,7 +17,7 @@ triggers:
 - `.ai/rules/00-operating-doctrine.md`
 - `.ai/rules/20-agent-quality.md`
 - `.ai/rules/30-go-standards.md`
-- `docs/plans/_conventions.md`
+- `docs/plans/human/_conventions.md`
 - The target workstream `tasks.md`
 
 ## Method

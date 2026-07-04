@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -14,6 +15,31 @@ ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "scripts" / "validate_agent_plan.py"
 SCHEMA = ROOT / ".ai" / "schemas" / "agent-plan-v1.schema.json"
 TEMPLATE = ROOT / ".ai" / "templates" / "agent-plan-v1.json"
+HUMAN_PLAN_ROOT = ROOT / "docs" / "plans" / "human"
+MACHINE_PLAN_ROOT = ROOT / ".ai" / "plans"
+AGENTKIT_PLAN = MACHINE_PLAN_ROOT / "agentkit-implementation-roadmap.plan.json"
+AGENTKIT_HUMAN_PLAN = ROOT / "docs" / "plans" / "agentkit-implementation-roadmap.md"
+
+EXPECTED_HUMAN_PLAN_FILES = [
+    "00-overview.md",
+    "_conventions.md",
+    "ws-00-bootstrap/tasks.md",
+    "ws-01-manifest-git-pathpolicy/tasks.md",
+    "ws-02-templates-init/tasks.md",
+    "ws-03-doctor-audit/tasks.md",
+    "ws-04-preflight-stamp/tasks.md",
+    "ws-05-hooks/tasks.md",
+    "ws-06-adapter-templates/tasks.md",
+    "ws-07-import-update/tasks.md",
+    "ws-08-ci-release-docs/tasks.md",
+    "ws-09-adapters/tasks.md",
+    "ws-10-orchestrator/tasks.md",
+    "ws-11-consensus/tasks.md",
+    "ws-12-governance/tasks.md",
+    "ws-13-run-review-adapters/tasks.md",
+]
+
+MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)\n]+)\)")
 
 
 VALID_PLAN = {
@@ -84,7 +110,7 @@ VALID_PLAN = {
     ],
     "correction_log": [
         {
-            "source": "docs/plans/00-overview.md",
+            "source": "docs/plans/human/00-overview.md",
             "gap": "human-only roadmap",
             "correction": "added machine-readable DAG contract",
         }
@@ -109,6 +135,17 @@ def run_validator(plan: dict[str, object]) -> subprocess.CompletedProcess[str]:
             stderr=subprocess.PIPE,
             check=False,
         )
+
+
+def run_validator_file(path: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(VALIDATOR), str(path)],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
 
 
 def assert_fails(plan: dict[str, object], contains: str) -> None:
@@ -193,6 +230,109 @@ def test_planning_skills_and_docs_are_registered() -> None:
         raise AssertionError("README Docs TOC missing Agent planning link")
 
 
+def test_human_roadmap_files_moved_under_human_root() -> None:
+    for rel in EXPECTED_HUMAN_PLAN_FILES:
+        moved = HUMAN_PLAN_ROOT / rel
+        if not moved.is_file():
+            raise AssertionError(f"moved human plan file missing: {moved.relative_to(ROOT)}")
+        old = ROOT / "docs" / "plans" / rel
+        if old.exists():
+            raise AssertionError(f"human roadmap file still exists at old path: {old.relative_to(ROOT)}")
+
+
+def test_readme_docs_toc_points_to_moved_roadmap() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    expected = "[Workstream roadmap](docs/plans/human/00-overview.md)"
+    stale = "[Workstream roadmap](docs/plans/00-overview.md)"
+    if expected not in readme:
+        raise AssertionError("README Docs TOC missing moved workstream roadmap link")
+    if stale in readme:
+        raise AssertionError("README Docs TOC still points to the old workstream roadmap path")
+
+
+def test_planning_markdown_links_resolve() -> None:
+    docs = [
+        ROOT / "README.md",
+        ROOT / ".ai" / "INDEX.md",
+        ROOT / "docs" / "agent-planning.md",
+        AGENTKIT_HUMAN_PLAN,
+    ]
+    docs.extend(sorted((ROOT / "docs" / "plans" / "human").rglob("*.md")))
+
+    for path in docs:
+        if not path.is_file():
+            raise AssertionError(f"planning doc missing: {path.relative_to(ROOT)}")
+        content = path.read_text(encoding="utf-8")
+        for raw_target in MARKDOWN_LINK.findall(content):
+            target = raw_target.strip().strip("<>")
+            if not target or target.startswith(("#", "http://", "https://", "mailto:")):
+                continue
+            target = target.split("#", 1)[0]
+            if not target:
+                continue
+            resolved = (path.parent / target).resolve()
+            if not resolved.exists():
+                raise AssertionError(
+                    f"{path.relative_to(ROOT)} has broken markdown link {raw_target!r} -> {resolved}"
+                )
+
+
+def test_committed_machine_plan_artifacts_are_real_and_validated() -> None:
+    plans = sorted(MACHINE_PLAN_ROOT.glob("*.plan.json"))
+    if not plans:
+        raise AssertionError(".ai/plans must contain at least one real validated plan artifact")
+
+    forbidden_markers = [
+        "<short-stable-id>",
+        "<repo path>",
+        "<plan>",
+        "test-valid",
+        "agent-planning-contracts",
+    ]
+    for path in plans:
+        raw = path.read_text(encoding="utf-8")
+        lowered = raw.lower()
+        for marker in forbidden_markers:
+            if marker in lowered:
+                raise AssertionError(f"{path.relative_to(ROOT)} contains placeholder marker {marker!r}")
+        parsed = json.loads(raw)
+        if parsed.get("PlanFormat") != "mivia-agent-plan/v1":
+            raise AssertionError(f"{path.relative_to(ROOT)} is not mivia-agent-plan/v1")
+        expected_name = f"{parsed.get('plan_id')}.plan.json"
+        if path.name != expected_name:
+            raise AssertionError(f"{path.relative_to(ROOT)} name does not match plan_id {parsed.get('plan_id')!r}")
+        proc = run_validator_file(path)
+        if proc.returncode != 0:
+            raise AssertionError(f"validator rejected {path.relative_to(ROOT)}: {proc.stderr}")
+
+
+def test_agentkit_implementation_plan_is_named_and_referenced() -> None:
+    if not AGENTKIT_PLAN.is_file():
+        raise AssertionError("missing .ai/plans/agentkit-implementation-roadmap.plan.json")
+    if not AGENTKIT_HUMAN_PLAN.is_file():
+        raise AssertionError("missing docs/plans/agentkit-implementation-roadmap.md")
+
+    human = AGENTKIT_HUMAN_PLAN.read_text(encoding="utf-8")
+    artifact = ".ai/plans/agentkit-implementation-roadmap.plan.json"
+    if f"PlanArtifact: {artifact}" not in human:
+        raise AssertionError("human AgentKit implementation plan missing PlanArtifact line")
+
+    parsed = json.loads(AGENTKIT_PLAN.read_text(encoding="utf-8"))
+    if parsed.get("plan_id") != "agentkit-implementation-roadmap":
+        raise AssertionError("AgentKit machine plan is not named for the implementation roadmap")
+    if parsed.get("gaps") != [
+        {
+            "id": "none",
+            "status": "closed",
+            "severity": "none",
+            "description": "none",
+            "required_fix": "none",
+            "required_test": "none",
+        }
+    ]:
+        raise AssertionError("AgentKit machine plan must report zero open gaps")
+
+
 def main() -> int:
     test_valid_plan_passes()
     test_cycle_rejected()
@@ -201,6 +341,11 @@ def main() -> int:
     test_missing_correction_log_rejected()
     test_plan_contract_files_exist()
     test_planning_skills_and_docs_are_registered()
+    test_human_roadmap_files_moved_under_human_root()
+    test_readme_docs_toc_points_to_moved_roadmap()
+    test_planning_markdown_links_resolve()
+    test_committed_machine_plan_artifacts_are_real_and_validated()
+    test_agentkit_implementation_plan_is_named_and_referenced()
     print("agent plan contract tests passed")
     return 0
 

@@ -1,7 +1,7 @@
 # Mivia AgentKit — Implementation Roadmap
 
-- **PRD:** [`docs/prd/0001-mivia-agentkit.md`](../prd/0001-mivia-agentkit.md)
-- **Product plan:** [`docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md`](../mivia-agentic-workflow-cli-proposal-2026-07-04.md)
+- **PRD:** [`docs/prd/0001-mivia-agentkit.md`](../../prd/0001-mivia-agentkit.md)
+- **Product plan:** [`docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md`](../../mivia-agentic-workflow-cli-proposal-2026-07-04.md)
 - **Conventions (read before any workstream):** [`_conventions.md`](_conventions.md)
 
 This directory decomposes the product plan into **workstreams** (WS). Each WS has its own folder with a `tasks.md` that is file-by-file, test-by-test executable. Work in dependency order; do not start a WS whose dependencies are not green.

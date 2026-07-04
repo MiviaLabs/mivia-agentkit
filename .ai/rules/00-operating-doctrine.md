@@ -8,7 +8,7 @@
 
 ## Scope Control
 
-- Before implementation, read `docs/plans/_conventions.md` and the relevant `docs/plans/ws-XX/tasks.md`.
+- Before implementation, read `docs/plans/human/_conventions.md` and the relevant `docs/plans/human/ws-XX/tasks.md`.
 - Do not implement product code unless a specific workstream task is in scope.
 - Stay inside the named workstream, task, branch, or file boundary unless the user expands scope.
 - Preserve existing docs and user changes unless the task explicitly requires editing them.
