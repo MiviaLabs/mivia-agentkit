@@ -11,10 +11,12 @@ Goal: a pure, deterministic policy engine over a set of `Verdict`s. No I/O. This
 ## T1 — Policy types
 
 Create:
+- `internal/adapter/adapter.go` — extend `Verdict` with `Adapter string`.
 - `internal/consensus/consensus.go` — `type Mode string` (`Majority`, `Unanimous`, `Weighted`, `FirstPass`), `type TieBreaker string` (`Strict`, `Manual`, `PreferPrefix`), `type Policy struct{ Mode; MinReviewers int; Weights map[string]float64; TieBreaker; Threshold float64 }`, `type Outcome struct{ Pass bool; Reason string; For, Against []string; Tied bool }`.
 - `internal/consensus/consensus_test.go`
 
 Spec:
+- `Verdict.Adapter` is the stable reviewer adapter name used by consensus; existing adapter parsers may leave it empty until orchestration fills it.
 - `Weights` default to `1.0` per adapter if unset.
 - `Threshold` default: for `Weighted`, `0.5 * sum(weights)`; for `Majority`, implicit `>50%`.
 
@@ -87,3 +89,11 @@ WS11 is ☑ when:
 - [ ] mutation proofs executed and reverted (≥3)
 - [ ] `go vet` clean
 - [ ] status updated in `00-overview.md`
+
+## Completion — 2026-07-05
+
+- Tests: 21 passing.
+- Mutation proofs: majority `>` to `>=` fail-then-revert ok; unanimous reject ignored fail-then-revert ok; strict protect-bound `FirstPass` allowed fail-then-revert ok.
+- Files: 6 created, 1 adapter contract extended.
+- Residual risk: none.
+- Follow-ups: none.

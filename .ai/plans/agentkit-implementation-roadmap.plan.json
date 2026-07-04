@@ -681,6 +681,7 @@
           "docs/prd/0001-mivia-agentkit.md"
         ],
         "files_edit": [
+          "internal/adapter/adapter.go",
           "internal/consensus/consensus.go",
           "internal/consensus/consensus_test.go",
           "internal/consensus/evaluate.go",
@@ -706,6 +707,7 @@
         ],
         "mutation": "Flip majority comparison to allow ties, ignore a unanimous reject, or allow first-pass under strict protected loops; the named WS11 tests must fail.",
         "outputs": [
+          "internal/adapter/adapter.go",
           "internal/consensus/**"
         ],
         "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-11-consensus/"
@@ -1045,6 +1047,11 @@
       "source": "docs/agent-planning.md",
       "gap": "agent planning named human and machine artifacts but did not require a task directory per DAG node; the AgentKit roadmap plan relied on implicit workstream folders",
       "correction": "added a required task_dir field to every DAG node, pointed each AgentKit node at its existing ws-XX task directory, and added validator plus contract-test coverage"
+    },
+    {
+      "source": ".ai/plans/agentkit-implementation-roadmap.plan.json",
+      "gap": "WS11 Evaluate required unique adapter names and prefer:<adapter> tie-breaking, but adapter.Verdict had no adapter identifier and WS11 files_edit omitted the required contract extension",
+      "correction": "added internal/adapter/adapter.go to WS11 files_edit and outputs so Verdict can carry the reviewer adapter name used by consensus"
     }
   ],
   "stop_conditions": [

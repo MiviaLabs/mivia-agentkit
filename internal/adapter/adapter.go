@@ -57,6 +57,7 @@ type Detection struct {
 
 // Verdict is a structured review result.
 type Verdict struct {
+	Adapter  string `json:"adapter,omitempty"`
 	Pass     bool   `json:"pass"`
 	Severity string `json:"severity"`
 	Notes    string `json:"notes"`

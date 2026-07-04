@@ -50,7 +50,7 @@ Phase 0                  Phase 1                       Phase 2
 | 4 | [`ws-04-preflight-stamp/`](ws-04-preflight-stamp/tasks.md) | Preflight + quality stamp | 2 | WS1 | ☑ |
 | 9 | [`ws-09-adapters/`](ws-09-adapters/tasks.md) | Adapter system (Codex, Claude headless) | 2 | WS1 | ☑ |
 | 10 | [`ws-10-orchestrator/`](ws-10-orchestrator/tasks.md) | Orchestrator (DAG + loops) | 3 | WS4, WS9 | ☑ |
-| 11 | [`ws-11-consensus/`](ws-11-consensus/tasks.md) | Consensus voting | 3 | WS9 | ☐ |
+| 11 | [`ws-11-consensus/`](ws-11-consensus/tasks.md) | Consensus voting | 3 | WS9 | ☑ |
 | 12 | [`ws-12-governance/`](ws-12-governance/tasks.md) | Governance provider (noop + AGT) | 2,4 | WS1 | ☑ |
 | 13 | [`ws-13-run-review-adapters/`](ws-13-run-review-adapters/tasks.md) | `run`, `review`, `adapters` commands | 2,3 | WS9, WS10, WS11, WS12 | ☐ |
 | 5 | [`ws-05-hooks/`](ws-05-hooks/tasks.md) | Hook engine (Codex + Claude) | 4 | WS4, WS12 | ☐ |
