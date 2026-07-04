@@ -1,0 +1,28 @@
+version: "1"
+profile: {{ .Profile }}
+template_version: {{ .Version }}
+project:
+  name: {{ .Project.Name }}
+adapters:
+{{- range $name, $enabled := .Adapters }}
+  {{ $name }}:
+    enabled: {{ $enabled }}
+    role: {{ if eq $name "copilot" }}guidance{{ else }}orchestrable{{ end }}
+{{- end }}
+routing:
+  default_producer: codex
+  default_reviewers:
+    - codex
+    - claude
+  consensus:
+    mode: majority
+    tie_breaker: strict
+    min_reviewers: 2
+  on_review_fail: iterate
+  max_iterations: 3
+governance:
+  provider: noop
+  audit_log: .ai/audit.jsonl
+global:
+  layer: ~/.agents
+  merge: project_wins

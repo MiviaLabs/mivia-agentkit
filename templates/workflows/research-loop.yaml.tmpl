@@ -1,0 +1,16 @@
+version: 1
+name: research-loop
+bound: iterations
+max_iterations: 3
+steps:
+  - id: research
+    producer: codex
+    artifact: research.md
+  - id: review
+    reviewers:
+      - codex
+      - claude
+    artifact: research.md
+    on_fail: iterate
+exit_when: review-pass
+on_exhausted: warn

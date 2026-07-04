@@ -1,0 +1,16 @@
+version: 1
+name: bug-audit-loop
+bound: iterations
+max_iterations: 3
+steps:
+  - id: audit
+    producer: codex
+    artifact: audit.md
+  - id: review
+    reviewers:
+      - codex
+      - claude
+    artifact: audit.md
+    on_fail: iterate
+exit_when: review-pass
+on_exhausted: fail

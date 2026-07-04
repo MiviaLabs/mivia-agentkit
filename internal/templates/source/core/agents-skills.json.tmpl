@@ -1,0 +1,7 @@
+{
+  "skills": [
+{{- range $i, $skill := .Skills }}
+    {{ if $i }},{{ end }}{"name": "{{ $skill.Name }}", "path": "{{ $skill.Path }}", "source": "{{ $skill.Source }}"}
+{{- end }}
+  ]
+}

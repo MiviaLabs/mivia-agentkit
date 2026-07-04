@@ -133,3 +133,14 @@ WS3 is ☑ when:
 - [ ] mutation proofs executed and reverted (≥3)
 - [ ] `go vet` clean
 - [ ] status updated in `00-overview.md`
+
+## Completion — 2026-07-04
+
+- Tests: `go test ./internal/doctor/... ./internal/audit/... ./internal/report/... ./internal/cli/... -count=1` passing.
+- Audit fixes: Codex adapter instructions are required; managed-block drift checks compare rendered pre/post content; audit uses doctor check IDs instead of registry indexes.
+- Mutation proofs: hook target check fail-then-revert ok; loop-bound check fail-then-revert ok; report severity sort fail-then-revert ok; Codex adapter instructions fail-then-revert ok; managed-block drift fail-then-revert ok.
+- Verification: `go vet ./...`, focused WS3 tests, fresh `init` + `doctor --json` + `audit --json`, `git diff --check`, and plan validation passed.
+- Audit loop: deep-bug-audit completed with two consecutive clean reports.
+- Files: 11 created.
+- Residual risk: none.
+- Follow-ups: none.
