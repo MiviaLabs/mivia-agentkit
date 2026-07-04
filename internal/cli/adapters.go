@@ -23,7 +23,7 @@ type adapterStatus struct {
 }
 
 var runtimeAdapters = func() []adapter.Adapter {
-	return []adapter.Adapter{adapter.Codex{}, adapter.Claude{}}
+	return []adapter.Adapter{adapter.Codex{}, adapter.Claude{}, adapter.Antigravity{}, adapter.Crush{}}
 }
 
 func newAdaptersCommand() *cobra.Command {
@@ -37,7 +37,7 @@ func newAdaptersCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			statuses, err := detectAdapters(cmd.Context(), manifest)
+			statuses, err := detectAdapterStatuses(cmd.Context(), manifest, map[string]struct{}{})
 			if jsonOut {
 				data, jsonErr := json.Marshal(statuses)
 				if jsonErr != nil {

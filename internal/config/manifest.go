@@ -102,11 +102,11 @@ func Defaults() Manifest {
 		Profile:         "standard",
 		TemplateVersion: "dev",
 		Adapters: map[string]AdapterConfig{
-			"codex":   {Enabled: true, Role: AdapterRoleOrchestrable},
-			"claude":  {Enabled: true, Role: AdapterRoleOrchestrable},
-			"copilot": {Enabled: true, Role: AdapterRoleGuidance},
-			"gemini":  {Enabled: false, Role: AdapterRoleOrchestrable},
-			"crush":   {Enabled: false, Role: AdapterRoleOrchestrable},
+			"codex":       {Enabled: true, Role: AdapterRoleOrchestrable},
+			"claude":      {Enabled: true, Role: AdapterRoleOrchestrable},
+			"copilot":     {Enabled: true, Role: AdapterRoleGuidance},
+			"antigravity": {Enabled: false, Role: AdapterRoleOrchestrable},
+			"crush":       {Enabled: false, Role: AdapterRoleGuidance},
 		},
 		Routing: Routing{
 			DefaultProducer:  "codex",
@@ -128,6 +128,9 @@ func Defaults() Manifest {
 // Parse decodes a strict YAML manifest.
 func Parse(data []byte) (Manifest, error) {
 	m := Defaults()
+	if declaresAdapters(data) {
+		m.Adapters = map[string]AdapterConfig{}
+	}
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(&m); err != nil {
@@ -137,6 +140,15 @@ func Parse(data []byte) (Manifest, error) {
 		return Manifest{}, err
 	}
 	return m, nil
+}
+
+func declaresAdapters(data []byte) bool {
+	for _, line := range bytes.Split(data, []byte("\n")) {
+		if bytes.Equal(bytes.TrimSpace(line), []byte("adapters:")) {
+			return true
+		}
+	}
+	return false
 }
 
 // Validate checks the manifest contract.

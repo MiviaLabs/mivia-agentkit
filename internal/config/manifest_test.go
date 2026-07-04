@@ -16,6 +16,9 @@ func TestManifestDefaultsIncludeRoutingAndLoopDefaults(t *testing.T) {
 	if got.Adapters["copilot"].Role != AdapterRoleGuidance {
 		t.Fatalf("copilot role = %q, want guidance", got.Adapters["copilot"].Role)
 	}
+	if got.Adapters["crush"].Role != AdapterRoleGuidance {
+		t.Fatalf("crush role = %q, want guidance", got.Adapters["crush"].Role)
+	}
 	if got.Routing.Consensus.Mode != "majority" || got.Routing.Consensus.MinReviewers != 2 {
 		t.Fatalf("consensus = %+v, want majority min 2", got.Routing.Consensus)
 	}
@@ -24,6 +27,23 @@ func TestManifestDefaultsIncludeRoutingAndLoopDefaults(t *testing.T) {
 	}
 	if got.Governance.Provider != "noop" {
 		t.Fatalf("governance provider = %q, want noop", got.Governance.Provider)
+	}
+}
+
+func TestManifestParseDoesNotEnableUnlistedDefaultAdapters(t *testing.T) {
+	got, err := Parse([]byte(`
+version: "1"
+profile: standard
+adapters:
+  codex:
+    enabled: true
+    role: orchestrable
+`))
+	if err != nil {
+		t.Fatalf("Parse() error = %v, want nil", err)
+	}
+	if _, ok := got.Adapters["copilot"]; ok {
+		t.Fatalf("Adapters includes copilot = %+v, want only explicit adapters", got.Adapters)
 	}
 }
 

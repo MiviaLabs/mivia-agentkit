@@ -205,7 +205,7 @@ func rawTextCandidates(v any) []string {
 	var out []string
 	switch typed := v.(type) {
 	case map[string]any:
-		for _, key := range []string{"result", "text", "content"} {
+		for _, key := range []string{"response", "result", "text", "content"} {
 			if value, ok := typed[key].(string); ok {
 				out = append(out, value)
 			}

@@ -2,7 +2,7 @@
 
 <img src="docs/logo-mivia-readme.webp" alt="Mivia logo" width="160">
 
-Mivia AgentKit is a greenfield Go CLI project for managing a local agent-control surface across Codex, Claude Code, GitHub Copilot, and future agent adapters.
+Mivia AgentKit is a greenfield Go CLI project for managing a local agent-control surface across Codex, Claude Code, Google Antigravity, GitHub Copilot, and future agent adapters.
 
 ## Quick Start
 
@@ -46,7 +46,7 @@ Useful `init` flags:
 
 - `--repo`: target repository; defaults to the current directory.
 - `--profile`: `starter`, `standard`, or `strict`; defaults to `standard`.
-- `--adapter`: repeat for each adapter to enable: `codex`, `claude`, `copilot`, `gemini`, or `crush`.
+- `--adapter`: repeat for each adapter to enable: `codex`, `claude`, `copilot`, `antigravity`, or `crush`.
 - `--dry-run`: print planned actions without writing.
 - `--write`: write files.
 - `--json`: emit a structured report with created, skipped, and conflicted files.

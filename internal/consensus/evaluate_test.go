@@ -106,7 +106,7 @@ func TestTieBreakerPrefersNamedAdapter(t *testing.T) {
 }
 
 func TestTieBreakerPreferFallsBackToStrictWhenAbsent(t *testing.T) {
-	out := mustEvaluate(t, Policy{Mode: Majority, TieBreaker: TieBreaker("prefer:gemini")}, verdict("codex", true), verdict("claude", false))
+	out := mustEvaluate(t, Policy{Mode: Majority, TieBreaker: TieBreaker("prefer:antigravity")}, verdict("codex", true), verdict("claude", false))
 	if out.Pass || out.Reason != "tie: strict fails" {
 		t.Fatalf("Outcome = %+v, want strict fallback", out)
 	}

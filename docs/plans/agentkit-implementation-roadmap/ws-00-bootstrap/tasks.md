@@ -74,7 +74,7 @@ Create:
 - `templates/adapters/codex/` — empty with `.gitkeep`.
 - `templates/adapters/claude/` — empty with `.gitkeep`.
 - `templates/adapters/copilot/` — empty with `.gitkeep`.
-- `templates/adapters/gemini/` — empty with `.gitkeep`.
+- `templates/adapters/antigravity/` — empty with `.gitkeep`.
 - `templates/adapters/crush/` — empty with `.gitkeep`.
 - `templates/workflows/` — empty with `.gitkeep`.
 - `templates/prompts/` — empty with `.gitkeep`.

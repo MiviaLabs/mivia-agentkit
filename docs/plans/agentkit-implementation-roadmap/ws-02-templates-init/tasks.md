@@ -79,7 +79,7 @@ Spec:
 - `.agents/skills.json` in the target repo lists both global and project skills (merged, project wins on name conflict).
 - After `--write`, call `doctor` (WS3) to validate. (For now, doctor is a stub the test skips if WS3 not present; wire fully in WS3.)
 - Idempotent: `init --write` then `init --write` (same options) → no diff in the repo.
-- `--adapter` accepts `codex|claude|copilot|gemini|crush`. Validate against manifest; unknown → error.
+- `--adapter` accepts `codex|claude|copilot|antigravity|crush`. Validate against manifest; unknown → error.
 - `--json`: emit a structured report `{files_created, files_skipped, conflicts}`.
 
 Tests that must pass:

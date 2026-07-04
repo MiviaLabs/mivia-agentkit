@@ -27,6 +27,20 @@ func TestAuditReportsDuplicatedAdapterPolicy(t *testing.T) {
 	}
 }
 
+func TestAdaptersDoNotDuplicateLongPolicy(t *testing.T) {
+	repo, home := freshRepo(t)
+	block := "Every guard has a mutation proof. This canonical policy paragraph is intentionally long enough to be caught when an adapter copies project policy verbatim."
+	writeFile(t, filepath.Join(repo, ".ai", "rules", "20-agent-quality.md"), block+"\n")
+	writeFile(t, filepath.Join(repo, "GEMINI.md"), "Antigravity adapter\n\n"+block+"\n")
+	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")}), "policy.duplicated_in_adapters")
+
+	writeFile(t, filepath.Join(repo, "GEMINI.md"), "# Gemini Adapter\n\nRead root AGENTS.md and .ai/INDEX.md.\n")
+	got := Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")})
+	if hasCode(got.Findings, "policy.duplicated_in_adapters") {
+		t.Fatalf("findings = %+v, want no adapter policy duplication", got.Findings)
+	}
+}
+
 func TestAuditReportsMissingCIForStrictProfile(t *testing.T) {
 	repo, home := freshRepo(t)
 	removePath(t, repo, ".github/workflows/agent-control.yml")

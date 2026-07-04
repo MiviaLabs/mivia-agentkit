@@ -16,10 +16,10 @@ Repository name: `github.com/MiviaLabs/mivia-agentkit`.
 
 Earlier drafts framed `mivia-agent` as a manifest + deterministic-gate generator: it wrote instruction/skill/hook files and blocked protected actions via local stamps, but it did not execute agent work. This revision promotes it to a **multi-CLI orchestrator** while keeping every original safety property:
 
-1. **Cross-CLI routing** — `mivia-agent run` shells out headlessly to Codex, Claude Code, Gemini CLI, and Crush, in sequence or in parallel, passing artifacts between steps. The system is **adapter-based**: every CLI is behind an `Adapter` interface, so adding or swapping a tool is one adapter, not a rewrite.
+1. **Cross-CLI routing** — `mivia-agent run` shells out headlessly to Codex, Claude Code, Antigravity CLI, and Crush, in sequence or in parallel, passing artifacts between steps. The system is **adapter-based**: every CLI is behind an `Adapter` interface, so adding or swapping a tool is one adapter, not a rewrite.
 2. **Consensus review/verification** — any step can fan out the same artifact to multiple CLI reviewers in parallel; a configurable voting/tie-breaker policy decides pass/fail/iterate. This is the verification primitive between CLIs.
 3. **Configurable loops** — `mivia-agent.yaml` declares named loops (research, bug-audit, fix-review, release-audit) with bounded iterations by default and an opt-in budget mode. Loops are safe to run in CI and in hooks.
-4. **Adapter set** — Codex, Claude Code, Gemini CLI, and Crush (Charmbracelet). The "pi agent" reference from earlier discussion is removed.
+4. **Adapter set** — Codex, Claude Code, Antigravity CLI, and Crush (Charmbracelet). The "pi agent" reference from earlier discussion is removed.
 5. **Governance backbone** — policy enforcement, structured decisions, and tamper-evident audit logging are delegated to the Microsoft Agent Governance Toolkit (AGT) Go SDK, wrapped behind an internal `policy` interface with a no-op fallback so the binary still ships standalone.
 
 Everything else — `.ai/` canonical model, `~/.agents/` global config layer, thin root/vendor adapters, quality stamp under `.git/`, idempotent init, no network in MVP, no live connectors by default — is unchanged.
@@ -171,10 +171,11 @@ Headless invocation surfaces (the part most likely to drift):
   - https://code.claude.com/docs/en/skills
   - https://code.claude.com/docs/en/settings
   - https://code.claude.com/docs/en/sub-agents
-- Gemini CLI — `-p`/`--prompt`, sandbox/`--yolo` modes, `--output-format json`, checkpointing:
-  - https://github.com/google-gemini/gemini-cli
-  - https://developers.google.com/gemini-code-assist/docs/gemini-cli
-  - https://developers.google.com/gemini-code-assist/docs/agent-mode
+- Antigravity CLI — `agy`, one-shot prompt mode (`agy -p`), install/update, permissions, rules, skills, hooks:
+  - https://developers.googleblog.com/an-important-update-transitioning-gemini-cli-to-antigravity-cli/
+  - https://antigravity.google/docs/cli/using
+  - https://antigravity.google/docs/cli/reference
+  - https://antigravity.google/docs/cli/best-practices
 - Crush (Charmbracelet) — non-interactive mode, approval/permission handling, config (`crush.json`), multi-model config. **Re-verify whether Crush supports a true headless/non-TUI mode; if not, mark the adapter interactive-only and exclude it from CI loops.**
   - https://github.com/charmbracelet/crush
 - GitHub Copilot — repo/path instructions, custom agents, firewall, MCP governance:
@@ -209,7 +210,7 @@ Inputs:
 
 - Target repository path.
 - Strictness profile: `starter`, `standard`, or `strict`. (Loop profile `expert`/unbounded is post-MVP.)
-- Selected adapters: `codex`, `claude`, `copilot`, `gemini`, `crush`. Of these, the orchestrating adapters (those `run` can invoke headlessly) are `codex`, `claude`, `gemini`, `crush`; `copilot` is guidance-only.
+- Selected adapters: `codex`, `claude`, `copilot`, `antigravity`, `crush`. Of these, the orchestrating adapters (those `run` can invoke headlessly) are `codex`, `claude`, `antigravity`, `crush`; `copilot` is guidance-only.
 - User-supplied or auto-detected command matrix: format, lint, typecheck, unit, integration, build, smoke.
 - Workflow/loop definitions in `mivia-agent.yaml` (named loops with steps, routing, review policy, bounds).
 - Current Git state: HEAD, changed files, staged files, untracked files.
@@ -318,7 +319,7 @@ project:
 adapters:
   codex:   { enabled: true,  role: orchestrable }   # can be invoked headlessly by `run`
   claude:  { enabled: true,  role: orchestrable }
-  gemini:  { enabled: false, role: orchestrable }
+  antigravity:  { enabled: false, role: orchestrable }
   crush:   { enabled: false, role: orchestrable }   # only if headless mode verified
   copilot: { enabled: true,  role: guidance }       # instructions only, never invoked by `run`
 
@@ -328,7 +329,7 @@ routing:
   default_reviewers: [codex, claude]
   consensus:
     mode: majority          # majority | unanimous | weighted | first-pass
-    weights: { codex: 1.0, claude: 1.0, gemini: 1.0, crush: 1.0 }
+    weights: { codex: 1.0, claude: 1.0, antigravity: 1.0, crush: 1.0 }
     tie_breaker: strict     # strict (fail on tie) | manual | prefer:<adapter>
     min_reviewers: 2
   on_review_fail: iterate   # iterate (route back to producer with notes) | fail | proceed
@@ -344,7 +345,7 @@ loops:
         producer: claude
         artifact: brief.md
       - id: review
-        reviewers: [codex, gemini]
+        reviewers: [codex, antigravity]
         consensus: { mode: majority, min_reviewers: 2 }
         on_fail: iterate    # send review notes back to `brief`
     exit_when: { gate: review-pass }
@@ -484,7 +485,7 @@ The orchestrator never calls a CLI directly. It calls an `Adapter`.
 ```go
 // internal/adapter/adapter.go (sketch)
 type Adapter interface {
-    Name() string                                          // "codex" | "claude" | "gemini" | "crush"
+    Name() string                                          // "codex" | "claude" | "antigravity" | "crush"
     Role() Role                                            // orchestrable | guidance
     Detect(ctx) (Presence, error)                          // is the binary installed + headless-capable?
     Run(ctx, Request) (Result, error)                      // headless invocation
@@ -612,11 +613,11 @@ mivia-agentkit/
     gitstate/
     pathpolicy/
     report/
-    adapter/           # Adapter interface + codex/claude/gemini/crush impls
+    adapter/           # Adapter interface + codex/claude/antigravity/crush impls
       adapter.go
       codex.go
       claude.go
-      gemini.go
+      antigravity.go
       crush.go
     orchestrator/      # DAG eval, fan-out, loop bounds, stamp gates
     consensus/         # voting + tie-breaker policies
@@ -633,7 +634,7 @@ mivia-agentkit/
       codex/               # Templates that render into target-repo adapter files
       claude/              # (AGENTS.md, CLAUDE.md, .codex/hooks.json, etc.)
       copilot/
-      gemini/
+      antigravity/
       crush/
     workflows/             # Loop definitions (research-loop.yaml, bug-audit-loop.yaml)
       review-loop.yaml     #   that `init` copies into .ai/workflows/
@@ -669,7 +670,7 @@ Flags:
 
 - `--repo <path>` default `.`
 - `--profile starter|standard|strict`
-- `--adapter <name>` repeated (`codex`|`claude`|`copilot`|`gemini`|`crush`)
+- `--adapter <name>` repeated (`codex`|`claude`|`copilot`|`antigravity`|`crush`)
 - `--with-loop <name>` repeated (enable a shipped loop template)
 - `--dry-run`
 - `--write`
@@ -902,7 +903,7 @@ Add `docs/adapter-authoring.md` and `docs/loop-authoring.md`. CI additionally ru
 Create:
 
 - `internal/adapter/adapter.go` (interface, types, `Detect`/`Run`/`Review` contracts)
-- `internal/adapter/codex.go`, `claude.go`, `gemini.go`, `crush.go`
+- `internal/adapter/codex.go`, `claude.go`, `antigravity.go`, `crush.go`
 - `internal/adapter/*_test.go`
 
 Behavior:
@@ -918,7 +919,7 @@ Tests first (per adapter, behind a fake-runner so no real CLI is required in CI)
 - `TestCodexRunEnforcesNonInteractiveApproval`
 - `TestCodexRunMapsExitCode`
 - `TestCodexRunScrubsSecretsFromStdout`
-- (same four for `claude`, `gemini`, `crush`)
+- (same four for `claude`, `antigravity`, `crush`)
 - `TestAdapterReturnsErrorWhenHeadlessNotCapable` (covers Crush-if-not-headless)
 
 Mutation proof:
@@ -1138,7 +1139,7 @@ Do not implement `expert`/budget loops, the AGT production wiring beyond the int
 - Consensus evaluator.
 - `run` and `review` commands.
 - Runstore + trace.
-- Gemini + Crush adapters (Crush gated on headless verification).
+- Antigravity + Crush adapters (Crush gated on headless verification).
 
 ### Phase 4 - Governance, Hooks, Strict Profile
 

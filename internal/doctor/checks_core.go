@@ -74,11 +74,11 @@ func checkAdapterFiles(ctx *Context) []report.Finding {
 		return nil
 	}
 	required := map[string][]string{
-		"codex":   {"AGENTS.md", ".codex/AGENTS.md", ".codex/hooks.json"},
-		"claude":  {"CLAUDE.md", ".claude/settings.json"},
-		"copilot": {".github/copilot-instructions.md"},
-		"gemini":  {"GEMINI.md"},
-		"crush":   {".crush/README.md"},
+		"codex":       {"AGENTS.md", ".codex/AGENTS.md", ".codex/hooks.json"},
+		"claude":      {"CLAUDE.md", ".claude/settings.json"},
+		"copilot":     {".github/copilot-instructions.md"},
+		"antigravity": {"GEMINI.md"},
+		"crush":       {".crush/README.md"},
 	}
 	var findings []report.Finding
 	for adapter, cfg := range ctx.manifest.manifest.Adapters {

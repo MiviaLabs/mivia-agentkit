@@ -35,7 +35,7 @@ func List(profile string, adapters []string) ([]string, error) {
 	enabled := map[string]bool{}
 	for _, adapter := range adapters {
 		switch adapter {
-		case "codex", "claude", "copilot", "gemini", "crush":
+		case "codex", "claude", "copilot", "antigravity", "crush":
 			enabled[adapter] = true
 		default:
 			return nil, fmt.Errorf("unknown adapter %q", adapter)
@@ -60,7 +60,7 @@ func List(profile string, adapters []string) ([]string, error) {
 	if enabled["copilot"] {
 		out = append(out, ".github/copilot-instructions.md", ".github/instructions/agent-quality.instructions.md")
 	}
-	if enabled["gemini"] {
+	if enabled["antigravity"] {
 		out = append(out, "GEMINI.md")
 	}
 	if enabled["crush"] {
@@ -125,6 +125,6 @@ var outputTemplates = map[string]string{
 	".claude/settings.json":                              "adapters/claude/settings.json.tmpl",
 	".github/copilot-instructions.md":                    "adapters/copilot/copilot-instructions.md.tmpl",
 	".github/instructions/agent-quality.instructions.md": "adapters/copilot/agent-quality.instructions.md.tmpl",
-	"GEMINI.md":        "adapters/gemini/GEMINI.md.tmpl",
+	"GEMINI.md":        "adapters/antigravity/GEMINI.md.tmpl",
 	".crush/README.md": "adapters/crush/README.md.tmpl",
 }

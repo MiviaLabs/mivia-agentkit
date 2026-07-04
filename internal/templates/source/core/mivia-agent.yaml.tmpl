@@ -7,7 +7,7 @@ adapters:
 {{- range $name, $enabled := .Adapters }}
   {{ $name }}:
     enabled: {{ $enabled }}
-    role: {{ if eq $name "copilot" }}guidance{{ else }}orchestrable{{ end }}
+    role: {{ if or (eq $name "copilot") (eq $name "crush") }}guidance{{ else }}orchestrable{{ end }}
 {{- end }}
 routing:
   default_producer: codex

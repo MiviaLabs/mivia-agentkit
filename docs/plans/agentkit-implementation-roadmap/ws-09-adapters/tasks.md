@@ -6,7 +6,7 @@
 - **Plan:** WS9, "Adapter System"
 - **Exit gate (Phase 2):** Codex + Claude adapters implemented behind a fake runner; non-interactive approval enforced; results scrubbed; `adapters` command reports capability.
 
-Goal: the swappable `Adapter` interface and the first two concrete adapters (Codex, Claude), with Gemini/Crush following the same shape in WS6. Every adapter is testable without the real CLI via a fake runner.
+Goal: the swappable `Adapter` interface and the first two concrete adapters (Codex, Claude), with Antigravity/Crush following the same shape in WS6. Every adapter is testable without the real CLI via a fake runner.
 
 ## T0 — Re-verify external surfaces (do this FIRST, before coding)
 
@@ -14,7 +14,7 @@ Before implementing, confirm against current official docs (URLs in plan "Extern
 
 - **Codex CLI** — exact `codex exec` flags: prompt input (stdin vs `--prompt`), `--output-last-message <path>`, approval mode flag (`--full-auto` / `--dangerously-bypass-approvals-and-sandbox` / `--ask-for-approval never` — whichever is current), sandbox mode, `--json` output, exit codes. Record the doc URL + version in `codex.go` package doc.
 - **Claude Code** — `claude -p`/`--print`, `--output-format json|stream-json`, `--permission-mode {default,acceptEdits,bypassPermissions,plan}`, `--max-turns`, `--allowedTools`/`--disallowedTools`. Record doc URL + version in `claude.go`.
-- **Gemini CLI** (deferred to WS6) — note for later.
+- **Antigravity CLI** (deferred to WS6) — note for later.
 - **Crush** (deferred to WS6) — note headless capability question for later.
 
 If a flag set has drifted from the plan's assumptions, update `codex.go`/`claude.go` and the tests; cite the change in the WS completion report. **Do not guess.**

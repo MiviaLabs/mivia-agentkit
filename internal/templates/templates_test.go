@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -25,7 +26,7 @@ func TestTemplatesSubdirsExist(t *testing.T) {
 		"templates/adapters/codex",
 		"templates/adapters/claude",
 		"templates/adapters/copilot",
-		"templates/adapters/gemini",
+		"templates/adapters/antigravity",
 		"templates/adapters/crush",
 		"templates/workflows",
 		"templates/prompts",
@@ -107,6 +108,72 @@ func TestListRespectsAdapterSelection(t *testing.T) {
 	}
 }
 
+func TestAntigravityAdapterOnlyRendersWhenSelected(t *testing.T) {
+	got, err := List("standard", []string{"codex"})
+	if err != nil {
+		t.Fatalf("List() error = %v, want nil", err)
+	}
+	for _, path := range got {
+		if path == "GEMINI.md" {
+			t.Fatalf("List() includes GEMINI.md with antigravity disabled: %#v", got)
+		}
+	}
+
+	got, err = List("standard", []string{"antigravity"})
+	if err != nil {
+		t.Fatalf("List() error = %v, want nil", err)
+	}
+	if !containsTemplatePath(got, "GEMINI.md") {
+		t.Fatalf("List() missing GEMINI.md with antigravity enabled: %#v", got)
+	}
+}
+
+func TestAntigravityAdapterIsThinPointer(t *testing.T) {
+	data, err := fs.ReadFile(FS(), "adapters/antigravity/GEMINI.md.tmpl")
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	assertThinAdapterPointer(t, string(data))
+}
+
+func TestCrushAdapterShimRendersWhenSelected(t *testing.T) {
+	got, err := List("standard", []string{"codex"})
+	if err != nil {
+		t.Fatalf("List() error = %v, want nil", err)
+	}
+	for _, path := range got {
+		if path == ".crush/README.md" {
+			t.Fatalf("List() includes Crush shim with crush disabled: %#v", got)
+		}
+	}
+
+	got, err = List("standard", []string{"crush"})
+	if err != nil {
+		t.Fatalf("List() error = %v, want nil", err)
+	}
+	if !containsTemplatePath(got, ".crush/README.md") {
+		t.Fatalf("List() missing Crush shim with crush enabled: %#v", got)
+	}
+}
+
+func TestCrushShimDoesNotDuplicateLongPolicy(t *testing.T) {
+	data, err := fs.ReadFile(FS(), "adapters/crush/README.md.tmpl")
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	assertThinAdapterPointer(t, string(data))
+}
+
+func TestCrushAdapterRendersGuidanceRole(t *testing.T) {
+	data, err := fs.ReadFile(FS(), "core/mivia-agent.yaml.tmpl")
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if !strings.Contains(string(data), `(eq $name "crush")`) || !strings.Contains(string(data), "guidance") {
+		t.Fatalf("mivia-agent.yaml template = %q, want crush guidance role", data)
+	}
+}
+
 func TestListIncludesWorkflowTemplatesForStandard(t *testing.T) {
 	got, err := List("standard", []string{"codex"})
 	if err != nil {
@@ -120,6 +187,25 @@ func TestListIncludesWorkflowTemplatesForStandard(t *testing.T) {
 		if !found[want] {
 			t.Fatalf("List() missing %q: %#v", want, got)
 		}
+	}
+}
+
+func containsTemplatePath(paths []string, want string) bool {
+	for _, path := range paths {
+		if path == want {
+			return true
+		}
+	}
+	return false
+}
+
+func assertThinAdapterPointer(t *testing.T, content string) {
+	t.Helper()
+	if !strings.Contains(content, ".ai/INDEX.md") {
+		t.Fatalf("template = %q, want pointer to .ai/INDEX.md", content)
+	}
+	if strings.Contains(content, "deterministic local checks") || strings.Contains(content, "Every guard has a mutation proof") {
+		t.Fatalf("template duplicates long policy: %q", content)
 	}
 }
 

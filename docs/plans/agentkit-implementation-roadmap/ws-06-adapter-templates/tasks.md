@@ -1,56 +1,56 @@
-# WS6 — Adapter Templates (incl. Gemini, Crush)
+# WS6 — Adapter Templates (incl. Antigravity, Crush)
 
 - **Phase:** 4
 - **Depends on:** WS2 (templates), WS9 (adapter interface)
 - **PRD:** FR-1.1, FR-3.1, FR-3.4
 - **Plan:** WS6, "Adapter Templates"
-- **Exit gate (Phase 4):** Gemini adapter template renders when selected; Crush template renders only when headless-verified (else ships as `interactive-only` shim with a clear note); adapters do not duplicate long policy.
+- **Exit gate (Phase 4):** Antigravity adapter template renders when selected; Crush template renders only when headless-verified (else ships as `interactive-only` shim with a clear note); adapters do not duplicate long policy.
 
-Goal: the file-generation side for the remaining adapters (Gemini, Crush) plus the runtime adapter implementations for Gemini/Crush that WS9 deferred. WS9 already shipped Codex + Claude.
+Goal: the file-generation side for the remaining adapters (Antigravity, Crush) plus the runtime adapter implementations for Antigravity/Crush that WS9 deferred. WS9 already shipped Codex + Claude.
 
 ## T0 — Re-verify external surfaces
 
 Before coding, confirm:
-- **Gemini CLI** — `-p`/`--prompt`, `--output-format json`, sandbox/`--yolo`/approval mode, checkpointing, exit codes. Record in `gemini.go`.
+- **Antigravity CLI** — current Google transition state and `agy -p` one-shot mode. Gemini CLI is not a supported target for this workstream. Record in `antigravity.go`.
 - **Crush** — **does a true headless/non-TUI mode exist?** (`crush run`? `--once`? confirm from `github.com/charmbracelet/crush` README + source). This is the gating question. Record findings in `crush.go`.
 
-## T1 — Gemini runtime adapter
+## T1 — Antigravity runtime adapter
 
 Create:
-- `internal/adapter/gemini.go` — `type Gemini struct{ Runner Runner }`, implements `Adapter`. Mirror WS9 T4/T5 structure.
-- `internal/adapter/gemini_test.go`
+- `internal/adapter/antigravity.go` — current Antigravity CLI adapter implementation, implements `Adapter`. Mirror WS9 T4/T5 structure.
+- `internal/adapter/antigravity_test.go`
 
 Spec:
-- `Name()` = `"gemini"`, `Role()` = `RoleOrchestrable`.
-- `Run` uses the headless command per T0; non-interactive approval; `--output-format json`; scrub stdout; drop prompt/completion from `ProviderMeta`.
+- `Name()` = `"antigravity"`, `Role()` = `RoleOrchestrable`.
+- `Run` uses the current Antigravity CLI command per T0 (`agy -p`) under the stable `"antigravity"` adapter name; scrub stdout; drop prompt/completion from `ProviderMeta`.
 - `Review` symmetric to WS9.
 - `Detect.HeadlessCapable` per T0.
 
 Tests that must pass (FakeRunner, mirroring WS9):
-- `TestGeminiDetectHeadlessCapability`
-- `TestGeminiRunEnforcesNonInteractiveApproval`
-- `TestGeminiRunMapsExitCode`
-- `TestGeminiRunScrubsSecretsFromStdout`
-- `TestGeminiReviewParsesVerdict`
+- `TestAntigravityDetectHeadlessCapability`
+- `TestAntigravityRunEnforcesNonInteractiveApproval`
+- `TestAntigravityRunMapsExitCode`
+- `TestAntigravityRunScrubsSecretsFromStdout`
+- `TestAntigravityReviewParsesVerdict`
 
 Mutation proof:
-- Remove the non-interactive flag; `TestGeminiRunEnforcesNonInteractiveApproval` must fail.
+- Revert to legacy `gemini --output-format json --yolo`; `TestAntigravityRunEnforcesNonInteractiveApproval` must fail.
 
-## T2 — Gemini template
+## T2 — Antigravity template
 
 Create:
-- `templates/adapters/gemini/GEMINI.md` (root adapter pointing to `.ai/INDEX.md`).
-- Update WS2 `templates.List` to include Gemini files when `gemini` enabled.
+- `templates/adapters/antigravity/GEMINI.md` (Antigravity-readable root context file pointing to `.ai/INDEX.md`).
+- Update WS2 `templates.List` to include Antigravity files when `antigravity` enabled.
 
 Spec:
 - `GEMINI.md` is thin: one paragraph + pointer to `.ai/INDEX.md`. No long policy duplication.
 
 Tests that must pass (extend WS2):
-- `TestGeminiAdapterOnlyRendersWhenSelected`
-- `TestGeminiAdapterIsThinPointer` (assert it does not duplicate `.ai/rules/*` text verbatim)
+- `TestAntigravityAdapterOnlyRendersWhenSelected`
+- `TestAntigravityAdapterIsThinPointer` (assert it does not duplicate `.ai/rules/*` text verbatim)
 
 Mutation proof:
-- Render Gemini always; `TestGeminiAdapterOnlyRendersWhenSelected` must fail.
+- Render Antigravity always; `TestAntigravityAdapterOnlyRendersWhenSelected` must fail.
 
 ## T3 — Crush runtime adapter (headless-gated)
 
@@ -106,14 +106,22 @@ go test ./internal/adapter/... ./internal/render/... ./internal/audit/... -count
 go vet ./internal/adapter/...
 tmp=$(mktemp -d) && (cd "$tmp" && git init -q && git commit -q --allow-empty -m init)
 go run ./cmd/mivia-agent init --repo "$tmp" --profile standard \
-  --adapter codex --adapter claude --adapter gemini --adapter crush --write
+  --adapter codex --adapter claude --adapter antigravity --adapter crush --write
 go run ./cmd/mivia-agent doctor --repo "$tmp"
 go run ./cmd/mivia-agent adapters --repo "$tmp"
 ```
 
 WS6 is ☑ when:
-- [ ] T0 findings recorded for Gemini AND Crush (headless yes/no explicit)
-- [ ] Gemini adapter + template tests pass
+- [ ] T0 findings recorded for Antigravity AND Crush (headless yes/no explicit)
+- [ ] Antigravity adapter + template tests pass
 - [ ] Crush adapter test path matches T0 finding (headless OR not)
 - [ ] non-duplication audit check + mutation proof
 - [ ] status updated in `00-overview.md`
+
+## Completion — 2026-07-05
+
+- Tests: focused config, adapter, templates, render, audit, and CLI packages passing.
+- Mutation proofs: Antigravity legacy-flag reintroduction fail-then-revert ok; Antigravity always-render fail-then-revert ok; Crush `Run` success fail-then-revert ok; duplicate-policy threshold raise fail-then-revert ok.
+- Files: Antigravity runtime adapter, Crush guidance adapter, adapter-policy audit check, template/catalog updates, manifest parser fix, and CLI adapter listing update.
+- Residual risk: `doctor` smoke reports the expected temp-repo CI warning; no WS6 blocker.
+- Follow-ups: none.

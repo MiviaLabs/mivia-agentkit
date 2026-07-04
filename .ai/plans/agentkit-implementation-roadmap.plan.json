@@ -822,7 +822,7 @@
       },
       {
         "id": "ws-06-adapter-templates",
-        "title": "Gemini and Crush adapters and templates",
+        "title": "Antigravity and Crush adapters and templates",
         "skill": "agent-plan-implementer",
         "agent": "codex",
         "depends_on": [
@@ -835,16 +835,22 @@
           "docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md"
         ],
         "files_edit": [
-          "internal/adapter/gemini.go",
-          "internal/adapter/gemini_test.go",
-          "templates/adapters/gemini/GEMINI.md",
+          "internal/adapter/codex.go",
+          "internal/adapter/antigravity.go",
+          "internal/adapter/antigravity_test.go",
+          "templates/adapters/antigravity/GEMINI.md",
           "internal/adapter/crush.go",
           "internal/adapter/crush_test.go",
           "templates/adapters/crush/README.md",
           "internal/audit/checks_adapter_policy.go",
           "internal/audit/audit_test.go",
+          "internal/config/manifest.go",
+          "internal/config/manifest_test.go",
+          "internal/templates/source/core/mivia-agent.yaml.tmpl",
           "internal/templates/templates.go",
           "internal/templates/templates_test.go",
+          "templates/core/mivia-agent.yaml.tmpl",
+          "internal/cli/adapters.go",
           "docs/plans/agentkit-implementation-roadmap/ws-06-adapter-templates/tasks.md",
           "docs/plans/agentkit-implementation-roadmap/00-overview.md"
         ],
@@ -852,8 +858,8 @@
           "none"
         ],
         "tests": [
-          "internal/adapter/gemini_test.go::TestGeminiRunEnforcesNonInteractiveApproval",
-          "internal/templates/templates_test.go::TestGeminiAdapterOnlyRendersWhenSelected",
+          "internal/adapter/antigravity_test.go::TestAntigravityRunEnforcesNonInteractiveApproval",
+          "internal/templates/templates_test.go::TestAntigravityAdapterOnlyRendersWhenSelected",
           "internal/adapter/crush_test.go::TestCrushDetectReportsHeadlessCapability",
           "internal/templates/templates_test.go::TestCrushAdapterShimRendersWhenSelected",
           "internal/audit/audit_test.go::TestAdaptersDoNotDuplicateLongPolicy"
@@ -861,17 +867,23 @@
         "verifiers": [
           "go test ./internal/adapter/... ./internal/render/... ./internal/audit/... -count=1",
           "go vet ./internal/adapter/...",
-          "go run ./cmd/mivia-agent init --repo \"$tmp\" --profile standard --adapter codex --adapter claude --adapter gemini --adapter crush --write",
+          "go run ./cmd/mivia-agent init --repo \"$tmp\" --profile standard --adapter codex --adapter claude --adapter antigravity --adapter crush --write",
           "go run ./cmd/mivia-agent doctor --repo \"$tmp\"",
           "go run ./cmd/mivia-agent adapters --repo \"$tmp\""
         ],
-        "mutation": "Remove Gemini approval flags, render Gemini always, make non-headless Crush run successfully, duplicate long policy into adapter shims, or raise duplicate-policy threshold too high; the named WS6 tests must fail.",
+        "mutation": "Remove Antigravity approval flags, render Antigravity always, make non-headless Crush run successfully, duplicate long policy into adapter shims, or raise duplicate-policy threshold too high; the named WS6 tests must fail.",
         "outputs": [
-          "internal/adapter/gemini.go",
+          "internal/adapter/codex.go",
+          "internal/adapter/antigravity.go",
           "internal/adapter/crush.go",
-          "templates/adapters/gemini/GEMINI.md",
+          "templates/adapters/antigravity/GEMINI.md",
           "templates/adapters/crush/README.md",
-          "internal/audit/checks_adapter_policy.go"
+          "internal/audit/checks_adapter_policy.go",
+          "internal/config/manifest.go",
+          "internal/config/manifest_test.go",
+          "internal/templates/source/core/mivia-agent.yaml.tmpl",
+          "templates/core/mivia-agent.yaml.tmpl",
+          "internal/cli/adapters.go"
         ],
         "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-06-adapter-templates/"
       },
@@ -1061,6 +1073,11 @@
       "source": "internal/orchestrator/engine.go",
       "gap": "WS13 run/review command integration required review prompt propagation through the orchestrator review path, but WS13 files_edit omitted the engine boundary",
       "correction": "added internal/orchestrator/engine.go and internal/orchestrator/engine_test.go to WS13 files_edit, and added review-prompt propagation coverage"
+    },
+    {
+      "source": "docs/plans/agentkit-implementation-roadmap/ws-07-import-update/tasks.md",
+      "gap": "WS7 T2 specified both type Plan and func Plan in the same Go package, which is not a valid Go identifier combination",
+      "correction": "renamed the constructor contract to BuildPlan in the task file and implemented that symbol in internal/importer/plan.go"
     }
   ],
   "stop_conditions": [

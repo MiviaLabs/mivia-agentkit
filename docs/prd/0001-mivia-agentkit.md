@@ -14,7 +14,7 @@ In MVP, governance runs in a no-op provider that allows all actions but still re
 
 ## 2. Problem
 
-Teams adopt coding-agent CLIs (Codex, Claude Code, Gemini CLI, Crush, Copilot) one at a time, and each brings its own configuration format, hook model, and approval semantics. The result is:
+Teams adopt coding-agent CLIs (Codex, Claude Code, Antigravity CLI, Crush, Copilot) one at a time, and each brings its own configuration format, hook model, and approval semantics. The result is:
 
 1. **No canonical control surface.** Policy is duplicated across `AGENTS.md`, `CLAUDE.md`, `.codex/`, `.claude/`, Copilot instructions, and CI, and drifts.
 2. **No cross-CLI verification.** One agent's output is rarely checked by another before it lands. There is no primitive for "agent B reviews agent A's work."
@@ -42,7 +42,7 @@ A single distributable binary that:
 - One command (`run`) executes named loops by orchestrating adapters headlessly, with bounded iterations and consensus review.
 - One command (`review`) runs a one-off cross-CLI consensus review.
 - Deterministic gates (quality stamp + policy decisions) block protected actions: commit, push, PR, deploy, release, live-smoke.
-- Adapter-based: Codex, Claude Code, Gemini CLI, Crush (orchestrable, Crush pending headless verification); Copilot (guidance). Adding a CLI = writing one adapter.
+- Adapter-based: Codex, Claude Code, Antigravity CLI, Crush (orchestrable, Crush pending headless verification); Copilot (guidance). Adding a CLI = writing one adapter.
 - Configurable loops in `mivia-agent.yaml`: research, bug-audit, fix-review, release-audit — bounded by iterations (budget mode is post-MVP).
 - Optional governance backbone via AGT; standalone by default.
 - Single Go binary; minimal dependencies; no required service, database, container engine, or cloud account.
@@ -232,7 +232,7 @@ bound (iterations) hit        ──▶ on_exhausted: fail | warn | proceed
 
 Tracked qualitatively for v0.1; instrumented lightly via the JSONL trace.
 
-1. `init` → `doctor` passes on a fresh empty repo for every supported adapter mix (mix = any subset of {codex, claude, copilot, gemini, crush}), with and without `~/.agents/` global config present.
+1. `init` → `doctor` passes on a fresh empty repo for every supported adapter mix (mix = any subset of {codex, claude, copilot, antigravity, crush}), with and without `~/.agents/` global config present.
 2. `init --write` is provably idempotent (`TestInitWriteIsIdempotent`).
 3. `preflight` writes a valid stamp that goes stale on any change to HEAD, diff hash, or changed-files set (`TestCheckStampRejectsStaleDiffHash`, `TestCheckStampRejectsChangedFilesMismatch`).
 4. Hooks deny protected actions without a fresh stamp (`TestProtectedActionRequiresFreshStamp`).
@@ -252,7 +252,7 @@ Each phase ships only when its exit gate is green (tests + mutation proofs).
 | 0 | Repo bootstrap | `go test ./...`; `--help` works. |
 | 1 | Init + Doctor (manifest incl. routing/loops/governance/global fields, templates, path policy, git state, ~/.agents/ layering) | FR-1.1–1.3, FR-2.1/2.3/2.4(stamp schema), FR-5.4, FR-6.1/6.2, FR-7.5, FR-10.1–10.3/10.6; idempotency + path-policy mutation proofs. |
 | 2 | Adapter system (Codex, Claude headless) + Preflight + `adapters` | FR-2.4, FR-3.1–3.5, FR-7.4; approval-enforcement + scrubbing tests. |
-| 3 | Orchestrator + Consensus + `run`/`review` (Gemini; Crush gated on headless) | FR-4.1–4.5, FR-5.1–5.3, FR-6.3; loop-bound + stamp-before-protect + consensus-threshold mutation proofs. |
+| 3 | Orchestrator + Consensus + `run`/`review` (Antigravity; Crush gated on headless) | FR-4.1–4.5, FR-5.1–5.3, FR-6.3; loop-bound + stamp-before-protect + consensus-threshold mutation proofs. |
 | 4 | Governance (noop + AGT interface), Hooks, Strict profile, Copilot templates | FR-2.2, FR-6.4, FR-7.1/7.2, FR-8.1–8.3; strict-requires-agt doctor failure test. |
 | 5 | Import, Update, Distribution | FR-1.4, FR-9.1/9.2; release binaries build for linux/macOS/windows. |
 | 6 (post-MVP) | Budget loops + `expert` profile + production AGT wiring | Lifts the FR-4.2 rejection; full OWASP-Agentic-Top-10 coverage under AGT. |

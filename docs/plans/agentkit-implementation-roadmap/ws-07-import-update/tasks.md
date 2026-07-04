@@ -29,7 +29,7 @@ Tests that must pass (fixtures under `testdata/import/`):
 ## T2 — Import plan + write
 
 Create:
-- `internal/importer/plan.go` — `type Plan struct{ Actions []Action; Conflicts []Conflict }`, `func Plan(repo string, manifest config.Manifest) (Plan, error)`, `(p Plan) Apply(repo string, force bool) (Report, error)`.
+- `internal/importer/plan.go` — `type Plan struct{ Actions []Action; Conflicts []Conflict }`, `func BuildPlan(repo string, manifest config.Manifest) (Plan, error)`, `(p Plan) Apply(repo string, force bool) (Report, error)`.
 - `internal/importer/plan_test.go`
 - `internal/cli/import.go` — `importCmd`, flags `--repo`, `--write`, `--force`, `--json`.
 
@@ -87,7 +87,15 @@ go run ./cmd/mivia-agent doctor --repo "$tmp"
 ```
 
 WS7 is ☑ when:
-- [ ] all listed tests pass
-- [ ] import read-only-by-default + overwrite-preserving mutation proofs
-- [ ] update managed-block-only + conflict-reporting mutation proofs
-- [ ] status updated in `00-overview.md`
+- [x] all listed tests pass
+- [x] import read-only-by-default + overwrite-preserving mutation proofs
+- [x] update managed-block-only + conflict-reporting mutation proofs
+- [x] status updated in `00-overview.md`
+
+## Completion — 2026-07-05
+
+- Tests: 13 passing (`internal/importer`, `internal/update`, and scoped `internal/cli` verifiers).
+- Mutation proofs: `--write` default enabled fail-then-revert ok; conflicted managed block overwrite without `--force` fail-then-revert ok; non-managed-region overwrite fail-then-revert ok.
+- Files: 20 created.
+- Residual risk: none.
+- Follow-ups: none.

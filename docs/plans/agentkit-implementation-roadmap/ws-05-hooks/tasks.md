@@ -119,3 +119,11 @@ WS5 is ☑ when:
 - [ ] all listed tests pass (golden-file + subprocess)
 - [ ] protected-pattern, fail-closed, deny-exit mutation proofs executed (≥3)
 - [ ] status updated in `00-overview.md`
+
+## Completion — 2026-07-05
+
+- Tests: 19 WS5 hook tests passing, plus focused `internal/cli` package tests passing.
+- Mutation proofs: `git commit` detector removal fail-then-revert ok; malformed protected payload allow fail-then-revert ok; Claude deny exit code `0` fail-then-revert ok.
+- Files: 8 created, 1 updated.
+- Residual risk: `go run` wraps Claude `os.Exit(2)` as process exit `1`; built-binary smoke and subprocess tests assert real exit code 2.
+- Follow-ups: none.

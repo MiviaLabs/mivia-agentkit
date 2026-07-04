@@ -31,7 +31,7 @@ Mutation proof:
 ## T2 — `adapters` command
 
 Create:
-- `internal/cli/adapters.go` — `adaptersCmd`, flags `--repo`, `--json`. Builds a `adapter.Registry` of all known adapters (Codex, Claude, Gemini stub, Crush stub from WS6), calls `Detect` on each.
+- `internal/cli/adapters.go` — `adaptersCmd`, flags `--repo`, `--json`. Builds a `adapter.Registry` of all known adapters (Codex, Claude, Antigravity stub, Crush stub from WS6), calls `Detect` on each.
 - `internal/cli/root.go` — registers `adapters`, `run`, and `review` commands with the root command.
 - `internal/cli/adapters_test.go`
 
@@ -128,4 +128,4 @@ WS13 is ☑ when:
 - Mutation proofs: prior-note prompt injection removal fail-then-revert ok; dry-run first-node invocation fail-then-revert ok; review consensus bypass fail-then-revert ok; audit found and covered review prompt propagation, command context propagation, repo-relative review artifact resolution, and guidance-adapter reporting.
 - Files: 12 created/updated.
 - Residual risk: none.
-- Follow-ups: WS6 can extend `runtimeAdapters` with Gemini and Crush once that node lands.
+- Follow-ups: WS6 can extend `runtimeAdapters` with Antigravity and Crush once that node lands.

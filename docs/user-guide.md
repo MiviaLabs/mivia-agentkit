@@ -33,6 +33,7 @@ go run ./cmd/mivia-agent init --repo /path/to/repo --profile standard \
 - `.ai/` canonical control-surface files.
 - Root adapter files such as `AGENTS.md` and `CLAUDE.md`.
 - Tool adapter files under `.codex/`, `.claude/`, and `.github/` for selected adapters.
+- `--adapter antigravity` targets Google Antigravity CLI (`agy`), not the retired consumer Gemini CLI.
 - `.agents/skills.json`, including project skills and any readable global skills from `~/.agents/skills/`.
 
 `init --write` is idempotent for the same inputs. Existing user-owned files are reported as conflicts and are not overwritten unless `--force` is passed. Managed files preserve text outside the `mivia-agent:managed` block.

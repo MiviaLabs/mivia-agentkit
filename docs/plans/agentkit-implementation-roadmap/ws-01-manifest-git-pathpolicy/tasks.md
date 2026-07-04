@@ -16,7 +16,7 @@ Create:
 
 Spec:
 - Struct fields mirror the manifest in plan "Manifest" section: `Version`, `Profile`, `TemplateVersion`, `Project`, `Adapters` (map of `name -> {Enabled, Role}`), `Routing` (default producer/reviewers, `Consensus{Mode,Weights,TieBreaker,MinReviewers}`, `OnReviewFail`, `MaxIterations`), `Loops` (map), `Commands`, `ProtectedActions`, `Quality`, `Paths`, `Governance{Provider,AuditLog,PolicyDecisions}`, `Global{Layer,Merge}`, `MCP`.
-- `Defaults()` returns the `standard` profile defaults from the plan (Codex+Claude orchestrable, Copilot guidance, Gemini/Crush disabled, `routing.default_reviewers=[codex,claude]`, `mode=majority`, `min_reviewers=2`, `tie_breaker=strict`, `on_review_fail=iterate`, `max_iterations=3`, `governance.provider=noop`).
+- `Defaults()` returns the `standard` profile defaults from the plan (Codex+Claude orchestrable, Copilot guidance, Antigravity/Crush disabled, `routing.default_reviewers=[codex,claude]`, `mode=majority`, `min_reviewers=2`, `tie_breaker=strict`, `on_review_fail=iterate`, `max_iterations=3`, `governance.provider=noop`).
 - `Validate()` returns errors for: unknown `Profile`, unknown adapter `Role` (must be `orchestrable|guidance`), `Loop` with no `bound`, `bound: budget` in MVP, `expert` profile in MVP, consensus `Mode` not in the allowed set.
 - Unknown fields: fail closed (strict YAML decode; reject unknown keys) — surface a clear error.
 
