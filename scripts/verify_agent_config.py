@@ -112,11 +112,14 @@ def verify_index() -> None:
         ".ai/templates/agent-report-v1.md",
         ".ai/policy/commit-message.json",
         ".ai/policy/agent-hook-bypass.json",
+        ".ai/policy/audit-loop.json",
         ".agents/hooks.json",
+        "docs/agent-hooks.md",
         "docs/development-hooks.md",
         "README.md",
         "make install-hooks",
         "make agent-hook-test",
+        "make audit-loop-test",
         "make skill-contract-test",
     ]:
         require(path in content, f".ai/INDEX.md: missing hook verification path {path}")
@@ -301,19 +304,19 @@ def verify_agents_hooks() -> None:
         return
     require(config.get("version") == 1, ".agents/hooks.json: expected version 1")
     generated_from = config.get("generated_from", [])
-    require(
-        isinstance(generated_from, list) and ".ai/policy/agent-hook-bypass.json" in generated_from,
-        ".agents/hooks.json: missing bypass policy source",
-    )
+    require(isinstance(generated_from, list), ".agents/hooks.json: generated_from must be a list")
+    for path in [".ai/policy/agent-hook-bypass.json", ".ai/policy/audit-loop.json"]:
+        require(path in generated_from, f".agents/hooks.json: missing policy source {path}")
     hooks = config.get("hooks", {})
     require(
-        set(hooks) == {"UserPromptSubmit", "PreToolUse", "PermissionRequest"},
+        set(hooks) == {"UserPromptSubmit", "PreToolUse", "PermissionRequest", "Stop"},
         ".agents/hooks.json: unexpected hook events",
     )
     for event, expected in {
         "UserPromptSubmit": "scripts/run_agent_hook_guard.sh\" agents user-prompt-submit",
         "PreToolUse": "scripts/run_agent_hook_guard.sh\" agents pre-tool-use",
         "PermissionRequest": "scripts/run_agent_hook_guard.sh\" agents permission-request",
+        "Stop": "scripts/run_agent_hook_guard.sh\" agents stop",
     }.items():
         commands = [hook.get("command", "") for hook in hooks.get(event, []) if isinstance(hook, dict)]
         require(any(expected in command for command in commands), f".agents/hooks.json: missing {expected}")
@@ -358,9 +361,84 @@ def verify_agent_hook_guard() -> None:
     for needle in [
         "mivia-agent hook",
         "scripts/agent_hook_guard.py",
+        "scripts/audit_loop_guard.py",
         "git rev-parse --show-toplevel",
     ]:
         require(needle in runner, f"scripts/run_agent_hook_guard.sh: missing {needle}")
+
+
+def verify_audit_loop_guard() -> None:
+    policy = load_json(".ai/policy/audit-loop.json")
+    if isinstance(policy, dict):
+        require(policy.get("version") == 1, ".ai/policy/audit-loop.json: expected version 1")
+        require(
+            policy.get("reportFormat") == "mivia-agent-report/v1",
+            ".ai/policy/audit-loop.json: report format drifted",
+        )
+        require(
+            policy.get("skills") == ["deep-bug-audit", "test-coverage-audit", "adversarial-test-review"],
+            ".ai/policy/audit-loop.json: skills drifted",
+        )
+        triggers = policy.get("promptTriggers")
+        require(isinstance(triggers, list), ".ai/policy/audit-loop.json: promptTriggers must be a list")
+        if isinstance(triggers, list):
+            for trigger in ["deep-bug-audit", "test-coverage-audit", "adversarial-test-review", "bug audit"]:
+                require(trigger in triggers, f".ai/policy/audit-loop.json: missing trigger {trigger}")
+        require(
+            policy.get("gapStatuses") == ["open", "missing", "shallow", "gated"],
+            ".ai/policy/audit-loop.json: gapStatuses drifted",
+        )
+        require(policy.get("maxIterations") == 10, ".ai/policy/audit-loop.json: maxIterations must be 10")
+        require(
+            policy.get("hostContinuationCaps") == {"claude": 8},
+            ".ai/policy/audit-loop.json: hostContinuationCaps drifted",
+        )
+        require(
+            policy.get("cleanReportsToStop") == 2,
+            ".ai/policy/audit-loop.json: cleanReportsToStop must be 2",
+        )
+        require(
+            policy.get("maxMalformedReports") == 2,
+            ".ai/policy/audit-loop.json: maxMalformedReports must be 2",
+        )
+        instruction = policy.get("instruction")
+        require(
+            isinstance(instruction, str)
+            and "fix every gap" in instruction
+            and "two consecutive clean reports" in instruction
+            and "ResidualRisk: none" in instruction,
+            ".ai/policy/audit-loop.json: instruction missing strict loop contract",
+        )
+
+    guard = text("scripts/audit_loop_guard.py")
+    for needle in [
+        "last_assistant_message",
+        "decision",
+        "block",
+        "mivia-agent-report/v1",
+        "maxIterations",
+        "hostContinuationCaps",
+        "max_iterations_for_agent",
+        "cleanReportsToStop",
+        "ResidualRisk",
+        "MIVIA_AUDIT_LOOP_STATE",
+        "gapStatuses",
+        "Fix every gap regardless of severity",
+    ]:
+        require(needle in guard, f"scripts/audit_loop_guard.py: missing {needle}")
+
+    tests = text("scripts/test_audit_loop_guard.py")
+    for needle in [
+        "test_stop_continues_when_low_severity_gap_exists",
+        "test_two_clean_reports_allow_stop",
+        "test_max_iterations_allows_stop",
+        "test_claude_host_cap_allows_stop_at_eight",
+        "test_malformed_report_continues_once",
+        "test_runner_runs_audit_loop_after_bypass_guard",
+        "ResidualRisk: none",
+        "low | open",
+    ]:
+        require(needle in tests, f"scripts/test_audit_loop_guard.py: missing {needle}")
 
 
 def verify_gitignore() -> None:
@@ -394,13 +472,17 @@ def verify_git_hooks() -> None:
         "scripts/agent_hook_guard.py",
         "scripts/run_agent_hook_guard.sh",
         "scripts/test_agent_hook_guard.py",
+        "scripts/audit_loop_guard.py",
+        "scripts/test_audit_loop_guard.py",
         "scripts/test_skill_contracts.py",
         "semgrep/agent-standards.yml",
         ".ai/templates/agent-report-v1.md",
         ".ai/policy/commit-message.json",
         ".ai/policy/agent-hook-bypass.json",
+        ".ai/policy/audit-loop.json",
         ".agents/hooks.json",
         "docs/setup/development-environment.md",
+        "docs/agent-hooks.md",
         "docs/development-hooks.md",
         "Makefile",
         "README.md",
@@ -423,6 +505,8 @@ def verify_git_hooks() -> None:
         "scripts/agent_hook_guard.py",
         "scripts/run_agent_hook_guard.sh",
         "scripts/test_agent_hook_guard.py",
+        "scripts/audit_loop_guard.py",
+        "scripts/test_audit_loop_guard.py",
         "scripts/test_skill_contracts.py",
     ]
     for path in executable_files:
@@ -436,6 +520,7 @@ def verify_git_hooks() -> None:
         "semgrep-test:",
         "hook-test:",
         "agent-hook-test:",
+        "audit-loop-test:",
         "skill-contract-test:",
         "pre-commit:",
         "pre-push:",
@@ -446,6 +531,7 @@ def verify_git_hooks() -> None:
     readme = text("README.md")
     for needle in [
         "docs/setup/development-environment.md",
+        "docs/agent-hooks.md",
         "docs/development-hooks.md",
         "make install-hooks",
         "make verify",
@@ -500,6 +586,7 @@ def verify_git_hooks() -> None:
         "scripts/test_semgrep_rules.py",
         "scripts/test_git_hooks.py",
         "scripts/test_agent_hook_guard.py",
+        "scripts/test_audit_loop_guard.py",
         "scripts/test_skill_contracts.py",
         "--disable-nosem",
         "semgrep --config semgrep/agent-standards.yml",
@@ -508,6 +595,7 @@ def verify_git_hooks() -> None:
         "Quality: pre-commit passed",
         "agent config verification passed",
         "agent hook tests passed",
+        "audit loop tests passed",
         "skill contract tests passed",
     ]:
         require(needle in pre_commit, f"scripts/git-hooks/pre-commit: missing {needle}")
@@ -575,6 +663,7 @@ def verify_git_hooks() -> None:
         "scripts/test_semgrep_rules.py",
         "scripts/test_git_hooks.py",
         "scripts/test_agent_hook_guard.py",
+        "scripts/test_audit_loop_guard.py",
         "scripts/test_skill_contracts.py",
         "--disable-nosem",
         "semgrep --config semgrep/agent-standards.yml",
@@ -635,6 +724,7 @@ def verify_secret_hygiene() -> None:
         ".github",
         ".githooks",
         "docs/setup/development-environment.md",
+        "docs/agent-hooks.md",
         "docs/development-hooks.md",
         "README.md",
         "scripts/git-hooks",
@@ -644,6 +734,8 @@ def verify_secret_hygiene() -> None:
         "scripts/agent_hook_guard.py",
         "scripts/run_agent_hook_guard.sh",
         "scripts/test_agent_hook_guard.py",
+        "scripts/audit_loop_guard.py",
+        "scripts/test_audit_loop_guard.py",
         "scripts/test_skill_contracts.py",
         "semgrep",
         "scripts/verify_agent_config.py",
@@ -682,6 +774,7 @@ def main() -> int:
     verify_adapters()
     verify_agents_hooks()
     verify_agent_hook_guard()
+    verify_audit_loop_guard()
     verify_claude_settings()
     verify_codex_hooks()
     verify_gitignore()

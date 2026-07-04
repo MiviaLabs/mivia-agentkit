@@ -25,5 +25,6 @@ make help
 
 - `docs/setup/development-environment.md` - local prerequisites and Ubuntu setup
 - `docs/development-hooks.md` - hook behavior and policy shape
+- `docs/agent-hooks.md` - agent hook surfaces, triggers, policies, and audit-loop behavior
 - `docs/prd/0001-mivia-agentkit.md` - product requirements
 - `docs/plans/00-overview.md` - workstream roadmap

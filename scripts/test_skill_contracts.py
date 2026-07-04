@@ -104,7 +104,7 @@ def test_verify_and_make_run_skill_contracts() -> None:
     for needle in [
         "skill-contract-test:",
         "scripts/test_skill_contracts.py",
-        "verify: verify-agent semgrep-validate semgrep-test hook-test agent-hook-test skill-contract-test semgrep go-check",
+        "verify: verify-agent semgrep-validate semgrep-test hook-test agent-hook-test audit-loop-test skill-contract-test semgrep go-check",
     ]:
         if needle not in makefile:
             fail(f"Makefile missing skill contract gate: {needle}")

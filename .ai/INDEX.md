@@ -44,6 +44,7 @@ The registry at `.agents/skills.json` lists all committed project skill files fr
 
 - `.ai/policy/commit-message.json` - allowed commit message types, scopes, and subject length for the repo `commit-msg` hook.
 - `.ai/policy/agent-hook-bypass.json` - blocked verification-bypass terms and the corrective instruction used by agent hooks.
+- `.ai/policy/audit-loop.json` - strict audit loop policy for structured audit/review Stop hooks.
 
 ## Templates
 
@@ -55,6 +56,8 @@ Run `python3 scripts/verify_agent_config.py` after changing `AGENTS.md`, `.ai/`,
 
 Run `make agent-hook-test` after changing `.agents/hooks.json`, `.claude/settings.json`, `.codex/hooks.json`, `.ai/policy/agent-hook-bypass.json`, or `scripts/agent_hook_guard.py`.
 
+Run `make audit-loop-test` after changing `.ai/policy/audit-loop.json`, `scripts/audit_loop_guard.py`, `scripts/run_agent_hook_guard.sh`, or audit/review skill report behavior.
+
 Run `make skill-contract-test` after changing `.ai/skills/`, `.claude/skills/`, `.ai/templates/`, or `scripts/test_skill_contracts.py`.
 
 Install local Git hooks with:
@@ -63,6 +66,6 @@ Install local Git hooks with:
 make install-hooks
 ```
 
-Hook policy details live in `docs/development-hooks.md`.
+Hook policy details live in `docs/development-hooks.md` and `docs/agent-hooks.md`.
 
 Makefile usage is documented in `README.md`.
