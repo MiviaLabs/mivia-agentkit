@@ -1,7 +1,7 @@
 SHELL := /usr/bin/env bash
 .SHELLFLAGS := -euo pipefail -c
 
-.PHONY: help install-hooks hooks verify verify-agent semgrep-validate semgrep-test hook-test agent-hook-test semgrep pre-commit pre-push go-check test vet build
+.PHONY: help install-hooks hooks verify verify-agent semgrep-validate semgrep-test hook-test agent-hook-test skill-contract-test semgrep pre-commit pre-push go-check test vet build
 
 help:
 	@printf '%s\n' \
@@ -14,12 +14,13 @@ help:
 		'  make semgrep-test      Run Semgrep rule contract tests' \
 		'  make hook-test         Run Git hook contract tests' \
 		'  make agent-hook-test   Run agent hook guard contract tests' \
+		'  make skill-contract-test Run skill report contract tests' \
 		'  make go-check          Run Go format/test/vet/build when go.mod exists'
 
 install-hooks hooks:
 	@scripts/install_git_hooks.sh
 
-verify: verify-agent semgrep-validate semgrep-test hook-test agent-hook-test semgrep go-check
+verify: verify-agent semgrep-validate semgrep-test hook-test agent-hook-test skill-contract-test semgrep go-check
 
 verify-agent:
 	@python3 scripts/verify_agent_config.py
@@ -35,6 +36,9 @@ hook-test:
 
 agent-hook-test:
 	@python3 scripts/test_agent_hook_guard.py
+
+skill-contract-test:
+	@python3 scripts/test_skill_contracts.py
 
 semgrep:
 	@semgrep --config semgrep/agent-standards.yml --error --skip-unknown-extensions --metrics off --disable-nosem .

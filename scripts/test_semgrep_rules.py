@@ -22,6 +22,7 @@ EXPECTED_RULES = {
     "mivia.generic.brand-mivialabs",
     "mivia.generic.commit-policy-no-optional-scope-wording",
     "mivia.generic.no-git-hook-bypass-in-agent-config",
+    "mivia.generic.no-skill-freeform-output-heading",
     "mivia.go.no-panic-in-internal",
     "mivia.go.no-fatal-exit-in-internal",
     "mivia.go.no-shell-exec",
@@ -110,6 +111,21 @@ def create_bad_fixture(root: Path) -> None:
         # Bad Adapter
 
         If hooks fail, run git commit --no-verify.
+        """,
+    )
+    write(
+        root / ".ai" / "skills" / "bad-skill" / "SKILL.md",
+        """
+        ---
+        name: bad-skill
+        description: Bad skill fixture.
+        ---
+
+        # Bad Skill
+
+        ## Output
+
+        Free-form report text.
         """,
     )
     write(

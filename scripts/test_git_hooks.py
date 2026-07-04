@@ -47,7 +47,7 @@ def write_summary(root: Path, summary: str, *, tree: str | None = None) -> None:
 
 def test_prepare_commit_msg_appends_summary(root: Path) -> None:
     init_repo(root)
-    summary = "Quality: pre-commit passed (agent config verification passed, whitespace passed, semgrep rules passed, hook tests passed, agent hook tests passed, staged semgrep 0 findings; gofmt skipped)"
+    summary = "Quality: pre-commit passed (agent config verification passed, whitespace passed, semgrep rules passed, hook tests passed, agent hook tests passed, skill contract tests passed, staged semgrep 0 findings; gofmt skipped)"
     write_summary(root, summary)
     msg = root / "COMMIT_MSG"
     msg.write_text("chore: test hooks\n", encoding="utf-8")

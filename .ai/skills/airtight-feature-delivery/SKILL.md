@@ -30,9 +30,33 @@ triggers:
 6. Execute and revert mutation proofs.
 7. Append the required completion report only when the task or workstream is actually complete.
 
-## Output
+## Required Report
 
-- Changed files.
-- Tests and mutation proofs run.
-- Completion report location or reason it was not updated.
-- Residual risk.
+Always use `mivia-agent-report/v1` from `.ai/templates/agent-report-v1.md`. Keep the report strict and concise; do not add free-form sections unless the user asks for a long artifact.
+
+Result semantics:
+
+- `PASS` means the scoped work is implemented, verified, mutation-proofed, and committed or ready for the requested handoff.
+- `BLOCK` means any implementation, test, verifier, or mutation-proof blocker remains.
+- `PARTIAL` means a useful slice landed but a named dependency, user decision, or gated proof remains.
+- `NOT_RUN` means the response is only a plan or implementation could not start.
+
+```md
+ReportFormat: mivia-agent-report/v1
+Skill: airtight-feature-delivery
+Result: PASS|BLOCK|PARTIAL|NOT_RUN
+Scope: <exact files/packages>
+Baseline: <branch/commit/diff>
+Summary: <one sentence>
+
+| ID | Severity | Status | File:Line | Finding | Required Fix | Required Test | Mutation |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| none | none | closed | none | none | none | none | none |
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| none | NOT_RUN | none |
+
+ResidualRisk: none|<short exact risk>
+NextAction: none|<exact task>
+```

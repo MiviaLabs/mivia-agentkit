@@ -26,7 +26,33 @@ triggers:
 4. Identify shallow tests that mock the thing under test or only assert no error.
 5. Convert each gap into a concrete test name and expected failing mutation.
 
-## Output
+## Required Report
 
-- Coverage matrix: behavior, existing test, gap, required test.
-- Fail closed: do not approve coverage unless every critical behavior has a real test or a justified exception.
+Always use `mivia-agent-report/v1` from `.ai/templates/agent-report-v1.md`. Keep the report strict and concise; do not add free-form sections unless the user asks for a long artifact.
+
+Result semantics:
+
+- `PASS` means every critical behavior has a named real test, verifier, and mutation target or justified exception.
+- `BLOCK` means any critical behavior is missing, shallow, unverified, or falsely mocked.
+- `PARTIAL` means the coverage map is useful but gated proof or source access is incomplete.
+- `NOT_RUN` means the response is only a plan or coverage mapping could not start.
+
+```md
+ReportFormat: mivia-agent-report/v1
+Skill: test-coverage-audit
+Result: PASS|BLOCK|PARTIAL|NOT_RUN
+Scope: <exact files/packages>
+Baseline: <branch/commit/diff>
+Summary: <one sentence>
+
+| ID | Severity | Status | File:Line | Finding | Required Fix | Required Test | Mutation |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| none | none | closed | none | none | none | none | none |
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| none | NOT_RUN | none |
+
+ResidualRisk: none|<short exact risk>
+NextAction: none|<exact task>
+```

@@ -12,6 +12,8 @@ triggers:
 
 Read `.ai/skills/adversarial-test-review/SKILL.md` first. Follow `AGENTS.md` and `.ai/rules/20-agent-quality.md`.
 
+Use `mivia-agent-report/v1` from `.ai/templates/agent-report-v1.md`; do not define a Claude-specific report shape.
+
 Claude-specific behavior:
 
 - Lead with blocking findings.

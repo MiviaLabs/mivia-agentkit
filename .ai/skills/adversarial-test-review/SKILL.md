@@ -25,8 +25,33 @@ triggers:
 4. Check error paths with `errors.Is` / `errors.As` where applicable.
 5. Require mutation proof for fail-closed behavior and idempotency.
 
-## Output
+## Required Report
 
-- Findings first with severity, file, line or symbol, and failing scenario.
-- Explicitly state "No blocking findings" only when the reviewed behavior and tests are both adequate.
-- List unrun verifiers and remaining risk.
+Always use `mivia-agent-report/v1` from `.ai/templates/agent-report-v1.md`. Keep the report strict and concise; do not add free-form sections unless the user asks for a long artifact.
+
+Result semantics:
+
+- `PASS` means reviewed behavior and tests are airtight, verifiers ran, and mutations are caught or clearly not applicable.
+- `BLOCK` means any regression can ship, any verifier failed, or mutation proof is missing for a load-bearing guard.
+- `PARTIAL` means the review is useful but the suite, baseline, or mutation proof could not be completed.
+- `NOT_RUN` means the response is only a plan or review could not start.
+
+```md
+ReportFormat: mivia-agent-report/v1
+Skill: adversarial-test-review
+Result: PASS|BLOCK|PARTIAL|NOT_RUN
+Scope: <exact files/packages>
+Baseline: <branch/commit/diff>
+Summary: <one sentence>
+
+| ID | Severity | Status | File:Line | Finding | Required Fix | Required Test | Mutation |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| none | none | closed | none | none | none | none | none |
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| none | NOT_RUN | none |
+
+ResidualRisk: none|<short exact risk>
+NextAction: none|<exact task>
+```

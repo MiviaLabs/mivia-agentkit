@@ -27,8 +27,33 @@ triggers:
 4. Check that tests exercise real boundaries rather than mocks of the thing under test.
 5. For each finding, provide file, symbol, failure mode, user impact, and the test that should catch it.
 
-## Output
+## Required Report
 
-- Findings first, ordered by severity.
-- No speculative issues without a concrete failure path.
-- Include residual risks and focused verifier commands.
+Always use `mivia-agent-report/v1` from `.ai/templates/agent-report-v1.md`. Keep the report strict and concise; do not add free-form sections unless the user asks for a long artifact.
+
+Result semantics:
+
+- `PASS` means no concrete bug path remains in scope and required verification ran.
+- `BLOCK` means at least one concrete bug, missing test, unsafe bypass, or failed verifier remains.
+- `PARTIAL` means the audit found useful evidence but scope, tooling, or gated runtime proof is incomplete.
+- `NOT_RUN` means the response is only a plan or the audit could not start.
+
+```md
+ReportFormat: mivia-agent-report/v1
+Skill: deep-bug-audit
+Result: PASS|BLOCK|PARTIAL|NOT_RUN
+Scope: <exact files/packages>
+Baseline: <branch/commit/diff>
+Summary: <one sentence>
+
+| ID | Severity | Status | File:Line | Finding | Required Fix | Required Test | Mutation |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| none | none | closed | none | none | none | none | none |
+
+| Command | Result | Notes |
+| --- | --- | --- |
+| none | NOT_RUN | none |
+
+ResidualRisk: none|<short exact risk>
+NextAction: none|<exact task>
+```

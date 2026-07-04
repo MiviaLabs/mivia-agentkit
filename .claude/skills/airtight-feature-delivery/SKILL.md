@@ -11,6 +11,8 @@ triggers:
 
 Read `.ai/skills/airtight-feature-delivery/SKILL.md` first. Follow `AGENTS.md`, `.ai/rules/00-operating-doctrine.md`, and `.ai/rules/30-go-standards.md`.
 
+Use `mivia-agent-report/v1` from `.ai/templates/agent-report-v1.md`; do not define a Claude-specific report shape.
+
 Claude-specific behavior:
 
 - State intended edits before modifying files.

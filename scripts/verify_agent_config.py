@@ -109,6 +109,7 @@ def verify_index() -> None:
         ".githooks/",
         "semgrep/",
         "scripts/",
+        ".ai/templates/agent-report-v1.md",
         ".ai/policy/commit-message.json",
         ".ai/policy/agent-hook-bypass.json",
         ".agents/hooks.json",
@@ -116,6 +117,7 @@ def verify_index() -> None:
         "README.md",
         "make install-hooks",
         "make agent-hook-test",
+        "make skill-contract-test",
     ]:
         require(path in content, f".ai/INDEX.md: missing hook verification path {path}")
 
@@ -153,6 +155,61 @@ def verify_skills() -> None:
         require(isinstance(triggers, list) and bool(triggers), f"{path}: triggers must be non-empty")
         expected_name = Path(path).parent.name
         require(frontmatter.get("name") == expected_name, f"{path}: name must match directory")
+
+
+def verify_skill_report_contract() -> None:
+    report_format = "mivia-agent-report/v1"
+    result_enum = "PASS|BLOCK|PARTIAL|NOT_RUN"
+    findings_header = "| ID | Severity | Status | File:Line | Finding | Required Fix | Required Test | Mutation |"
+    command_header = "| Command | Result | Notes |"
+
+    template_path = ".ai/templates/agent-report-v1.md"
+    require(repo_path(template_path).is_file(), f"{template_path}: missing")
+    template = text(template_path)
+    for needle in [
+        f"ReportFormat: {report_format}",
+        "Skill: <name>",
+        f"Result: {result_enum}",
+        "Scope: <exact files/packages>",
+        "Baseline: <branch/commit/diff>",
+        "Summary: <one sentence>",
+        findings_header,
+        command_header,
+        "ResidualRisk: none|<short exact risk>",
+        "NextAction: none|<exact task>",
+        "Result enum is exactly `PASS`, `BLOCK`, `PARTIAL`, or `NOT_RUN`.",
+        "Keep every cell to one short sentence or `none`.",
+    ]:
+        require(needle in template, f"{template_path}: missing {needle}")
+
+    for path in sorted(str(p.relative_to(ROOT)) for p in repo_path(".ai/skills").glob("*/SKILL.md")):
+        content = text(path)
+        for needle in [
+            "## Required Report",
+            f"ReportFormat: {report_format}",
+            ".ai/templates/agent-report-v1.md",
+            f"Result: {result_enum}",
+            findings_header,
+            command_header,
+            "ResidualRisk:",
+            "NextAction:",
+        ]:
+            require(needle in content, f"{path}: missing report contract marker {needle}")
+        require(
+            re.search(r"^## Output\s*$", content, re.MULTILINE) is None,
+            f"{path}: must use ## Required Report instead of free-form ## Output",
+        )
+
+    for path in sorted(str(p.relative_to(ROOT)) for p in repo_path(".claude/skills").glob("*/SKILL.md")):
+        content = text(path)
+        require(report_format in content, f"{path}: missing {report_format}")
+        require(".ai/templates/agent-report-v1.md" in content, f"{path}: missing report template reference")
+        require(
+            re.search(r"^## Output\s*$", content, re.MULTILINE) is None,
+            f"{path}: must not define a separate ## Output section",
+        )
+        require(findings_header not in content, f"{path}: must not duplicate report findings table")
+        require(command_header not in content, f"{path}: must not duplicate report command table")
 
 
 def verify_adapters() -> None:
@@ -331,7 +388,9 @@ def verify_git_hooks() -> None:
         "scripts/agent_hook_guard.py",
         "scripts/run_agent_hook_guard.sh",
         "scripts/test_agent_hook_guard.py",
+        "scripts/test_skill_contracts.py",
         "semgrep/agent-standards.yml",
+        ".ai/templates/agent-report-v1.md",
         ".ai/policy/commit-message.json",
         ".ai/policy/agent-hook-bypass.json",
         ".agents/hooks.json",
@@ -358,6 +417,7 @@ def verify_git_hooks() -> None:
         "scripts/agent_hook_guard.py",
         "scripts/run_agent_hook_guard.sh",
         "scripts/test_agent_hook_guard.py",
+        "scripts/test_skill_contracts.py",
     ]
     for path in executable_files:
         require(os.access(repo_path(path), os.X_OK), f"{path}: must be executable")
@@ -370,6 +430,7 @@ def verify_git_hooks() -> None:
         "semgrep-test:",
         "hook-test:",
         "agent-hook-test:",
+        "skill-contract-test:",
         "pre-commit:",
         "pre-push:",
         "go-check:",
@@ -433,6 +494,7 @@ def verify_git_hooks() -> None:
         "scripts/test_semgrep_rules.py",
         "scripts/test_git_hooks.py",
         "scripts/test_agent_hook_guard.py",
+        "scripts/test_skill_contracts.py",
         "--disable-nosem",
         "semgrep --config semgrep/agent-standards.yml",
         "mivia-agent-precommit-summary",
@@ -440,6 +502,7 @@ def verify_git_hooks() -> None:
         "Quality: pre-commit passed",
         "agent config verification passed",
         "agent hook tests passed",
+        "skill contract tests passed",
     ]:
         require(needle in pre_commit, f"scripts/git-hooks/pre-commit: missing {needle}")
 
@@ -506,6 +569,7 @@ def verify_git_hooks() -> None:
         "scripts/test_semgrep_rules.py",
         "scripts/test_git_hooks.py",
         "scripts/test_agent_hook_guard.py",
+        "scripts/test_skill_contracts.py",
         "--disable-nosem",
         "semgrep --config semgrep/agent-standards.yml",
         "go test ./...",
@@ -523,6 +587,7 @@ def verify_git_hooks() -> None:
         "mivia.generic.brand-mivialabs",
         "mivia.generic.commit-policy-no-optional-scope-wording",
         "mivia.generic.no-git-hook-bypass-in-agent-config",
+        "mivia.generic.no-skill-freeform-output-heading",
         "mivia.go.no-panic-in-internal",
         "mivia.go.no-fatal-exit-in-internal",
         "mivia.go.no-shell-exec",
@@ -543,6 +608,7 @@ def verify_git_hooks() -> None:
         "mivia.generic.brand-mivialabs",
         "mivia.generic.commit-policy-no-optional-scope-wording",
         "mivia.generic.no-git-hook-bypass-in-agent-config",
+        "mivia.generic.no-skill-freeform-output-heading",
         "mivia.go.no-shell-exec",
         "mivia.go.tests-no-time-sleep",
     ]:
@@ -570,6 +636,7 @@ def verify_secret_hygiene() -> None:
         "scripts/agent_hook_guard.py",
         "scripts/run_agent_hook_guard.sh",
         "scripts/test_agent_hook_guard.py",
+        "scripts/test_skill_contracts.py",
         "semgrep",
         "scripts/verify_agent_config.py",
     ]
@@ -603,6 +670,7 @@ def main() -> int:
     verify_index()
     verify_agent_quality_rules()
     verify_skills()
+    verify_skill_report_contract()
     verify_adapters()
     verify_agents_hooks()
     verify_agent_hook_guard()
