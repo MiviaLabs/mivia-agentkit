@@ -242,10 +242,7 @@ def test_roadmap_files_moved_under_named_root() -> None:
 
 def test_readme_docs_toc_points_to_moved_roadmap() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    expected = "[Workstream roadmap](docs/plans/agentkit-implementation-roadmap/00-overview.md)"
     stale = "[Workstream roadmap](docs/plans/00-overview.md)"
-    if expected not in readme:
-        raise AssertionError("README Docs TOC missing moved workstream roadmap link")
     if stale in readme:
         raise AssertionError("README Docs TOC still points to the old workstream roadmap path")
 

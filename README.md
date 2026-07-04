@@ -76,7 +76,5 @@ make help
 - [Development hooks](docs/development-hooks.md) - hook behavior and policy shape
 - [Agent hooks](docs/agent-hooks.md) - agent hook surfaces, triggers, policies, and audit-loop behavior
 - [Agent planning](docs/agent-planning.md) - DAG planning skill, machine plan contract, and implementation hooks
-- [Product requirements](docs/prd/0001-mivia-agentkit.md) - product requirements
-- [Workstream roadmap](docs/plans/agentkit-implementation-roadmap/00-overview.md) - AgentKit implementation roadmap
 
 ![Mivia AgentKit](docs/mivia-agentkit.jpeg)
