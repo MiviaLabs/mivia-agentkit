@@ -48,7 +48,7 @@ Phase 0                  Phase 1                       Phase 2
 | 2 | [`ws-02-templates-init/`](ws-02-templates-init/tasks.md) | Templates + `init` | 1 | WS1 | ☑ |
 | 3 | [`ws-03-doctor-audit/`](ws-03-doctor-audit/tasks.md) | `doctor` + `audit` | 1 | WS2 | ☑ |
 | 4 | [`ws-04-preflight-stamp/`](ws-04-preflight-stamp/tasks.md) | Preflight + quality stamp | 2 | WS1 | ☑ |
-| 9 | [`ws-09-adapters/`](ws-09-adapters/tasks.md) | Adapter system (Codex, Claude headless) | 2 | WS1 | ☐ |
+| 9 | [`ws-09-adapters/`](ws-09-adapters/tasks.md) | Adapter system (Codex, Claude headless) | 2 | WS1 | ☑ |
 | 10 | [`ws-10-orchestrator/`](ws-10-orchestrator/tasks.md) | Orchestrator (DAG + loops) | 3 | WS4, WS9 | ☐ |
 | 11 | [`ws-11-consensus/`](ws-11-consensus/tasks.md) | Consensus voting | 3 | WS9 | ☐ |
 | 12 | [`ws-12-governance/`](ws-12-governance/tasks.md) | Governance provider (noop + AGT) | 2,4 | WS1 | ☐ |

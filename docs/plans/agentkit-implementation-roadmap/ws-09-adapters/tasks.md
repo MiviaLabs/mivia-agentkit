@@ -146,9 +146,17 @@ grep -rn 'exec.Command\|os/exec' ./internal/adapter/*_test.go || echo "no real e
 ```
 
 WS9 is ☑ when:
-- [ ] T0 re-verification done; doc URLs + versions cited in adapter package docs
-- [ ] all listed tests pass (Codex + Claude behind FakeRunner)
-- [ ] approval-enforcement mutation proofs executed (2)
-- [ ] scrubbing mutation proof executed (1)
-- [ ] no real CLI invocation in tests
-- [ ] status updated in `00-overview.md`
+- [x] T0 re-verification done; doc URLs + versions cited in adapter package docs
+- [x] all listed tests pass (Codex + Claude behind FakeRunner)
+- [x] approval-enforcement mutation proofs executed (2)
+- [x] scrubbing mutation proof executed (1)
+- [x] no real CLI invocation in tests
+- [x] status updated in `00-overview.md`
+
+## Completion — 2026-07-05
+
+- Tests: 35 passing in `go test ./internal/adapter/... -count=1`.
+- Mutation proofs: empty approval validation failed `TestRequestRejectsEmptyApproval`; Codex approval flag removal failed `TestCodexRunEnforcesNonInteractiveApproval`; Claude permission flag removal failed `TestClaudeRunEnforcesNonInteractiveApproval`; scrub pattern removal failed `TestScrubAWSKey`; runner timeout guard removal failed `TestOSRunnerRespectsTimeout`; raw JSON/JSONL output bypass failed `TestClaudeRunRemovesRawResultFromStdout` and `TestCodexRunRemovesAgentMessageTextFromStdout`; plain provider output bypass failed `TestClaudeRunRedactsPlainProviderStdout` and `TestCodexRunRedactsPlainProviderStdout`; review wrapper parsing bypass failed `TestClaudeReviewParsesVerdictFromJSONResult` and `TestCodexReviewParsesVerdictFromJSONLMessageText`.
+- Files: 11 created.
+- Residual risk: none.
+- Follow-ups: none.
