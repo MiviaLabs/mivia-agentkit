@@ -28,6 +28,7 @@ This sets `core.hooksPath=.githooks`, so Git runs the committed hooks in this re
 - Git hook contract tests
 - `semgrep --config semgrep/agent-standards.yml --error --skip-unknown-extensions --metrics off` on staged files
 - writes a fresh `.git/mivia-agent-precommit-summary` record for `prepare-commit-msg`
+- records the exact `agent config verification passed` result in the commit-message `Quality:` line
 
 ## Prepare-Commit-Msg
 

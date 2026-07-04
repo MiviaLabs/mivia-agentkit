@@ -342,6 +342,7 @@ def verify_git_hooks() -> None:
         "mivia-agent-precommit-summary",
         "git write-tree",
         "Quality: pre-commit passed",
+        "agent config verification passed",
     ]:
         require(needle in pre_commit, f"scripts/git-hooks/pre-commit: missing {needle}")
 
