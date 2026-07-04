@@ -1,6 +1,6 @@
 # Mivia AgentKit
 
-![Mivia logo](docs/logo-mivia.png)
+<img src="docs/logo-mivia-readme.webp" alt="Mivia logo" width="160">
 
 Mivia AgentKit is a greenfield Go CLI project for managing a local agent-control surface across Codex, Claude Code, GitHub Copilot, and future agent adapters.
 
