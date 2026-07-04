@@ -110,9 +110,12 @@ def verify_index() -> None:
         "semgrep/",
         "scripts/",
         ".ai/policy/commit-message.json",
+        ".ai/policy/agent-hook-bypass.json",
+        ".agents/hooks.json",
         "docs/development-hooks.md",
         "README.md",
         "make install-hooks",
+        "make agent-hook-test",
     ]:
         require(path in content, f".ai/INDEX.md: missing hook verification path {path}")
 
@@ -168,11 +171,16 @@ def verify_claude_settings() -> None:
         return
 
     hooks = settings.get("hooks", {})
-    require(set(hooks) == {"PreToolUse", "Stop"}, ".claude/settings.json: unexpected hook events")
+    require(
+        set(hooks) == {"UserPromptSubmit", "PreToolUse", "PermissionRequest", "Stop"},
+        ".claude/settings.json: unexpected hook events",
+    )
 
     event_commands = {
-        "PreToolUse": "mivia-agent hook claude pre-tool-use",
-        "Stop": "mivia-agent hook claude stop",
+        "UserPromptSubmit": "scripts/run_agent_hook_guard.sh\" claude user-prompt-submit",
+        "PreToolUse": "scripts/run_agent_hook_guard.sh\" claude pre-tool-use",
+        "PermissionRequest": "scripts/run_agent_hook_guard.sh\" claude permission-request",
+        "Stop": "scripts/run_agent_hook_guard.sh\" claude stop",
     }
     for event, expected in event_commands.items():
         commands = [
@@ -209,10 +217,10 @@ def verify_codex_hooks() -> None:
         ".codex/hooks.json: unexpected hook events",
     )
     event_commands = {
-        "UserPromptSubmit": "mivia-agent hook codex user-prompt-submit",
-        "PreToolUse": "mivia-agent hook codex pre-tool-use",
-        "PermissionRequest": "mivia-agent hook codex permission-request",
-        "Stop": "mivia-agent hook codex stop",
+        "UserPromptSubmit": "scripts/run_agent_hook_guard.sh\" codex user-prompt-submit",
+        "PreToolUse": "scripts/run_agent_hook_guard.sh\" codex pre-tool-use",
+        "PermissionRequest": "scripts/run_agent_hook_guard.sh\" codex permission-request",
+        "Stop": "scripts/run_agent_hook_guard.sh\" codex stop",
     }
     for event, expected in event_commands.items():
         commands = [
@@ -222,6 +230,74 @@ def verify_codex_hooks() -> None:
             if isinstance(hook, dict)
         ]
         require(any(expected in command for command in commands), f".codex/hooks.json: missing {expected}")
+
+
+def verify_agents_hooks() -> None:
+    config = load_json(".agents/hooks.json")
+    if not isinstance(config, dict):
+        return
+    require(config.get("version") == 1, ".agents/hooks.json: expected version 1")
+    generated_from = config.get("generated_from", [])
+    require(
+        isinstance(generated_from, list) and ".ai/policy/agent-hook-bypass.json" in generated_from,
+        ".agents/hooks.json: missing bypass policy source",
+    )
+    hooks = config.get("hooks", {})
+    require(
+        set(hooks) == {"UserPromptSubmit", "PreToolUse", "PermissionRequest"},
+        ".agents/hooks.json: unexpected hook events",
+    )
+    for event, expected in {
+        "UserPromptSubmit": "scripts/run_agent_hook_guard.sh\" agents user-prompt-submit",
+        "PreToolUse": "scripts/run_agent_hook_guard.sh\" agents pre-tool-use",
+        "PermissionRequest": "scripts/run_agent_hook_guard.sh\" agents permission-request",
+    }.items():
+        commands = [hook.get("command", "") for hook in hooks.get(event, []) if isinstance(hook, dict)]
+        require(any(expected in command for command in commands), f".agents/hooks.json: missing {expected}")
+
+
+def verify_agent_hook_guard() -> None:
+    policy = load_json(".ai/policy/agent-hook-bypass.json")
+    if isinstance(policy, dict):
+        require(policy.get("version") == 1, ".ai/policy/agent-hook-bypass.json: expected version 1")
+        require(policy.get("blockedFlags") == ["--no-verify"], ".ai/policy/agent-hook-bypass.json: blockedFlags drifted")
+        require(
+            policy.get("blockedEnv") == {"HUSKY": "0"},
+            ".ai/policy/agent-hook-bypass.json: blockedEnv drifted",
+        )
+        require(
+            policy.get("blockedLegacyEnv") == ["HUSKY_SKIP_HOOKS"],
+            ".ai/policy/agent-hook-bypass.json: blockedLegacyEnv drifted",
+        )
+        message = policy.get("correctiveMessage")
+        require(
+            isinstance(message, str)
+            and "Do not bypass Git hooks" in message
+            and "fix the failing hook" in message
+            and "notify the user" in message,
+            ".ai/policy/agent-hook-bypass.json: correctiveMessage missing required guidance",
+        )
+
+    guard = text("scripts/agent_hook_guard.py")
+    for needle in [
+        "agent-hook-bypass.json",
+        "blockedFlags",
+        "blockedEnv",
+        "blockedLegacyEnv",
+        "permissionDecision",
+        "deny",
+        "additionalContext",
+        "Malformed agent hook payload; protected action denied",
+    ]:
+        require(needle in guard, f"scripts/agent_hook_guard.py: missing {needle}")
+
+    runner = text("scripts/run_agent_hook_guard.sh")
+    for needle in [
+        "mivia-agent hook",
+        "scripts/agent_hook_guard.py",
+        "git rev-parse --show-toplevel",
+    ]:
+        require(needle in runner, f"scripts/run_agent_hook_guard.sh: missing {needle}")
 
 
 def verify_gitignore() -> None:
@@ -252,8 +328,13 @@ def verify_git_hooks() -> None:
         "scripts/install_git_hooks.sh",
         "scripts/test_semgrep_rules.py",
         "scripts/test_git_hooks.py",
+        "scripts/agent_hook_guard.py",
+        "scripts/run_agent_hook_guard.sh",
+        "scripts/test_agent_hook_guard.py",
         "semgrep/agent-standards.yml",
         ".ai/policy/commit-message.json",
+        ".ai/policy/agent-hook-bypass.json",
+        ".agents/hooks.json",
         "docs/setup/development-environment.md",
         "docs/development-hooks.md",
         "Makefile",
@@ -274,6 +355,9 @@ def verify_git_hooks() -> None:
         "scripts/install_git_hooks.sh",
         "scripts/test_semgrep_rules.py",
         "scripts/test_git_hooks.py",
+        "scripts/agent_hook_guard.py",
+        "scripts/run_agent_hook_guard.sh",
+        "scripts/test_agent_hook_guard.py",
     ]
     for path in executable_files:
         require(os.access(repo_path(path), os.X_OK), f"{path}: must be executable")
@@ -285,6 +369,7 @@ def verify_git_hooks() -> None:
         "semgrep-validate:",
         "semgrep-test:",
         "hook-test:",
+        "agent-hook-test:",
         "pre-commit:",
         "pre-push:",
         "go-check:",
@@ -347,12 +432,14 @@ def verify_git_hooks() -> None:
         "semgrep --validate --config semgrep/agent-standards.yml",
         "scripts/test_semgrep_rules.py",
         "scripts/test_git_hooks.py",
+        "scripts/test_agent_hook_guard.py",
         "--disable-nosem",
         "semgrep --config semgrep/agent-standards.yml",
         "mivia-agent-precommit-summary",
         "git write-tree",
         "Quality: pre-commit passed",
         "agent config verification passed",
+        "agent hook tests passed",
     ]:
         require(needle in pre_commit, f"scripts/git-hooks/pre-commit: missing {needle}")
 
@@ -418,6 +505,7 @@ def verify_git_hooks() -> None:
         "semgrep --validate --config semgrep/agent-standards.yml",
         "scripts/test_semgrep_rules.py",
         "scripts/test_git_hooks.py",
+        "scripts/test_agent_hook_guard.py",
         "--disable-nosem",
         "semgrep --config semgrep/agent-standards.yml",
         "go test ./...",
@@ -434,6 +522,7 @@ def verify_git_hooks() -> None:
         "mivia.generic.no-unresolved-drift-markers",
         "mivia.generic.brand-mivialabs",
         "mivia.generic.commit-policy-no-optional-scope-wording",
+        "mivia.generic.no-git-hook-bypass-in-agent-config",
         "mivia.go.no-panic-in-internal",
         "mivia.go.no-fatal-exit-in-internal",
         "mivia.go.no-shell-exec",
@@ -453,6 +542,7 @@ def verify_git_hooks() -> None:
         "mivia.generic.no-unresolved-drift-markers",
         "mivia.generic.brand-mivialabs",
         "mivia.generic.commit-policy-no-optional-scope-wording",
+        "mivia.generic.no-git-hook-bypass-in-agent-config",
         "mivia.go.no-shell-exec",
         "mivia.go.tests-no-time-sleep",
     ]:
@@ -477,6 +567,9 @@ def verify_secret_hygiene() -> None:
         "scripts/install_git_hooks.sh",
         "scripts/test_semgrep_rules.py",
         "scripts/test_git_hooks.py",
+        "scripts/agent_hook_guard.py",
+        "scripts/run_agent_hook_guard.sh",
+        "scripts/test_agent_hook_guard.py",
         "semgrep",
         "scripts/verify_agent_config.py",
     ]
@@ -511,6 +604,8 @@ def main() -> int:
     verify_agent_quality_rules()
     verify_skills()
     verify_adapters()
+    verify_agents_hooks()
+    verify_agent_hook_guard()
     verify_claude_settings()
     verify_codex_hooks()
     verify_gitignore()

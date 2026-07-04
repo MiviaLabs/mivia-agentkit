@@ -100,6 +100,21 @@ rules:
         - /scripts/test_git_hooks.py
     pattern-regex: 'type\(optional-scope\)|optional scope'
 
+  - id: mivia.generic.no-git-hook-bypass-in-agent-config
+    languages:
+      - generic
+    severity: ERROR
+    message: Do not instruct agents to bypass Git hooks; fix validation failures or report blockers.
+    paths:
+      include:
+        - /AGENTS.md
+        - /CLAUDE.md
+        - /.agents/**
+        - /.claude/**
+        - /.codex/**
+        - /.github/**
+    pattern-regex: '(?i)(--no-verify|\bHUSKY\s*=\s*0\b|\bHUSKY_SKIP_HOOKS\b)'
+
   - id: mivia.go.no-panic-in-internal
     languages:
       - go

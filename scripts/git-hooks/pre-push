@@ -22,6 +22,7 @@ require_cmd semgrep
 semgrep --validate --config semgrep/agent-standards.yml
 python3 scripts/test_semgrep_rules.py
 python3 scripts/test_git_hooks.py
+python3 scripts/test_agent_hook_guard.py
 semgrep --config semgrep/agent-standards.yml --error --skip-unknown-extensions --metrics off --disable-nosem .
 
 if [[ ! -f go.mod ]]; then

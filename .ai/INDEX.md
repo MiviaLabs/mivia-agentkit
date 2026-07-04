@@ -8,7 +8,7 @@
 2. `.ai/INDEX.md`
 3. Relevant `.ai/rules/*.md`
 4. Relevant `.ai/skills/*/SKILL.md`
-5. Tool adapter files only when running that tool: `CLAUDE.md`, `.claude/settings.json`, `.codex/hooks.json`, `.github/copilot-instructions.md`
+5. Tool adapter files only when running that tool: `CLAUDE.md`, `.agents/hooks.json`, `.claude/settings.json`, `.codex/hooks.json`, `.github/copilot-instructions.md`
 
 ## Rules
 
@@ -43,10 +43,13 @@ The registry at `.agents/skills.json` lists all committed project skill files fr
 ## Policy
 
 - `.ai/policy/commit-message.json` - allowed commit message types, scopes, and subject length for the repo `commit-msg` hook.
+- `.ai/policy/agent-hook-bypass.json` - blocked verification-bypass terms and the corrective instruction used by agent hooks.
 
 ## Verification
 
 Run `python3 scripts/verify_agent_config.py` after changing `AGENTS.md`, `.ai/`, `.claude/`, `.codex/`, `.github/`, `.agents/`, `.githooks/`, `semgrep/`, `.gitignore`, or `scripts/`.
+
+Run `make agent-hook-test` after changing `.agents/hooks.json`, `.claude/settings.json`, `.codex/hooks.json`, `.ai/policy/agent-hook-bypass.json`, or `scripts/agent_hook_guard.py`.
 
 Install local Git hooks with:
 

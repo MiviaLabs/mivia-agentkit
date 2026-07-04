@@ -33,6 +33,7 @@ require_cmd semgrep
 semgrep --validate --config semgrep/agent-standards.yml
 python3 scripts/test_semgrep_rules.py
 python3 scripts/test_git_hooks.py
+python3 scripts/test_agent_hook_guard.py
 
 mapfile -d '' STAGED_FILES < <(
   git diff --cached --name-only --diff-filter=ACMR -z \
@@ -48,5 +49,5 @@ fi
 TREE="$(git write-tree)"
 printf 'tree=%s\nsummary=%s\n' \
   "$TREE" \
-  "Quality: pre-commit passed (agent config verification passed, whitespace passed, semgrep rules passed, hook tests passed, ${STAGED_SEMGREP_SUMMARY}; ${GOFMT_SUMMARY})" \
+  "Quality: pre-commit passed (agent config verification passed, whitespace passed, semgrep rules passed, hook tests passed, agent hook tests passed, ${STAGED_SEMGREP_SUMMARY}; ${GOFMT_SUMMARY})" \
   >"$SUMMARY_FILE"

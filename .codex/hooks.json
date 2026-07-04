@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -c 'command -v mivia-agent >/dev/null 2>&1 && exec mivia-agent hook codex user-prompt-submit || exit 0'",
+            "command": "sh -c 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); exec \"$ROOT/scripts/run_agent_hook_guard.sh\" codex user-prompt-submit'",
             "statusMessage": "Checking prompt policy"
           }
         ]
@@ -13,11 +13,11 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash|apply_patch|Edit|Write|mcp__.*",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "sh -c 'command -v mivia-agent >/dev/null 2>&1 && exec mivia-agent hook codex pre-tool-use || exit 0'",
+            "command": "sh -c 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); exec \"$ROOT/scripts/run_agent_hook_guard.sh\" codex pre-tool-use'",
             "statusMessage": "Checking tool policy"
           }
         ]
@@ -25,11 +25,11 @@
     ],
     "PermissionRequest": [
       {
-        "matcher": "Bash|apply_patch|Edit|Write|mcp__.*",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "sh -c 'command -v mivia-agent >/dev/null 2>&1 && exec mivia-agent hook codex permission-request || exit 0'",
+            "command": "sh -c 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); exec \"$ROOT/scripts/run_agent_hook_guard.sh\" codex permission-request'",
             "statusMessage": "Checking permission request"
           }
         ]
@@ -40,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -c 'command -v mivia-agent >/dev/null 2>&1 && exec mivia-agent hook codex stop || exit 0'",
+            "command": "sh -c 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); exec \"$ROOT/scripts/run_agent_hook_guard.sh\" codex stop'",
             "statusMessage": "Checking completion policy",
             "timeout": 30
           }

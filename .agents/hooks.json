@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "generated_from": [
+    ".ai/policy/agent-hook-bypass.json"
+  ],
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "type": "command",
+        "command": "sh -c 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); exec \"$ROOT/scripts/run_agent_hook_guard.sh\" agents user-prompt-submit'"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Shell|Command",
+        "type": "command",
+        "command": "sh -c 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); exec \"$ROOT/scripts/run_agent_hook_guard.sh\" agents pre-tool-use'"
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "Bash|Shell|Command",
+        "type": "command",
+        "command": "sh -c 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); exec \"$ROOT/scripts/run_agent_hook_guard.sh\" agents permission-request'"
+      }
+    ]
+  }
+}

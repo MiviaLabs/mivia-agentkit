@@ -50,13 +50,35 @@
     }
   },
   "hooks": {
-    "PreToolUse": [
+    "UserPromptSubmit": [
       {
-        "matcher": "Bash|Edit|Write|MultiEdit",
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "sh -c 'command -v mivia-agent >/dev/null 2>&1 && exec mivia-agent hook claude pre-tool-use || exit 0'"
+            "command": "sh -c 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); exec \"$ROOT/scripts/run_agent_hook_guard.sh\" claude user-prompt-submit'"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); exec \"$ROOT/scripts/run_agent_hook_guard.sh\" claude pre-tool-use'"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); exec \"$ROOT/scripts/run_agent_hook_guard.sh\" claude permission-request'"
           }
         ]
       }
@@ -67,7 +89,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -c 'command -v mivia-agent >/dev/null 2>&1 && exec mivia-agent hook claude stop || exit 0'"
+            "command": "sh -c 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); exec \"$ROOT/scripts/run_agent_hook_guard.sh\" claude stop'"
           }
         ]
       }

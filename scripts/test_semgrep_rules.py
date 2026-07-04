@@ -21,6 +21,7 @@ EXPECTED_RULES = {
     "mivia.generic.no-unresolved-drift-markers",
     "mivia.generic.brand-mivialabs",
     "mivia.generic.commit-policy-no-optional-scope-wording",
+    "mivia.generic.no-git-hook-bypass-in-agent-config",
     "mivia.go.no-panic-in-internal",
     "mivia.go.no-fatal-exit-in-internal",
     "mivia.go.no-shell-exec",
@@ -101,6 +102,14 @@ def create_bad_fixture(root: Path) -> None:
         root / "docs" / "development-hooks.md",
         """
         Commit subjects may use type(optional-scope): subject.
+        """,
+    )
+    write(
+        root / ".codex" / "AGENTS.md",
+        """
+        # Bad Adapter
+
+        If hooks fail, run git commit --no-verify.
         """,
     )
     write(

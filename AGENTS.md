@@ -16,6 +16,7 @@ Sources: https://agents.md/, https://go.dev/doc/modules/layout. Repo sources: `d
 
 - `docs/` contains the PRD, product proposal, workstream roadmap, and task files. Treat it as the source for product behavior.
 - `.ai/` is the project-level canonical control surface for rules, skills, workflows, quality contracts, and future run artifacts.
+- `.agents/` contains generic cross-agent registries and hook declarations that delegate back to `.ai/` policy.
 - `.claude/`, `.codex/`, and `.github/` are tool adapters that reference `AGENTS.md` and `.ai/`.
 - Future Go code belongs in `cmd/mivia-agent/` and `internal/` following the package map in `docs/plans/_conventions.md`.
 - Runtime output belongs under `.ai/runs/` and must stay gitignored.
@@ -92,6 +93,8 @@ make install-hooks
 
 The committed hooks run `gofmt`, Semgrep rule tests, and Semgrep policy checks before commit, then agent-config validation, full Semgrep, and Go test/vet/build checks before push. The Go checks no-op until `go.mod` exists. `make verify` runs the full local gate.
 
+Agent tool hooks in `.agents/`, `.claude/`, and `.codex/` run a shared guard that rejects verification-bypass attempts and tells the model to fix the failed validation or report the blocker after one focused repair attempt.
+
 When adding or changing a durable repo standard, forbidden pattern, hook policy, security invariant, or repeated agent failure mode, update `semgrep/agent-standards.yml` if the rule can be checked statically and add coverage in `scripts/test_semgrep_rules.py`.
 
 Sources: https://agents.md/, https://go.dev/doc/modules/layout, https://git-scm.com/docs/githooks, https://git-scm.com/docs/git-config, https://pkg.go.dev/cmd/gofmt, https://docs.semgrep.dev/extensions/pre-commit, https://docs.semgrep.dev/writing-rules/testing-rules, https://docs.semgrep.dev/cli-reference. Repo sources: `docs/plans/_conventions.md`, `docs/development-hooks.md`.
@@ -109,8 +112,9 @@ Sources: https://agents.md/, https://developers.openai.com/codex/guides/agents-m
 ## Tool Adapters
 
 - `CLAUDE.md` is a thin Claude Code adapter; it must keep Claude-specific notes only.
-- `.claude/settings.json` configures project permissions and stub hooks. Hooks are safe no-ops until `mivia-agent` exists.
-- `.codex/hooks.json` configures Codex hook stubs for `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, and `Stop`.
+- `.agents/hooks.json` declares the generic hook guard surface for cross-agent tooling.
+- `.claude/settings.json` configures project permissions and delegates Claude Code hooks through the shared guard before falling through to the future `mivia-agent` hook implementation.
+- `.codex/hooks.json` configures Codex hooks for `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, and `Stop`, all delegated through the shared guard before falling through to the future `mivia-agent` hook implementation.
 - `.github/copilot-instructions.md` and `.github/instructions/*.instructions.md` are Copilot adapters that point back to this file.
 - Skills use `SKILL.md` frontmatter with at least `name`, `description`, and `triggers`. The canonical project skills live under `.ai/skills/`; `.claude/skills/` adapts them for Claude Code.
 

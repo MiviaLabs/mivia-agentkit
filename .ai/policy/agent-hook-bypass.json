@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "blockedFlags": [
+    "--no-verify"
+  ],
+  "blockedEnv": {
+    "HUSKY": "0"
+  },
+  "blockedLegacyEnv": [
+    "HUSKY_SKIP_HOOKS"
+  ],
+  "correctiveMessage": "Do not bypass Git hooks with blocked verification flags or Husky skip variables. Run the hooks normally, fix the failing hook, test, or validation, then retry once. If one focused repair attempt cannot resolve it, notify the user with the exact blocker instead of bypassing verification."
+}
