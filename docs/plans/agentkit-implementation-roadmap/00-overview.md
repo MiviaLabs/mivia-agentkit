@@ -58,7 +58,7 @@ Phase 0                  Phase 1                       Phase 2
 | 6 | [`ws-06-adapter-templates/`](ws-06-adapter-templates/tasks.md) | Adapter templates (incl. Crush) | 4 | WS2, WS9 | ☑ |
 | 7 | [`ws-07-import-update/`](ws-07-import-update/tasks.md) | `import` + `update` | 5 | WS2, WS3 | ☑ |
 | 14 | [`ws-14-real-runtime-coverage/`](ws-14-real-runtime-coverage/tasks.md) | Real runtime coverage for commands and adapters | 5 | WS2, WS3, WS4, WS5, WS6, WS7, WS9, WS10, WS11, WS12, WS13 | ☑ |
-| 8 | [`ws-08-ci-release-docs/`](ws-08-ci-release-docs/tasks.md) | CI, release, docs | 5 | all prior, WS14 | ☐ |
+| 8 | [`ws-08-ci-release-docs/`](ws-08-ci-release-docs/tasks.md) | CI, release, docs | 5 | all prior, WS14 | ☑ |
 
 Numbering follows the product plan, not execution order. **Execute by phase, not by number.**
 

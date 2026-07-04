@@ -36,7 +36,6 @@
       ".ai/schemas/agent-plan-v1.schema.json",
       ".ai/plans/agentkit-implementation-roadmap.plan.json",
       "docs/agent-planning.md",
-      "docs/plans/agentkit-implementation-roadmap.md",
       "docs/plans/agentkit-implementation-roadmap/00-overview.md",
       "docs/plans/agentkit-implementation-roadmap/_conventions.md",
       "docs/plans/agentkit-implementation-roadmap/ws-00-bootstrap/tasks.md",

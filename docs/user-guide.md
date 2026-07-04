@@ -25,6 +25,8 @@ go run ./cmd/mivia-agent --help
 
 Use `--repo` on commands to point at the target Git repository. If omitted, commands use the current directory unless the command says otherwise.
 
+Example manifest and workflow files live in [config-examples.md](./config-examples.md).
+
 ## Command Matrix
 
 | Command | PRD | Current behavior |

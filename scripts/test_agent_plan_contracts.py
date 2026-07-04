@@ -18,8 +18,6 @@ TEMPLATE = ROOT / ".ai" / "templates" / "agent-plan-v1.json"
 ROADMAP_PLAN_ROOT = ROOT / "docs" / "plans" / "agentkit-implementation-roadmap"
 MACHINE_PLAN_ROOT = ROOT / ".ai" / "plans"
 AGENTKIT_PLAN = MACHINE_PLAN_ROOT / "agentkit-implementation-roadmap.plan.json"
-AGENTKIT_HUMAN_PLAN = ROOT / "docs" / "plans" / "agentkit-implementation-roadmap.md"
-
 EXPECTED_ROADMAP_PLAN_FILES = [
     "00-overview.md",
     "_conventions.md",
@@ -260,7 +258,6 @@ def test_planning_markdown_links_resolve() -> None:
         ROOT / "README.md",
         ROOT / ".ai" / "INDEX.md",
         ROOT / "docs" / "agent-planning.md",
-        AGENTKIT_HUMAN_PLAN,
     ]
     docs.extend(sorted(ROADMAP_PLAN_ROOT.rglob("*.md")))
 
@@ -314,13 +311,8 @@ def test_committed_machine_plan_artifacts_are_real_and_validated() -> None:
 def test_agentkit_implementation_plan_is_named_and_referenced() -> None:
     if not AGENTKIT_PLAN.is_file():
         raise AssertionError("missing .ai/plans/agentkit-implementation-roadmap.plan.json")
-    if not AGENTKIT_HUMAN_PLAN.is_file():
-        raise AssertionError("missing docs/plans/agentkit-implementation-roadmap.md")
-
-    human = AGENTKIT_HUMAN_PLAN.read_text(encoding="utf-8")
-    artifact = ".ai/plans/agentkit-implementation-roadmap.plan.json"
-    if f"PlanArtifact: {artifact}" not in human:
-        raise AssertionError("human AgentKit implementation plan missing PlanArtifact line")
+    if not ROADMAP_PLAN_ROOT.is_dir():
+        raise AssertionError("missing docs/plans/agentkit-implementation-roadmap/")
 
     parsed = json.loads(AGENTKIT_PLAN.read_text(encoding="utf-8"))
     if parsed.get("plan_id") != "agentkit-implementation-roadmap":

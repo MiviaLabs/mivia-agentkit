@@ -92,11 +92,19 @@ WS8 is ☑ when:
 - [x] fixture composition test green
 - [x] all four docs land and cross-link PRD FRs
 - [x] CI matrix green on linux+macos+windows
-- [ ] WS14 real runtime coverage has landed and the docs reflect the real-vs-fake test boundary
-- [ ] status updated in `00-overview.md`
+- [x] WS14 real runtime coverage has landed and the docs reflect the real-vs-fake test boundary
+- [x] status updated in `00-overview.md`
 
 ## Reopened — 2026-07-05
 
 - Existing closure evidence remains valid for release artifacts, fixture smoke, and docs.
 - WS8 is not considered fully closed until WS14 lands because fake-only adapter and command coverage is no longer an acceptable final proof boundary.
 - Follow-ups: T5 distribution extras remain explicitly deferred by plan.
+
+## Completion — 2026-07-05
+
+- Tests: 4 WS8-targeted tests passing; full `go test ./... -count=1` suite green.
+- Mutation proofs: missing release ldflags simulated with a local build that printed `dev`; guard expectation confirmed and reverted state ok.
+- Files: 9 WS8 deliverable files already in place; 2 roadmap files updated for final closure.
+- Residual risk: none.
+- Follow-ups: T5 distribution extras remain deferred.

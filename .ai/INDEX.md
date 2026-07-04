@@ -49,7 +49,7 @@ The registry at `.agents/skills.json` lists all committed project skill files fr
 
 Committed machine-readable implementation plans live under `.ai/plans/`. `.ai/runs/` is reserved for future workflow traces and summaries and is gitignored. Do not persist raw prompts, raw model outputs, provider payloads, credentials, or plausible secrets there.
 
-The AgentKit implementation roadmap is under `docs/plans/agentkit-implementation-roadmap/`, and the current planning report is `docs/plans/agentkit-implementation-roadmap.md`.
+The AgentKit implementation roadmap is under `docs/plans/agentkit-implementation-roadmap/`. Treat that directory and `.ai/plans/agentkit-implementation-roadmap.plan.json` as the durable planning source of truth.
 
 ## Policy
 

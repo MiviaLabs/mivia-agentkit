@@ -20,7 +20,7 @@ The task directory contains executable task files for each DAG node or workstrea
 - validate the plan with `scripts/validate_agent_plan.py`
 - end with `PlanArtifact: .ai/plans/<id>.plan.json`
 
-The canonical AgentKit implementation roadmap artifact is `.ai/plans/agentkit-implementation-roadmap.plan.json`, with its human report at `docs/plans/agentkit-implementation-roadmap.md`.
+The canonical AgentKit implementation roadmap artifact is `.ai/plans/agentkit-implementation-roadmap.plan.json`, with human planning material kept under `docs/plans/agentkit-implementation-roadmap/`.
 
 `agent-plan-implementer` executes validated plans. It must:
 
