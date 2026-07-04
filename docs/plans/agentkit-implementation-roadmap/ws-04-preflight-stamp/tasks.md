@@ -110,8 +110,16 @@ cat "$tmp/.git/mivia-agent-quality-stamp.json"
 ```
 
 WS4 is ☑ when:
-- [ ] all listed tests pass
-- [ ] stamp written exactly under `.git/`
-- [ ] staleness mutation proofs executed (2)
-- [ ] risk→proof mutation proofs executed (≥2)
-- [ ] status updated in `00-overview.md`
+- [x] all listed tests pass
+- [x] stamp written exactly under `.git/`
+- [x] staleness mutation proofs executed (2)
+- [x] risk→proof mutation proofs executed (≥2)
+- [x] status updated in `00-overview.md`
+
+## Completion — 2026-07-05
+
+- Tests: 21 passing in `go test ./internal/preflight/... -count=1`.
+- Mutation proofs: risk high→low failed `TestClassifyHighForCIChange`; contract-row removal failed `TestPreflightRequiresContractRowsForHighRiskChange`; focused-verifier removal failed `TestPreflightRequiresFocusedVerifierForHighRiskChange`; mutation-proof removal failed `TestPreflightRequiresMutationProofForHighRiskChange`; diff-hash removal failed `TestCheckStampRejectsStaleDiffHash`; changed-files removal failed `TestCheckStampRejectsChangedFilesMismatch`; not-run/broad-verifier conflict removal failed `TestPreflightRejectsNotRunWhenBroadVerifierPresent`; untracked-directory expansion removal failed `TestPreflightHandlesUnstagedUntrackedFile`.
+- Files: 9 created.
+- Residual risk: none.
+- Follow-ups: none.
