@@ -250,6 +250,7 @@ def verify_git_hooks() -> None:
         "scripts/test_semgrep_rules.py",
         "scripts/test_git_hooks.py",
         "semgrep/agent-standards.yml",
+        "docs/setup/development-environment.md",
         "docs/development-hooks.md",
         "Makefile",
         "README.md",
@@ -286,14 +287,30 @@ def verify_git_hooks() -> None:
 
     readme = text("README.md")
     for needle in [
+        "docs/setup/development-environment.md",
+        "docs/development-hooks.md",
         "make install-hooks",
         "make verify",
-        "make semgrep-test",
-        "make hook-test",
-        "semgrep/agent-standards.yml",
-        "scripts/test_semgrep_rules.py",
+        "make help",
+        "docs/prd/0001-mivia-agentkit.md",
+        "docs/plans/00-overview.md",
     ]:
         require(needle in readme, f"README.md: missing {needle}")
+
+    setup_doc = text("docs/setup/development-environment.md")
+    for needle in [
+        "Python 3.10 or newer",
+        "Semgrep CLI",
+        "GNU Make",
+        "sudo apt install -y git bash make python3 python3-venv python3-pip pipx",
+        "pipx install semgrep",
+        "sudo apt install -y golang-go",
+        "sudo snap install go --classic",
+        "go.dev/dl/",
+        "make install-hooks",
+        "make verify",
+    ]:
+        require(needle in setup_doc, f"docs/setup/development-environment.md: missing {needle}")
 
     require(
         'core.hooksPath .githooks' in text("scripts/install_git_hooks.sh"),
@@ -358,6 +375,7 @@ def verify_git_hooks() -> None:
         "mivia.generic.no-shell-metachar-bash-allow",
         "mivia.generic.no-semgrep-suppression",
         "mivia.generic.no-unresolved-drift-markers",
+        "mivia.generic.brand-mivialabs",
         "mivia.go.no-panic-in-internal",
         "mivia.go.no-fatal-exit-in-internal",
         "mivia.go.no-shell-exec",
@@ -375,6 +393,7 @@ def verify_git_hooks() -> None:
     for rule_id in [
         "mivia.generic.no-semgrep-suppression",
         "mivia.generic.no-unresolved-drift-markers",
+        "mivia.generic.brand-mivialabs",
         "mivia.go.no-shell-exec",
         "mivia.go.tests-no-time-sleep",
     ]:
@@ -392,6 +411,7 @@ def verify_secret_hygiene() -> None:
         ".codex",
         ".github",
         ".githooks",
+        "docs/setup/development-environment.md",
         "docs/development-hooks.md",
         "README.md",
         "scripts/git-hooks",

@@ -1,7 +1,7 @@
 # PRD-0001 — Mivia AgentKit
 
 - **Status:** Draft v2 (validated against implementation plan revision 2)
-- **Owner:** Mivia Labs
+- **Owner:** MiviaLabs
 - **Date:** 2026-07-04
 - **Implementation plan:** `docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md`
 - **Replaces:** —

@@ -70,6 +70,23 @@ rules:
         - /.github/**
     pattern-regex: '(?i)\b(TODO|FIXME|HACK|XXX)\b'
 
+  - id: mivia.generic.brand-mivialabs
+    languages:
+      - generic
+    severity: ERROR
+    message: Use MiviaLabs as the brand spelling, not Mivia Labs.
+    paths:
+      include:
+        - /AGENTS.md
+        - /CLAUDE.md
+        - /README.md
+        - /docs/**
+        - /.ai/**
+        - /.claude/**
+        - /.codex/**
+        - /.github/**
+    pattern-regex: '\bMivia Labs\b'
+
   - id: mivia.go.no-panic-in-internal
     languages:
       - go

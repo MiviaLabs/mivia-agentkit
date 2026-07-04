@@ -19,6 +19,7 @@ EXPECTED_RULES = {
     "mivia.generic.no-shell-metachar-bash-allow",
     "mivia.generic.no-semgrep-suppression",
     "mivia.generic.no-unresolved-drift-markers",
+    "mivia.generic.brand-mivialabs",
     "mivia.go.no-panic-in-internal",
     "mivia.go.no-fatal-exit-in-internal",
     "mivia.go.no-shell-exec",
@@ -91,6 +92,8 @@ def create_bad_fixture(root: Path) -> None:
         # Agent Rules
 
         TODO: remove this drift marker.
+
+        The brand must not be written as Mivia Labs.
         """,
     )
     write(
@@ -167,6 +170,14 @@ def create_good_fixture(root: Path) -> None:
         func run() error {
           return errors.New("not implemented")
         }
+        """,
+    )
+    write(
+        root / "README.md",
+        """
+        # MiviaLabs
+
+        This fixture uses the correct brand spelling.
         """,
     )
     write(
