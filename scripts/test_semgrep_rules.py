@@ -20,6 +20,7 @@ EXPECTED_RULES = {
     "mivia.generic.no-semgrep-suppression",
     "mivia.generic.no-unresolved-drift-markers",
     "mivia.generic.brand-mivialabs",
+    "mivia.generic.commit-policy-no-optional-scope-wording",
     "mivia.go.no-panic-in-internal",
     "mivia.go.no-fatal-exit-in-internal",
     "mivia.go.no-shell-exec",
@@ -94,6 +95,12 @@ def create_bad_fixture(root: Path) -> None:
         TODO: remove this drift marker.
 
         The brand must not be written as Mivia Labs.
+        """,
+    )
+    write(
+        root / "docs" / "development-hooks.md",
+        """
+        Commit subjects may use type(optional-scope): subject.
         """,
     )
     write(

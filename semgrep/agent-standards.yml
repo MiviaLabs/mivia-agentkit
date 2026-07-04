@@ -87,6 +87,19 @@ rules:
         - /.github/**
     pattern-regex: '\bMivia Labs\b'
 
+  - id: mivia.generic.commit-policy-no-optional-scope-wording
+    languages:
+      - generic
+    severity: ERROR
+    message: Commit-message docs must require type(scope), not optional scope.
+    paths:
+      include:
+        - /.ai/policy/**
+        - /docs/development-hooks.md
+        - /scripts/git-hooks/commit-msg
+        - /scripts/test_git_hooks.py
+    pattern-regex: 'type\(optional-scope\)|optional scope'
+
   - id: mivia.go.no-panic-in-internal
     languages:
       - go

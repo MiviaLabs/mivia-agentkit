@@ -36,6 +36,15 @@ This sets `core.hooksPath=.githooks`, so Git runs the committed hooks in this re
 - skips merge and squash messages
 - refuses stale summaries by comparing the current staged tree to the pre-commit tree
 
+## Commit-Msg
+
+- validates regular commit subjects as `type(scope): imperative subject`
+- allowed types and scopes are centralized in `.ai/policy/commit-message.json`
+- expand commit types or scopes only by updating `.ai/policy/commit-message.json`, then running `make hook-test`
+- rejects subjects longer than 72 characters or ending with a period
+- appends `commit message passed` to the `Quality:` line after validation succeeds
+- allows Git-generated merge/revert subjects and `fixup!`/`squash!` autosquash subjects
+
 ## Pre-Push
 
 - `python3 scripts/verify_agent_config.py`

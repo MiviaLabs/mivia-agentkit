@@ -6,11 +6,14 @@ from __future__ import annotations
 import subprocess
 import sys
 import tempfile
+import shutil
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 PREPARE_HOOK = ROOT / "scripts" / "git-hooks" / "prepare-commit-msg"
+COMMIT_MSG_HOOK = ROOT / "scripts" / "git-hooks" / "commit-msg"
+COMMIT_POLICY = ROOT / ".ai" / "policy" / "commit-message.json"
 
 
 def run(args: list[str], cwd: Path, *, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -26,6 +29,9 @@ def init_repo(root: Path) -> None:
     run(["git", "config", "user.email", "hook-test@example.invalid"], root)
     run(["git", "config", "user.name", "Hook Test"], root)
     (root / "file.txt").write_text("content\n", encoding="utf-8")
+    policy_path = root / ".ai" / "policy" / "commit-message.json"
+    policy_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(COMMIT_POLICY, policy_path)
     run(["git", "add", "file.txt"], root)
 
 
@@ -72,10 +78,61 @@ def test_prepare_commit_msg_rejects_stale_summary(root: Path) -> None:
         raise AssertionError("prepare-commit-msg appended stale quality summary")
 
 
+def test_commit_msg_accepts_conventional_subject(root: Path) -> None:
+    init_repo(root)
+    msg = root / "COMMIT_MSG_VALID"
+    msg.write_text(
+        "chore(hooks): enforce commit message convention\n\n"
+        "Quality: pre-commit passed (agent config verification passed)\n",
+        encoding="utf-8",
+    )
+
+    run([str(COMMIT_MSG_HOOK), str(msg)], root)
+    content = msg.read_text(encoding="utf-8")
+    if "commit message passed" not in content:
+        raise AssertionError("commit-msg did not record commit message result")
+
+
+def test_commit_msg_rejects_invalid_subject(root: Path) -> None:
+    init_repo(root)
+    msg = root / "COMMIT_MSG_INVALID"
+    msg.write_text("bad message\n", encoding="utf-8")
+
+    proc = run([str(COMMIT_MSG_HOOK), str(msg)], root, check=False)
+    if proc.returncode == 0:
+        raise AssertionError("commit-msg accepted invalid subject")
+    if "expected format" not in proc.stderr:
+        raise AssertionError(f"commit-msg error did not explain convention: {proc.stderr}")
+
+
+def test_commit_msg_requires_scope(root: Path) -> None:
+    init_repo(root)
+    msg = root / "COMMIT_MSG_NO_SCOPE"
+    msg.write_text("chore: missing scope\n", encoding="utf-8")
+
+    proc = run([str(COMMIT_MSG_HOOK), str(msg)], root, check=False)
+    if proc.returncode == 0:
+        raise AssertionError("commit-msg accepted subject without scope")
+
+
+def test_commit_msg_rejects_unknown_scope(root: Path) -> None:
+    init_repo(root)
+    msg = root / "COMMIT_MSG_BAD_SCOPE"
+    msg.write_text("chore(random): unknown scope\n", encoding="utf-8")
+
+    proc = run([str(COMMIT_MSG_HOOK), str(msg)], root, check=False)
+    if proc.returncode == 0:
+        raise AssertionError("commit-msg accepted unknown scope")
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         test_prepare_commit_msg_appends_summary(Path(tmp) / "append")
         test_prepare_commit_msg_rejects_stale_summary(Path(tmp) / "stale")
+        test_commit_msg_accepts_conventional_subject(Path(tmp) / "valid")
+        test_commit_msg_rejects_invalid_subject(Path(tmp) / "invalid")
+        test_commit_msg_requires_scope(Path(tmp) / "no-scope")
+        test_commit_msg_rejects_unknown_scope(Path(tmp) / "bad-scope")
     print("git hook tests passed")
     return 0
 

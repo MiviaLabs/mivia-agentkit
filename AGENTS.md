@@ -99,12 +99,12 @@ Sources: https://agents.md/, https://go.dev/doc/modules/layout, https://git-scm.
 ## Git Workflow
 
 - Use branch names like `codex/<short-scope>` for agent-created branches unless the user asks otherwise.
-- Commit messages should be imperative and scoped, for example `docs(agent): tighten hook adapter guidance` or `feat(config): add manifest parser`.
+- Commit messages must follow `type(scope): imperative subject`; allowed types, scopes, and subject length live in `.ai/policy/commit-message.json`.
 - Do not force-push `dev`.
 - Do not commit product code without green relevant tests and mutation proofs for guards.
 - If existing unrelated changes are present, do not revert them. Work around them or ask only when they block the task.
 
-Sources: https://agents.md/, https://developers.openai.com/codex/guides/agents-md. Repo source: `docs/plans/_conventions.md`.
+Sources: https://agents.md/, https://developers.openai.com/codex/guides/agents-md. Repo sources: `docs/plans/_conventions.md`, `.ai/policy/commit-message.json`.
 
 ## Tool Adapters
 

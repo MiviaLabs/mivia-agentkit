@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MSG_FILE="${1:?commit message file is required}"
+ROOT="$(git rev-parse --show-toplevel)"
+POLICY_FILE="$ROOT/.ai/policy/commit-message.json"
+
+fail() {
+  printf 'commit-msg: %s\n' "$*" >&2
+  printf 'commit-msg: expected format: type(scope): imperative subject\n' >&2
+  printf 'commit-msg: allowed types/scopes are defined in .ai/policy/commit-message.json\n' >&2
+  exit 1
+}
+
+subject="$(
+  awk '
+    /^[[:space:]]*#/ { next }
+    /^[[:space:]]*$/ { next }
+    { print; exit }
+  ' "$MSG_FILE"
+)"
+
+[[ -n "$subject" ]] || fail "empty commit subject"
+
+case "$subject" in
+  Merge\ * | Revert\ \"* | fixup!\ * | squash!\ *)
+    exit 0
+    ;;
+esac
+
+mapfile -t policy < <(
+  python3 - "$POLICY_FILE" <<'PY'
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+policy = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+print("|".join(policy["types"]))
+print("|".join(policy["scopes"]))
+print(policy["maxSubjectLength"])
+PY
+)
+if ((${#policy[@]} != 3)); then
+  fail "invalid commit policy"
+fi
+types="${policy[0]}"
+scopes="${policy[1]}"
+max_length="${policy[2]}"
+
+if ((${#subject} > max_length)); then
+  fail "subject is longer than ${max_length} characters"
+fi
+
+if [[ ! "$subject" =~ ^(${types})\(((${scopes}))\)!?:\ [a-z0-9].* ]]; then
+  fail "subject does not follow conventional commit format"
+fi
+
+if [[ "$subject" =~ \.$ ]]; then
+  fail "subject must not end with a period"
+fi
+
+tmp_file="$(mktemp)"
+python3 - "$MSG_FILE" >"$tmp_file" <<'PY'
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+content = path.read_text(encoding="utf-8")
+lines = content.splitlines()
+
+updated = False
+for index, line in enumerate(lines):
+    if not line.startswith("Quality: pre-commit passed "):
+        continue
+    if "commit message passed" in line:
+        updated = True
+        break
+    if line.endswith(")"):
+        lines[index] = f"{line[:-1]}, commit message passed)"
+        updated = True
+    break
+
+ending = "\n" if content.endswith("\n") else ""
+sys.stdout.write("\n".join(lines) + ending)
+PY
+
+mv "$tmp_file" "$MSG_FILE"

@@ -109,6 +109,7 @@ def verify_index() -> None:
         ".githooks/",
         "semgrep/",
         "scripts/",
+        ".ai/policy/commit-message.json",
         "docs/development-hooks.md",
         "README.md",
         "make install-hooks",
@@ -243,13 +244,16 @@ def verify_git_hooks() -> None:
         ".githooks/pre-commit",
         ".githooks/pre-push",
         ".githooks/prepare-commit-msg",
+        ".githooks/commit-msg",
         "scripts/git-hooks/pre-commit",
         "scripts/git-hooks/pre-push",
         "scripts/git-hooks/prepare-commit-msg",
+        "scripts/git-hooks/commit-msg",
         "scripts/install_git_hooks.sh",
         "scripts/test_semgrep_rules.py",
         "scripts/test_git_hooks.py",
         "semgrep/agent-standards.yml",
+        ".ai/policy/commit-message.json",
         "docs/setup/development-environment.md",
         "docs/development-hooks.md",
         "Makefile",
@@ -262,9 +266,11 @@ def verify_git_hooks() -> None:
         ".githooks/pre-commit",
         ".githooks/pre-push",
         ".githooks/prepare-commit-msg",
+        ".githooks/commit-msg",
         "scripts/git-hooks/pre-commit",
         "scripts/git-hooks/pre-push",
         "scripts/git-hooks/prepare-commit-msg",
+        "scripts/git-hooks/commit-msg",
         "scripts/install_git_hooks.sh",
         "scripts/test_semgrep_rules.py",
         "scripts/test_git_hooks.py",
@@ -328,6 +334,10 @@ def verify_git_hooks() -> None:
         "scripts/git-hooks/prepare-commit-msg" in text(".githooks/prepare-commit-msg"),
         ".githooks/prepare-commit-msg: must delegate to scripts/git-hooks/prepare-commit-msg",
     )
+    require(
+        "scripts/git-hooks/commit-msg" in text(".githooks/commit-msg"),
+        ".githooks/commit-msg: must delegate to scripts/git-hooks/commit-msg",
+    )
 
     pre_commit = text("scripts/git-hooks/pre-commit")
     for needle in [
@@ -355,6 +365,52 @@ def verify_git_hooks() -> None:
     ]:
         require(needle in prepare_commit_msg, f"scripts/git-hooks/prepare-commit-msg: missing {needle}")
 
+    commit_msg = text("scripts/git-hooks/commit-msg")
+    for needle in [
+        ".ai/policy/commit-message.json",
+        "expected format: type(scope): imperative subject",
+        "allowed types/scopes are defined",
+        "invalid commit policy",
+        "subject is longer than",
+        "commit message passed",
+        "fixup!",
+        "squash!",
+    ]:
+        require(needle in commit_msg, f"scripts/git-hooks/commit-msg: missing {needle}")
+
+    commit_policy = load_json(".ai/policy/commit-message.json")
+    if isinstance(commit_policy, dict):
+        types = commit_policy.get("types")
+        scopes = commit_policy.get("scopes")
+        max_length = commit_policy.get("maxSubjectLength")
+        expected_types = [
+            "feat",
+            "fix",
+            "docs",
+            "chore",
+            "test",
+            "refactor",
+            "build",
+            "ci",
+            "perf",
+            "style",
+            "revert",
+        ]
+        expected_scopes = [
+            "agent",
+            "brand",
+            "config",
+            "docs",
+            "hooks",
+            "quality",
+            "setup",
+            "semgrep",
+            "workflow",
+        ]
+        require(types == expected_types, ".ai/policy/commit-message.json: commit types drifted")
+        require(scopes == expected_scopes, ".ai/policy/commit-message.json: commit scopes drifted")
+        require(max_length == 72, ".ai/policy/commit-message.json: maxSubjectLength must be 72")
+
     pre_push = text("scripts/git-hooks/pre-push")
     for needle in [
         "scripts/verify_agent_config.py",
@@ -377,6 +433,7 @@ def verify_git_hooks() -> None:
         "mivia.generic.no-semgrep-suppression",
         "mivia.generic.no-unresolved-drift-markers",
         "mivia.generic.brand-mivialabs",
+        "mivia.generic.commit-policy-no-optional-scope-wording",
         "mivia.go.no-panic-in-internal",
         "mivia.go.no-fatal-exit-in-internal",
         "mivia.go.no-shell-exec",
@@ -395,6 +452,7 @@ def verify_git_hooks() -> None:
         "mivia.generic.no-semgrep-suppression",
         "mivia.generic.no-unresolved-drift-markers",
         "mivia.generic.brand-mivialabs",
+        "mivia.generic.commit-policy-no-optional-scope-wording",
         "mivia.go.no-shell-exec",
         "mivia.go.tests-no-time-sleep",
     ]:
