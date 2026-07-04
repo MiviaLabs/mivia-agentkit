@@ -28,7 +28,10 @@ type Step struct {
 }
 
 // Validate checks loop references and bounded execution fields.
-func (l Loop) Validate(enabledAdapters map[string]AdapterRole) error {
+func (l *Loop) Validate(enabledAdapters map[string]AdapterRole) error {
+	if l == nil {
+		return fmt.Errorf("loop is nil")
+	}
 	if l.MaxIterations <= 0 {
 		return fmt.Errorf("max_iterations must be positive")
 	}

@@ -177,8 +177,8 @@ WS1 is ☑ when:
 
 ## Completion — 2026-07-04
 
-- Tests: 35 passing.
-- Mutation proofs: expert-profile rejection fail-then-revert ok; budget-bound rejection fail-then-revert ok; guidance producer rejection fail-then-revert ok; detect-root parent walk fail-then-revert ok; diff content hash fail-then-revert ok; diff status hash fail-then-revert ok; traversal rejection fail-then-revert ok; symlink resolution fail-then-revert ok; absent global config fail-then-revert ok; project-wins layering fail-then-revert ok.
+- Tests: 38 passing.
+- Mutation proofs: expert-profile rejection fail-then-revert ok; budget-bound rejection fail-then-revert ok; guidance producer rejection fail-then-revert ok; loop default persistence fail-then-revert ok; detect-root parent walk fail-then-revert ok; diff content hash fail-then-revert ok; diff status hash fail-then-revert ok; traversal rejection fail-then-revert ok; symlink resolution fail-then-revert ok; absent global config fail-then-revert ok; project-wins manifest layering fail-then-revert ok; project-wins rule/skill layering fail-then-revert ok.
 - Files: 12 created.
 - Residual risk: none.
 - Follow-ups: none.

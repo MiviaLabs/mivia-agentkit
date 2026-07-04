@@ -140,7 +140,10 @@ func Parse(data []byte) (Manifest, error) {
 }
 
 // Validate checks the manifest contract.
-func (m Manifest) Validate() error {
+func (m *Manifest) Validate() error {
+	if m == nil {
+		return errors.New("manifest is nil")
+	}
 	if m.Profile == "" {
 		m.Profile = "standard"
 	}
@@ -178,6 +181,7 @@ func (m Manifest) Validate() error {
 		if err := loop.Validate(enabled); err != nil {
 			return fmt.Errorf("loop %q: %w", name, err)
 		}
+		m.Loops[name] = loop
 	}
 	return nil
 }

@@ -66,6 +66,23 @@ func TestGlobalConfigLayerProjectWinsOnConflict(t *testing.T) {
 	}
 }
 
+func TestGlobalConfigLayerProjectRulesAndSkillsWin(t *testing.T) {
+	global := GlobalConfig{
+		Rules:  map[string]string{"quality.md": "global", "security.md": "global"},
+		Skills: map[string]string{"audit": "global", "review": "global"},
+	}
+	got := Layer(global, config.Manifest{}, ProjectContent{
+		Rules:  map[string]string{"quality.md": "project"},
+		Skills: map[string]string{"audit": "project"},
+	})
+	if got.Rules["quality.md"] != "project" || got.Rules["security.md"] != "global" {
+		t.Fatalf("Rules = %#v, want project override plus global fallback", got.Rules)
+	}
+	if got.Skills["audit"] != "project" || got.Skills["review"] != "global" {
+		t.Fatalf("Skills = %#v, want project override plus global fallback", got.Skills)
+	}
+}
+
 func TestGlobalConfigLayerFillsEmptyProjectFields(t *testing.T) {
 	global := GlobalConfig{Defaults: config.Manifest{Profile: "starter", Adapters: map[string]config.AdapterConfig{"codex": {Enabled: true, Role: config.AdapterRoleOrchestrable}}}}
 	got := Layer(global, config.Manifest{})

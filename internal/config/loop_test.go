@@ -44,6 +44,20 @@ func TestLoopValidateDefaultsOnExhaustedToFailForProtectBoundLoop(t *testing.T) 
 	if err := loop.Validate(enabledAdapters()); err != nil {
 		t.Fatalf("Validate() error = %v, want nil", err)
 	}
+	if loop.OnExhausted != "fail" {
+		t.Fatalf("OnExhausted = %q, want fail", loop.OnExhausted)
+	}
+}
+
+func TestLoopValidateDefaultsOnExhaustedToWarnForNonProtectLoop(t *testing.T) {
+	loop := validLoop()
+	loop.OnExhausted = ""
+	if err := loop.Validate(enabledAdapters()); err != nil {
+		t.Fatalf("Validate() error = %v, want nil", err)
+	}
+	if loop.OnExhausted != "warn" {
+		t.Fatalf("OnExhausted = %q, want warn", loop.OnExhausted)
+	}
 }
 
 func enabledAdapters() map[string]AdapterRole {

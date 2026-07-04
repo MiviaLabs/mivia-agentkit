@@ -77,6 +77,25 @@ func TestManifestRejectsUnknownYAMLField(t *testing.T) {
 	}
 }
 
+func TestManifestParseAppliesLoopDefaults(t *testing.T) {
+	got, err := Parse([]byte(`
+loops:
+  release:
+    bound: iterations
+    max_iterations: 1
+    exit_when: protected_action
+    steps:
+      - id: produce
+        producer: codex
+`))
+	if err != nil {
+		t.Fatalf("Parse() error = %v, want nil", err)
+	}
+	if got.Loops["release"].OnExhausted != "fail" {
+		t.Fatalf("OnExhausted = %q, want fail", got.Loops["release"].OnExhausted)
+	}
+}
+
 func validLoop() Loop {
 	return Loop{
 		Bound:         "iterations",

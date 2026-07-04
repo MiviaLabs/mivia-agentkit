@@ -28,6 +28,12 @@ type EffectiveConfig struct {
 	Skills   map[string]string
 }
 
+// ProjectContent contains project-level rules and skills that override globals.
+type ProjectContent struct {
+	Rules  map[string]string
+	Skills map[string]string
+}
+
 type globalYAML struct {
 	Defaults config.Manifest `yaml:"defaults"`
 }
@@ -63,8 +69,8 @@ func Read() (GlobalConfig, error) {
 	return cfg, nil
 }
 
-// Layer merges global defaults under the project manifest.
-func Layer(global GlobalConfig, project config.Manifest) EffectiveConfig {
+// Layer merges global defaults and content under the project configuration.
+func Layer(global GlobalConfig, project config.Manifest, projectContent ...ProjectContent) EffectiveConfig {
 	effective := project
 	if effective.Profile == "" {
 		effective.Profile = global.Defaults.Profile
@@ -78,8 +84,12 @@ func Layer(global GlobalConfig, project config.Manifest) EffectiveConfig {
 	if effective.Governance.Provider == "" {
 		effective.Governance = global.Defaults.Governance
 	}
-	rules := cloneMap(global.Rules)
-	skills := cloneMap(global.Skills)
+	content := ProjectContent{}
+	if len(projectContent) > 0 {
+		content = projectContent[0]
+	}
+	rules := mergeMap(global.Rules, content.Rules)
+	skills := mergeMap(global.Skills, content.Skills)
 	return EffectiveConfig{Manifest: effective, Rules: rules, Skills: skills}
 }
 
@@ -167,6 +177,14 @@ func readSkills(root string, policy pathpolicy.Policy, skills map[string]string)
 func cloneMap(in map[string]string) map[string]string {
 	out := map[string]string{}
 	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}
+
+func mergeMap(base, override map[string]string) map[string]string {
+	out := cloneMap(base)
+	for k, v := range override {
 		out[k] = v
 	}
 	return out
