@@ -1,5 +1,5 @@
-// Package orchestrator resolves and executes bounded agent loops.
-// Plan: WS10. PRD: FR-4.1, FR-5.1, FR-7.1.
+// Package orchestrator tests bounded agent loop execution.
+// Plan: WS-B. PRD: FR-4.1, FR-5.1, FR-7.1.
 package orchestrator
 
 import (
@@ -106,6 +106,49 @@ func TestExecuteProducerStepAppendsTrace(t *testing.T) {
 	}
 }
 
+func TestExecuteProducerStepPassesResolvedModelAndEffort(t *testing.T) {
+	producer := &requestRecorderAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}}
+	e := testEngine(t, producer)
+	e.AdapterDefaults = map[string]config.AdapterConfig{
+		"codex": {Model: "gpt-5.5", Effort: "high"},
+	}
+	if _, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "produce", Producer: "codex"}}, 1); err != nil {
+		t.Fatalf("ExecuteStep error = %v", err)
+	}
+	if producer.runReq.Model != "gpt-5.5" || producer.runReq.Effort != "high" {
+		t.Fatalf("run request = %+v, want adapter defaults", producer.runReq)
+	}
+}
+
+func TestExecuteReviewStepPassesResolvedModelAndEffort(t *testing.T) {
+	reviewer := &requestRecorderAdapter{name: "claude", verdict: adapter.Verdict{Pass: true}}
+	e := testEngine(t, reviewer)
+	e.AdapterDefaults = map[string]config.AdapterConfig{
+		"claude": {Model: "sonnet", Effort: "medium"},
+	}
+	if _, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "review", Reviewers: []string{"claude"}}}, 1); err != nil {
+		t.Fatalf("ExecuteStep error = %v", err)
+	}
+	if reviewer.reviewReq.Model != "sonnet" || reviewer.reviewReq.Effort != "medium" {
+		t.Fatalf("review request = %+v, want adapter defaults", reviewer.reviewReq)
+	}
+}
+
+func TestStepOverrideWinsOverAdapterDefault(t *testing.T) {
+	producer := &requestRecorderAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}}
+	e := testEngine(t, producer)
+	e.AdapterDefaults = map[string]config.AdapterConfig{
+		"codex": {Model: "gpt-5.5", Effort: "high"},
+	}
+	step := config.Step{ID: "produce", Producer: "codex", Model: "gpt-5.5-mini", Effort: "low"}
+	if _, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: step}, 1); err != nil {
+		t.Fatalf("ExecuteStep error = %v", err)
+	}
+	if producer.runReq.Model != "gpt-5.5-mini" || producer.runReq.Effort != "low" {
+		t.Fatalf("run request = %+v, want step override", producer.runReq)
+	}
+}
+
 func TestExecuteStepRespectsTimeout(t *testing.T) {
 	e := testEngine(t, scriptedAdapter{name: "codex", delay: 100 * time.Millisecond})
 	if _, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "produce", Producer: "codex", Timeout: "10ms"}}, 1); err == nil {
@@ -178,6 +221,28 @@ func (p *promptRecorderAdapter) Run(context.Context, adapter.Request) (adapter.R
 func (p *promptRecorderAdapter) Review(_ context.Context, req adapter.Request) (adapter.Verdict, error) {
 	p.prompt = req.Prompt
 	return p.verdict, nil
+}
+
+type requestRecorderAdapter struct {
+	name      string
+	run       adapter.Result
+	verdict   adapter.Verdict
+	runReq    adapter.Request
+	reviewReq adapter.Request
+}
+
+func (r *requestRecorderAdapter) Name() string       { return r.name }
+func (r *requestRecorderAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (r *requestRecorderAdapter) Detect(context.Context) (adapter.Detection, error) {
+	return adapter.Detection{Name: r.name, HeadlessCapable: true}, nil
+}
+func (r *requestRecorderAdapter) Run(_ context.Context, req adapter.Request) (adapter.Result, error) {
+	r.runReq = req
+	return r.run, nil
+}
+func (r *requestRecorderAdapter) Review(_ context.Context, req adapter.Request) (adapter.Verdict, error) {
+	r.reviewReq = req
+	return r.verdict, nil
 }
 
 type recordingPolicy struct{ calls int }

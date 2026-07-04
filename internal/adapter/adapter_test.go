@@ -1,9 +1,10 @@
-// Package adapter defines headless CLI adapter contracts.
-// Plan: WS9. PRD: FR-3.1, FR-3.2, FR-7.4.
+// Package adapter tests headless CLI adapter contracts.
+// Plan: WS-B. PRD: FR-3.1, FR-3.2, FR-7.4.
 package adapter
 
 import (
 	"context"
+	"strings"
 	"testing"
 )
 
@@ -26,6 +27,37 @@ func TestRequestRejectsEmptyApproval(t *testing.T) {
 	err := (Request{Prompt: "x"}).Validate()
 	if err == nil {
 		t.Fatalf("Validate() error = nil, want rejection for empty approval")
+	}
+}
+
+func TestRequestAcceptsModelAndEffort(t *testing.T) {
+	err := (Request{
+		Prompt:   "x",
+		Approval: "never",
+		Model:    "gpt-5.5",
+		Effort:   "high",
+		Params:   map[string]string{"provider": "openai"},
+	}).Validate()
+	if err != nil {
+		t.Fatalf("Validate() error = %v, want nil", err)
+	}
+}
+
+func TestRequestAcceptsDocumentedEffortVariants(t *testing.T) {
+	for _, effort := range []string{"none", "minimal", "low", "medium", "high", "xhigh", "max"} {
+		t.Run(effort, func(t *testing.T) {
+			err := (Request{Prompt: "x", Approval: "never", Effort: effort}).Validate()
+			if err != nil {
+				t.Fatalf("Validate() error = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestRequestRejectsUnknownEffort(t *testing.T) {
+	err := (Request{Prompt: "x", Approval: "never", Effort: "turbo"}).Validate()
+	if err == nil || !strings.Contains(err.Error(), "unknown effort") {
+		t.Fatalf("Validate() error = %v, want unknown effort", err)
 	}
 }
 

@@ -1,5 +1,5 @@
 // Package adapter defines headless CLI adapter contracts.
-// Plan: WS9. PRD: FR-3.1, FR-3.2, FR-7.4.
+// Plan: WS-B. PRD: FR-3.1, FR-3.2, FR-7.4.
 package adapter
 
 import (
@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/MiviaLabs/mivia-agentkit/internal/config"
 )
 
 // Role identifies how an adapter can participate in workflows.
@@ -25,6 +27,9 @@ type Request struct {
 	Workdir     string
 	Approval    string
 	ArtifactOut string
+	Model       string
+	Effort      string
+	Params      map[string]string
 	Timeout     time.Duration
 	MaxTurns    int
 }
@@ -36,6 +41,9 @@ func (r Request) Validate() error {
 	}
 	if r.MaxTurns < 0 {
 		return errors.New("max turns cannot be negative")
+	}
+	if err := config.ValidateEffortValue(r.Effort); err != nil {
+		return err
 	}
 	return nil
 }

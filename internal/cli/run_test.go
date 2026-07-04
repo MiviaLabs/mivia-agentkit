@@ -103,6 +103,38 @@ func TestRunReviewStepUsesConcreteArtifactPath(t *testing.T) {
 	}
 }
 
+func TestRunPassesManifestAdapterDefaultsToRuntime(t *testing.T) {
+	var runReqs []adapter.Request
+	var reviewReqs []adapter.Request
+	repo := repoWithResearchLoop(t)
+	mustWrite(t, filepath.Join(repo, "mivia-agent.yaml"), "version: \"1\"\nadapters:\n  codex:\n    enabled: true\n    role: orchestrable\n    model: gpt-5.5\n    effort: minimal\n  claude:\n    enabled: true\n    role: orchestrable\n    model: sonnet\n    effort: max\n")
+	withRuntimeAdapters(t,
+		fakeCLIAdapter{name: "codex", headless: true, run: adapter.Result{Stdout: []byte("artifact")}, verdict: adapter.Verdict{Pass: true, Severity: "low", Notes: "ok"}, runReqs: &runReqs, reviews: &reviewReqs},
+		fakeCLIAdapter{name: "claude", headless: true, verdict: adapter.Verdict{Pass: true, Severity: "low", Notes: "ok"}, reviews: &reviewReqs},
+	)
+	cmd := newRunCommand()
+	cmd.SetArgs([]string{"--repo", repo, "--workflow", "research", "--json"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("run error = %v", err)
+	}
+	if len(runReqs) == 0 || runReqs[0].Model != "gpt-5.5" || runReqs[0].Effort != "minimal" {
+		t.Fatalf("producer requests = %#v, want manifest defaults", runReqs)
+	}
+	if len(reviewReqs) < 2 {
+		t.Fatalf("review requests = %#v, want codex and claude reviews", reviewReqs)
+	}
+	var foundClaude bool
+	for _, req := range reviewReqs {
+		if req.Model == "sonnet" && req.Effort == "max" {
+			foundClaude = true
+			break
+		}
+	}
+	if !foundClaude {
+		t.Fatalf("review requests = %#v, want claude manifest defaults", reviewReqs)
+	}
+}
+
 func TestRunPropagatesCommandContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

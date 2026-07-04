@@ -213,14 +213,22 @@ func validConsensusMode(mode string) bool {
 	}
 }
 
-func validateEffort(scope string, effort string) error {
+// ValidateEffortValue rejects unknown cross-adapter effort values.
+func ValidateEffortValue(effort string) error {
 	if effort == "" {
 		return nil
 	}
 	switch effort {
-	case "low", "medium", "high", "xhigh":
+	case "none", "minimal", "low", "medium", "high", "xhigh", "max":
 		return nil
 	default:
-		return fmt.Errorf("%s has unknown effort %q", scope, effort)
+		return fmt.Errorf("unknown effort %q", effort)
 	}
+}
+
+func validateEffort(scope string, effort string) error {
+	if err := ValidateEffortValue(effort); err != nil {
+		return fmt.Errorf("%s has %s", scope, err)
+	}
+	return nil
 }

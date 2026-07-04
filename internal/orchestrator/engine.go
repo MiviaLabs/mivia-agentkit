@@ -1,5 +1,5 @@
 // Package orchestrator resolves and executes bounded agent loops.
-// Plan: WS10. PRD: FR-4.1, FR-5.1, FR-7.1.
+// Plan: WS-B. PRD: FR-4.1, FR-5.1, FR-7.1.
 package orchestrator
 
 import (
@@ -27,6 +27,7 @@ type Engine struct {
 	Stamp           StampChecker
 	Policy          policy.Provider
 	Store           runstore.Store
+	AdapterDefaults map[string]config.AdapterConfig
 	Clock           func() time.Time
 	PromptBuilder   PromptBuilder
 	Repo            string
@@ -76,7 +77,7 @@ func (e Engine) executeProducer(ctx context.Context, runID runstore.RunID, node 
 	}
 	ctx, cancel := context.WithTimeout(ctx, stepTimeout(node.Step))
 	defer cancel()
-	result, err := a.Run(ctx, adapter.Request{Prompt: prompt, Workdir: e.Repo, Approval: approval(node.Step), ArtifactOut: artifactName(node.Step), Timeout: stepTimeout(node.Step), MaxTurns: node.Step.MaxTurns})
+	result, err := a.Run(ctx, e.requestFor(node.Step.Producer, node.Step, prompt, true))
 	if err != nil {
 		return StepResult{}, err
 	}
@@ -116,7 +117,7 @@ func (e Engine) executeReview(ctx context.Context, runID runstore.RunID, node No
 				results <- item{i: i, reviewer: reviewer, err: err}
 				return
 			}
-			v, err := a.Review(ctx, adapter.Request{Prompt: prompt, Workdir: e.Repo, Approval: approval(node.Step), Timeout: stepTimeout(node.Step), MaxTurns: node.Step.MaxTurns})
+			v, err := a.Review(ctx, e.requestFor(reviewer, node.Step, prompt, false))
 			results <- item{i: i, reviewer: reviewer, verdict: v, err: err}
 		}()
 	}
@@ -200,6 +201,43 @@ func artifactName(step config.Step) string {
 		return "artifact.txt"
 	}
 	return step.Artifact
+}
+
+func (e Engine) requestFor(adapterName string, step config.Step, prompt string, producer bool) adapter.Request {
+	defaults := e.AdapterDefaults[adapterName]
+	model := defaults.Model
+	if step.Model != "" {
+		model = step.Model
+	}
+	effort := defaults.Effort
+	if step.Effort != "" {
+		effort = step.Effort
+	}
+	req := adapter.Request{
+		Prompt:   prompt,
+		Workdir:  e.Repo,
+		Approval: approval(step),
+		Model:    model,
+		Effort:   effort,
+		Params:   copyParams(defaults.Params),
+		Timeout:  stepTimeout(step),
+		MaxTurns: step.MaxTurns,
+	}
+	if producer {
+		req.ArtifactOut = artifactName(step)
+	}
+	return req
+}
+
+func copyParams(src map[string]string) map[string]string {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make(map[string]string, len(src))
+	for key, value := range src {
+		dst[key] = value
+	}
+	return dst
 }
 
 func consensusPass(verdicts []adapter.Verdict) bool {

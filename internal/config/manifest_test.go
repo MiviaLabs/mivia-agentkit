@@ -71,6 +71,22 @@ adapters:
 	}
 }
 
+func TestManifestAcceptsDocumentedEffortVariants(t *testing.T) {
+	for _, effort := range []string{"none", "minimal", "low", "medium", "high", "xhigh", "max"} {
+		t.Run(effort, func(t *testing.T) {
+			m := Defaults()
+			m.Adapters["codex"] = AdapterConfig{
+				Enabled: true,
+				Role:    AdapterRoleOrchestrable,
+				Effort:  effort,
+			}
+			if err := m.Validate(); err != nil {
+				t.Fatalf("Validate() error = %v, want nil", err)
+			}
+		})
+	}
+}
+
 func TestManifestRejectsUnknownProfile(t *testing.T) {
 	m := Defaults()
 	m.Profile = "enterprise"

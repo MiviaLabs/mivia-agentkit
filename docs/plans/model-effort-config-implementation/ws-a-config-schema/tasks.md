@@ -57,8 +57,8 @@ WS ws-a-config-schema is ☑ when:
 
 ## Completion — 2026-07-05
 
-- Tests: 19 passing.
+- Tests: 20 passing.
 - Mutation proofs: T1 adapter-effort guard fail-then-revert ok; T1 step-effort guard fail-then-revert ok; T2 step-field parsing fail-then-revert ok.
 - Files: 5 updated.
 - Residual risk: none.
-- Follow-ups: update the parent overview when the broader model-effort workstream set is complete.
+- Follow-ups: audit hardening broadened the shared effort validator to the documented cross-adapter set `none|minimal|low|medium|high|xhigh|max`; update the parent overview when the broader model-effort workstream set is complete.

@@ -48,7 +48,7 @@ func newRunCommand() *cobra.Command {
 				return err
 			}
 			builder := PromptBuilder{Repo: absRepoPath(repo), Vars: map[string]string{"project": manifest.Project.Name}}
-			engine := orchestrator.Engine{Adapters: reg, Policy: prov, Store: runstore.New(absRepoPath(repo)), Repo: absRepoPath(repo), MaxIterations: maxIterations, Stamp: func(repo string) (string, error) {
+			engine := orchestrator.Engine{Adapters: reg, Policy: prov, Store: runstore.New(absRepoPath(repo)), AdapterDefaults: manifest.Adapters, Repo: absRepoPath(repo), MaxIterations: maxIterations, Stamp: func(repo string) (string, error) {
 				stamp, err := preflight.CheckStamp(repo)
 				return stamp.Head, err
 			}}

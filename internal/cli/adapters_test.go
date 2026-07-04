@@ -75,6 +75,8 @@ type fakeCLIAdapter struct {
 	verdict  adapter.Verdict
 	calls    *int
 	prompts  *[]string
+	runReqs  *[]adapter.Request
+	reviews  *[]adapter.Request
 }
 
 func (f fakeCLIAdapter) Name() string { return f.name }
@@ -91,6 +93,9 @@ func (f fakeCLIAdapter) Run(_ context.Context, req adapter.Request) (adapter.Res
 	if f.prompts != nil {
 		*f.prompts = append(*f.prompts, req.Prompt)
 	}
+	if f.runReqs != nil {
+		*f.runReqs = append(*f.runReqs, req)
+	}
 	return f.run, nil
 }
 func (f fakeCLIAdapter) Review(_ context.Context, req adapter.Request) (adapter.Verdict, error) {
@@ -99,6 +104,9 @@ func (f fakeCLIAdapter) Review(_ context.Context, req adapter.Request) (adapter.
 	}
 	if f.prompts != nil {
 		*f.prompts = append(*f.prompts, req.Prompt)
+	}
+	if f.reviews != nil {
+		*f.reviews = append(*f.reviews, req)
 	}
 	return f.verdict, nil
 }
