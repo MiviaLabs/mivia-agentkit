@@ -61,8 +61,8 @@ func (s Store) Dir(id RunID) string {
 }
 
 // WriteArtifact writes one step artifact and returns its absolute path.
-func (s Store) WriteArtifact(id RunID, step, name string, b []byte) (string, error) {
-	rel, abs, err := s.checkedArtifactPath(id, step, name)
+func (s Store) WriteArtifact(id RunID, step string, iteration int, name string, b []byte) (string, error) {
+	rel, abs, err := s.checkedArtifactPath(id, step, iteration, name)
 	if err != nil {
 		return "", err
 	}
@@ -79,8 +79,8 @@ func (s Store) WriteArtifact(id RunID, step, name string, b []byte) (string, err
 }
 
 // ReadArtifact reads a step artifact.
-func (s Store) ReadArtifact(id RunID, step, name string) ([]byte, error) {
-	_, abs, err := s.checkedArtifactPath(id, step, name)
+func (s Store) ReadArtifact(id RunID, step string, iteration int, name string) ([]byte, error) {
+	_, abs, err := s.checkedArtifactPath(id, step, iteration, name)
 	if err != nil {
 		return nil, err
 	}
@@ -117,9 +117,9 @@ func (s Store) AppendTrace(id RunID, event TraceEvent) error {
 	return nil
 }
 
-func (s Store) checkedArtifactPath(id RunID, step, name string) (string, string, error) {
-	if id == "" || step == "" || name == "" {
-		return "", "", fmt.Errorf("run id, step, and name are required")
+func (s Store) checkedArtifactPath(id RunID, step string, iteration int, name string) (string, string, error) {
+	if id == "" || step == "" || iteration <= 0 || name == "" {
+		return "", "", fmt.Errorf("run id, step, iteration, and name are required")
 	}
 	for _, raw := range []string{string(id), step, name} {
 		for _, part := range strings.FieldsFunc(raw, func(r rune) bool { return r == '/' || r == '\\' }) {
@@ -128,7 +128,7 @@ func (s Store) checkedArtifactPath(id RunID, step, name string) (string, string,
 			}
 		}
 	}
-	rel := filepath.Join(".ai", "runs", string(id), step, name)
+	rel := filepath.Join(".ai", "runs", string(id), step, fmt.Sprintf("iter-%03d", iteration), name)
 	abs := filepath.Join(s.repoRoot(), rel)
 	runs, err := filepath.Abs(filepath.Join(s.repoRoot(), ".ai", "runs"))
 	if err != nil {

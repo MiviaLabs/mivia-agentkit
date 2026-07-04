@@ -781,7 +781,7 @@ Behavior:
 1. Load manifest + selected loop; validate it via the same rules as `doctor`.
 2. Build the execution DAG (steps, edges, gates).
 3. For each step, in order:
-   - Render the prompt; write inputs to `.ai/runs/<run-id>/<step>/input/`.
+   - Render the prompt; write inputs to `.ai/runs/<run-id>/<step>/iter-<nnn>/input/`.
    - If the step is a producer: pick the adapter, enforce non-interactive approval mode, max-turns, timeout; invoke via `Adapter.Run`; capture artifact + structured metadata.
    - If the step is a review: fan out to all reviewers concurrently (`oklog/run`); collect `Verdict`s; apply the consensus policy; record the decision.
    - On review fail with `on_fail: iterate`: route reviewer notes back to the producing step, increment iteration counter, continue.

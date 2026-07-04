@@ -12,6 +12,14 @@ go run ./cmd/mivia-agent doctor --repo /path/to/repo --json
 
 This example keeps the current supported manifest fields and a simple review loop.
 
+For `run` workflows, treat each step `artifact` as a run-local name, not a shared repo path. The engine writes it under:
+
+```text
+.ai/runs/<run-id>/<step-id>/iter-<nnn>/<artifact>
+```
+
+That means separate `mivia-agent run` executions already get separate directories, and retried steps within one run also keep distinct artifact files instead of overwriting the prior iteration.
+
 ```yaml
 version: "1"
 profile: standard
@@ -59,13 +67,13 @@ loops:
     steps:
       - id: produce
         producer: codex
-        artifact: notes/research.md
+        artifact: research.md
         max_turns: 4
       - id: review
         reviewers:
           - codex
           - claude
-        artifact: notes/research.md
+        artifact: research.md
         consensus:
           mode: majority
           min_reviewers: 2
@@ -80,14 +88,14 @@ loops:
     steps:
       - id: patch
         producer: codex
-        artifact: .ai/runs/latest/patch.md
+        artifact: patch.md
         approval: commit
         max_turns: 4
         timeout: 10m
       - id: review
         reviewers:
           - claude
-        artifact: .ai/runs/latest/patch.md
+        artifact: patch.md
         consensus:
           mode: first-pass
           min_reviewers: 1
@@ -145,13 +153,13 @@ on_exhausted: warn
 steps:
   - id: produce
     producer: codex
-    artifact: notes/research.md
+    artifact: research.md
     max_turns: 4
   - id: review
     reviewers:
       - codex
       - claude
-    artifact: notes/research.md
+    artifact: research.md
     consensus:
       mode: majority
       min_reviewers: 2
@@ -189,6 +197,8 @@ defaults:
 
 - Supported profiles are `starter`, `standard`, and `strict`.
 - Workflow `bound: budget` is not supported in MVP.
+- Separate `run` executions are isolated under unique `.ai/runs/<run-id>/` directories.
+- Retried steps within one run are stored under per-iteration subdirectories such as `iter-001` and `iter-002`.
 - Producer and reviewer adapters in loops must be enabled and `orchestrable`.
 - `copilot` and `crush` are guidance-only and cannot be workflow producers or reviewers.
 - `init --with-loop`, `run --step`, `run --input-artifact`, and `run --var` are reserved surface today.

@@ -31,6 +31,17 @@ func TestExecuteProducerStepWritesArtifact(t *testing.T) {
 	}
 }
 
+func TestExecuteProducerStepUsesIterationArtifactPath(t *testing.T) {
+	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}})
+	res, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "produce", Producer: "codex", Artifact: "out.md"}}, 2)
+	if err != nil {
+		t.Fatalf("ExecuteStep error = %v", err)
+	}
+	if !strings.Contains(res.Artifact, filepath.Join("produce", "iter-002", "out.md")) {
+		t.Fatalf("artifact path = %q, want iteration subdirectory", res.Artifact)
+	}
+}
+
 func TestExecuteReviewStepFansOutConcurrently(t *testing.T) {
 	e := testEngine(t, scriptedAdapter{name: "a", delay: 200 * time.Millisecond, verdict: adapter.Verdict{Pass: true}}, scriptedAdapter{name: "b", delay: 200 * time.Millisecond, verdict: adapter.Verdict{Pass: true}})
 	start := time.Now()
@@ -68,14 +79,15 @@ func TestExecuteReviewStepSetsVerdictAdapterNames(t *testing.T) {
 func TestExecuteReviewStepSendsReviewPrompt(t *testing.T) {
 	a := &promptRecorderAdapter{name: "a", verdict: adapter.Verdict{Pass: true}}
 	e := testEngine(t, a)
-	e.PromptBuilder = func(step config.Step, iteration int, prior []adapter.Verdict) (string, error) {
-		return "review " + step.Artifact, nil
+	e.CurrentArtifact = "/tmp/run/produce/iter-001/artifact.md"
+	e.PromptBuilder = func(step config.Step, iteration int, prior []adapter.Verdict, artifactPath string) (string, error) {
+		return "review " + artifactPath, nil
 	}
 	if _, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "review", Reviewers: []string{"a"}, Artifact: "artifact.md"}}, 1); err != nil {
 		t.Fatalf("ExecuteStep error = %v", err)
 	}
-	if a.prompt != "review artifact.md" {
-		t.Fatalf("review prompt = %q, want rendered prompt", a.prompt)
+	if a.prompt != "review /tmp/run/produce/iter-001/artifact.md" {
+		t.Fatalf("review prompt = %q, want concrete artifact path", a.prompt)
 	}
 }
 
@@ -121,7 +133,7 @@ func testEngine(t *testing.T, adapters ...adapter.Adapter) Engine {
 		t.Fatalf("NewRegistry error = %v", err)
 	}
 	repo := t.TempDir()
-	return Engine{Adapters: reg, Store: runstore.New(repo), Repo: repo, Clock: func() time.Time { return time.Date(2026, 7, 5, 0, 0, 0, 0, time.UTC) }, PromptBuilder: func(config.Step, int, []adapter.Verdict) (string, error) { return "prompt", nil }}
+	return Engine{Adapters: reg, Store: runstore.New(repo), Repo: repo, Clock: func() time.Time { return time.Date(2026, 7, 5, 0, 0, 0, 0, time.UTC) }, PromptBuilder: func(config.Step, int, []adapter.Verdict, string) (string, error) { return "prompt", nil }}
 }
 
 type scriptedAdapter struct {

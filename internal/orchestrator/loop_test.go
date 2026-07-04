@@ -5,6 +5,8 @@ package orchestrator
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
@@ -34,11 +36,32 @@ func TestLoopIteratesOnReviewFail(t *testing.T) {
 	}
 }
 
+func TestLoopPreservesArtifactsAcrossIterations(t *testing.T) {
+	producer := &sequenceProducerAdapter{name: "codex", outputs: []string{"artifact-one", "artifact-two"}}
+	reviewer := &sequenceAdapter{name: "claude", verdicts: []adapter.Verdict{{Pass: false}, {Pass: true}}}
+	e := testEngine(t, producer, reviewer)
+	res, err := e.RunLoop(context.Background(), testLoop(3, "iterate", "fail"), nil)
+	if err != nil {
+		t.Fatalf("RunLoop error = %v", err)
+	}
+	first, err := os.ReadFile(filepath.Join(e.Store.Dir(res.Trace), "produce", "iter-001", "artifact.txt"))
+	if err != nil {
+		t.Fatalf("read first iteration artifact: %v", err)
+	}
+	second, err := os.ReadFile(filepath.Join(e.Store.Dir(res.Trace), "produce", "iter-002", "artifact.txt"))
+	if err != nil {
+		t.Fatalf("read second iteration artifact: %v", err)
+	}
+	if string(first) != "artifact-one" || string(second) != "artifact-two" {
+		t.Fatalf("artifacts = %q / %q, want per-iteration preservation", first, second)
+	}
+}
+
 func TestLoopFeedsReviewNotesIntoNextProducerPrompt(t *testing.T) {
 	reviewer := &sequenceAdapter{name: "claude", verdicts: []adapter.Verdict{{Pass: false, Notes: "fix it"}, {Pass: true}}}
 	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}}, reviewer)
 	var secondPrior []adapter.Verdict
-	e.PromptBuilder = func(step config.Step, iteration int, prior []adapter.Verdict) (string, error) {
+	e.PromptBuilder = func(step config.Step, iteration int, prior []adapter.Verdict, artifactPath string) (string, error) {
 		if step.ID == "produce" && iteration == 2 {
 			secondPrior = append([]adapter.Verdict(nil), prior...)
 		}
@@ -136,4 +159,27 @@ func (s *sequenceAdapter) Review(context.Context, adapter.Request) (adapter.Verd
 		i = len(s.verdicts) - 1
 	}
 	return s.verdicts[i], nil
+}
+
+type sequenceProducerAdapter struct {
+	name    string
+	outputs []string
+	calls   int
+}
+
+func (s *sequenceProducerAdapter) Name() string       { return s.name }
+func (s *sequenceProducerAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (s *sequenceProducerAdapter) Detect(context.Context) (adapter.Detection, error) {
+	return adapter.Detection{Name: s.name, HeadlessCapable: true}, nil
+}
+func (s *sequenceProducerAdapter) Run(context.Context, adapter.Request) (adapter.Result, error) {
+	i := s.calls
+	s.calls++
+	if i >= len(s.outputs) {
+		i = len(s.outputs) - 1
+	}
+	return adapter.Result{Stdout: []byte(s.outputs[i])}, nil
+}
+func (s *sequenceProducerAdapter) Review(context.Context, adapter.Request) (adapter.Verdict, error) {
+	return adapter.Verdict{}, nil
 }

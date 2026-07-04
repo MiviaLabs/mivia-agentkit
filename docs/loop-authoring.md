@@ -16,7 +16,15 @@ Core fields:
 - `exit_when`
 - `on_exhausted`
 
-Step fields come from the `config.Step` contract in [internal/config/loop.go](../internal/config/loop.go), including producer, reviewers, consensus, artifact path, and protected-action approval hints.
+Step fields come from the `config.Step` contract in [internal/config/loop.go](../internal/config/loop.go), including producer, reviewers, consensus, artifact name, and protected-action approval hints.
+
+For `run` workflows, `artifact` is a run-local artifact name. The engine writes it under:
+
+```text
+.ai/runs/<run-id>/<step-id>/iter-<nnn>/<artifact>
+```
+
+Separate runs therefore do not overwrite each other across terminals, and repeated iterations within one run also keep separate artifact files.
 
 ## Control Fields
 
@@ -69,11 +77,11 @@ on_exhausted: warn
 steps:
   - id: produce
     producer: codex
-    artifact: notes/research.md
+    artifact: research.md
     max_turns: 4
   - id: review
     reviewers: [codex, claude]
-    artifact: notes/research.md
+    artifact: research.md
     consensus:
       mode: majority
       min_reviewers: 2
@@ -85,5 +93,6 @@ steps:
 
 - Prefer one producer step followed by one review step.
 - Keep reviewer count satisfiable by enabled headless adapters.
-- Use explicit artifact paths so run traces stay stable.
+- Use stable artifact names so run traces stay stable.
+- Do not point loop artifacts at shared repo paths such as `notes/foo.md` or `.ai/runs/latest/...`; the runstore already places them under the per-run directory.
 - Test new loops with `mivia-agent run --workflow <name> --dry-run --json` before real execution.

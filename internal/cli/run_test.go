@@ -85,6 +85,24 @@ func TestRunReviewStepRequestsJSONVerdict(t *testing.T) {
 	}
 }
 
+func TestRunReviewStepUsesConcreteArtifactPath(t *testing.T) {
+	var prompts []string
+	repo := repoWithResearchLoop(t)
+	withRuntimeAdapters(t,
+		fakeCLIAdapter{name: "codex", headless: true, run: adapter.Result{Stdout: []byte("artifact")}, verdict: adapter.Verdict{Pass: true, Severity: "low", Notes: "ok"}, prompts: &prompts},
+		fakeCLIAdapter{name: "claude", headless: true, verdict: adapter.Verdict{Pass: true, Severity: "low", Notes: "ok"}, prompts: &prompts},
+	)
+	cmd := newRunCommand()
+	cmd.SetArgs([]string{"--repo", repo, "--workflow", "research", "--json"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("run error = %v", err)
+	}
+	if !anyContains(prompts, string(filepath.Separator)+".ai"+string(filepath.Separator)+"runs"+string(filepath.Separator)) ||
+		!anyContains(prompts, string(filepath.Separator)+"iter-001"+string(filepath.Separator)+"research.md") {
+		t.Fatalf("prompts = %#v, want concrete per-iteration artifact path", prompts)
+	}
+}
+
 func TestRunPropagatesCommandContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

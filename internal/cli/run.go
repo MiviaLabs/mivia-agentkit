@@ -52,9 +52,12 @@ func newRunCommand() *cobra.Command {
 				stamp, err := preflight.CheckStamp(repo)
 				return stamp.Head, err
 			}}
-			result, err := engine.RunLoop(cmd.Context(), loop, func(step config.Step, _ int, prior []adapter.Verdict) (string, error) {
+			result, err := engine.RunLoop(cmd.Context(), loop, func(step config.Step, _ int, prior []adapter.Verdict, artifactPath string) (string, error) {
 				if len(step.Reviewers) > 0 {
-					return builder.Reviewer(step, step.Artifact)
+					if artifactPath == "" {
+						artifactPath = step.Artifact
+					}
+					return builder.Reviewer(step, artifactPath)
 				}
 				return builder.Producer(step, prior)
 			})

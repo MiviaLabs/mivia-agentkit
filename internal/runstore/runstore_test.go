@@ -24,12 +24,23 @@ func TestNewRunCreatesDir(t *testing.T) {
 func TestWriteArtifactStaysUnderRuns(t *testing.T) {
 	repo := t.TempDir()
 	s := New(repo)
-	path, err := s.WriteArtifact(s.NewRun(), "produce", "out.txt", []byte("ok"))
+	path, err := s.WriteArtifact(s.NewRun(), "produce", 1, "out.txt", []byte("ok"))
 	if err != nil {
 		t.Fatalf("WriteArtifact error = %v", err)
 	}
 	if !strings.HasPrefix(path, filepath.Join(repo, ".ai", "runs")) {
 		t.Fatalf("artifact path = %q, want under .ai/runs", path)
+	}
+}
+
+func TestWriteArtifactUsesIterationSubdirectory(t *testing.T) {
+	s := New(t.TempDir())
+	path, err := s.WriteArtifact(s.NewRun(), "produce", 2, "artifact.md", []byte("ok"))
+	if err != nil {
+		t.Fatalf("WriteArtifact error = %v", err)
+	}
+	if !strings.Contains(path, filepath.Join("produce", "iter-002", "artifact.md")) {
+		t.Fatalf("artifact path = %q, want iteration subdirectory", path)
 	}
 }
 
@@ -70,10 +81,10 @@ func TestAppendTraceStableKeyOrder(t *testing.T) {
 func TestReadArtifactRoundTrip(t *testing.T) {
 	s := New(t.TempDir())
 	id := s.NewRun()
-	if _, err := s.WriteArtifact(id, "produce", "artifact.md", []byte("hello")); err != nil {
+	if _, err := s.WriteArtifact(id, "produce", 1, "artifact.md", []byte("hello")); err != nil {
 		t.Fatalf("WriteArtifact error = %v", err)
 	}
-	got, err := s.ReadArtifact(id, "produce", "artifact.md")
+	got, err := s.ReadArtifact(id, "produce", 1, "artifact.md")
 	if err != nil {
 		t.Fatalf("ReadArtifact error = %v", err)
 	}
@@ -84,7 +95,7 @@ func TestReadArtifactRoundTrip(t *testing.T) {
 
 func TestWriteArtifactRejectsTraversal(t *testing.T) {
 	s := New(t.TempDir())
-	if _, err := s.WriteArtifact(s.NewRun(), "produce", "../../escape.txt", []byte("bad")); err == nil {
+	if _, err := s.WriteArtifact(s.NewRun(), "produce", 1, "../../escape.txt", []byte("bad")); err == nil {
 		t.Fatalf("WriteArtifact traversal error = nil, want error")
 	}
 }

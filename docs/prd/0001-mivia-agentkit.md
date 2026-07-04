@@ -224,7 +224,7 @@ exit_when.gate = review-pass  ──▶ loop ends successfully
 bound (iterations) hit        ──▶ on_exhausted: fail | warn | proceed
 ```
 
-- Artifacts live under `.ai/runs/<run-id>/<step>/`.
+- Artifacts live under `.ai/runs/<run-id>/<step>/iter-<nnn>/`.
 - Each step's invocation produces a `policy.Decision` ref stored in the stamp (when governance is on).
 - The trace (`trace.jsonl`) records every step, verdict, decision, and iteration.
 

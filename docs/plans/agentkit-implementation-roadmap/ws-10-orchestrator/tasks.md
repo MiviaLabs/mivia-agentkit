@@ -11,18 +11,19 @@ Goal: the in-process engine that turns a `Loop` into executed steps. Uses `oklog
 ## T1 — Runstore
 
 Create:
-- `internal/runstore/runstore.go` — `type RunID string`, `type Store struct{ Root string }`, `New(repo string) Store`, `(s Store) NewRun() RunID`, `(s Store) Dir(id RunID) string`, `(s Store) WriteArtifact(id RunID, step, name string, b []byte) (string, error)`, `(s Store) AppendTrace(id RunID, event TraceEvent) error`, `(s Store) ReadArtifact(id RunID, step, name string) ([]byte, error)`.
+- `internal/runstore/runstore.go` — `type RunID string`, `type Store struct{ Root string }`, `New(repo string) Store`, `(s Store) NewRun() RunID`, `(s Store) Dir(id RunID) string`, `(s Store) WriteArtifact(id RunID, step string, iteration int, name string, b []byte) (string, error)`, `(s Store) AppendTrace(id RunID, event TraceEvent) error`, `(s Store) ReadArtifact(id RunID, step string, iteration int, name string) ([]byte, error)`.
 - `internal/runstore/runstore_test.go`
 
 Spec:
 - Root is `<repo>/.ai/runs/`. `NewRun()` returns a RunID = RFC3339-UTC-compact + short random suffix; creates `<Dir>`.
-- `WriteArtifact` writes to `<Dir>/<step>/<name>` and returns the abs path. Validate via WS1 pathpolicy (must stay under `.ai/runs/`).
+- `WriteArtifact` writes to `<Dir>/<step>/iter-<nnn>/<name>` and returns the abs path. Validate via WS1 pathpolicy (must stay under `.ai/runs/`).
 - `TraceEvent` is `{ts, kind, step, iteration, payload map}`. `AppendTrace` appends one JSON object per line to `<Dir>/trace.jsonl`. Stable key order.
 - No file outside `.ai/runs/` is ever written.
 
 Tests that must pass:
 - `TestNewRunCreatesDir`
 - `TestWriteArtifactStaysUnderRuns`
+- `TestWriteArtifactUsesIterationSubdirectory`
 - `TestAppendTraceAppendsJSONL`
 - `TestAppendTraceStableKeyOrder`
 - `TestReadArtifactRoundTrip`
@@ -65,6 +66,7 @@ Spec:
 
 Tests that must pass (using fake adapters from WS9 + a noop policy):
 - `TestExecuteProducerStepWritesArtifact`
+- `TestExecuteProducerStepUsesIterationArtifactPath`
 - `TestExecuteReviewStepFansOutConcurrently` (assert wall-clock parallelism: 2 fake adapters each sleep 200ms, total < 350ms)
 - `TestExecuteReviewStepCollectsAllVerdicts`
 - `TestExecuteProducerStepAppendsTrace`
@@ -91,6 +93,7 @@ Spec:
 Tests that must pass (fake adapters scripted to fail-then-pass on iteration 2):
 - `TestLoopExitsWhenGatePasses`
 - `TestLoopIteratesOnReviewFail`
+- `TestLoopPreservesArtifactsAcrossIterations`
 - `TestLoopFailsOnExhaustionWithOnExhaustedFail`
 - `TestLoopWarnsOnExhaustionWithOnExhaustedWarn`
 - `TestLoopRejectsBudgetBoundInMVP`
@@ -144,3 +147,11 @@ WS10 is ☑ when:
 - Files: 10 created, 2 docs updated.
 - Residual risk: WS10 uses an internal all-reviewers-pass consensus gate until WS11 lands the full consensus package.
 - Follow-ups: implement WS11 consensus modes and replace the temporary internal pass gate.
+
+## Completion — 2026-07-05 (iteration artifact paths)
+
+- Tests: added `TestWriteArtifactUsesIterationSubdirectory`, `TestExecuteProducerStepUsesIterationArtifactPath`, and `TestLoopPreservesArtifactsAcrossIterations`; focused WS10 suite passes.
+- Mutation proofs: removing the `iter-<nnn>` subdirectory failed `TestWriteArtifactUsesIterationSubdirectory`, `TestExecuteProducerStepUsesIterationArtifactPath`, and `TestLoopPreservesArtifactsAcrossIterations`; reverted cleanly.
+- Files: updated `internal/runstore/runstore.go`, `internal/runstore/runstore_test.go`, `internal/orchestrator/engine.go`, `internal/orchestrator/engine_test.go`, `internal/orchestrator/loop_test.go`, and WS10/docs references.
+- Residual risk: none.
+- Follow-ups: updated WS13 prompt handoff so review steps now receive the concrete per-iteration artifact path.

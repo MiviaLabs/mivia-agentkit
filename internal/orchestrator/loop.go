@@ -51,6 +51,7 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 		max = e.MaxIterations
 	}
 	var prior []adapter.Verdict
+	var currentArtifact string
 	for iteration := 1; iteration <= max; iteration++ {
 		var last StepResult
 		for _, node := range nodes {
@@ -63,9 +64,13 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 				}
 			}
 			e.PriorVerdicts = prior
+			e.CurrentArtifact = currentArtifact
 			last, err = e.ExecuteStep(ctx, runID, node, iteration)
 			if err != nil {
 				return LoopResult{Iterations: iteration, Trace: runID, Err: err}, err
+			}
+			if last.Artifact != "" {
+				currentArtifact = last.Artifact
 			}
 			if len(last.Verdicts) > 0 {
 				prior = last.Verdicts

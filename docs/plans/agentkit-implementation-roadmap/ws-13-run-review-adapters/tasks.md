@@ -65,6 +65,7 @@ Spec:
 - Build the orchestrator `Engine` (WS10) with: registry from `adapters` (only headless-approved), policy provider from manifest (WS12), stamp checker (WS4), runstore.
 - `--dry-run`: build the DAG, print `[{step, type, adapter(s), max_turns, timeout, artifact}]`, write nothing, invoke nothing. Exit 0.
 - Without `--dry-run`: `Engine.RunLoop`. Stream JSONL events to stdout when `--json`. On finish, print a concise summary (iterations, outcome, trace path, exit code).
+- Review prompts must receive the concrete produced artifact path from the current run iteration, not only the logical manifest artifact name.
 - `--max-iterations` caps the loop but cannot exceed the manifest value (WS10 enforces; CLI surfaces the error).
 - Exit codes: 0 success, 1 loop failed / adapter error / policy denial, 2 warn-only.
 
@@ -76,6 +77,7 @@ Tests that must pass (all behind fake adapters + fake-CLI fixtures; no real CLIs
 - `TestRunRejectsUnknownWorkflow`
 - `TestRunRejectsBudgetBoundLoopInMVP`
 - `TestRunArtifactContainsNoRawPromptsOrOutputs` (uses WS10 `AssertNoLeaks`)
+- `TestRunReviewStepUsesConcreteArtifactPath`
 - `TestRunStrictFailsOnFirstPassConsensusForProtectBound`
 
 Mutation proof:
@@ -129,3 +131,11 @@ WS13 is ☑ when:
 - Files: 12 created/updated.
 - Residual risk: none.
 - Follow-ups: WS6 can extend `runtimeAdapters` with Antigravity and Crush once that node lands.
+
+## Completion — 2026-07-05 (concrete review artifact handoff)
+
+- Tests: added `TestRunReviewStepUsesConcreteArtifactPath` and strengthened WS10 review-prompt coverage with a concrete artifact-path assertion.
+- Mutation proofs: reverting CLI review prompts to the logical artifact name failed `TestRunReviewStepUsesConcreteArtifactPath`; reverted cleanly.
+- Files: updated `internal/orchestrator/engine.go`, `internal/orchestrator/loop.go`, `internal/orchestrator/engine_test.go`, `internal/orchestrator/loop_test.go`, `internal/cli/run.go`, and `internal/cli/run_test.go`.
+- Residual risk: none.
+- Follow-ups: none.

@@ -15,23 +15,24 @@ import (
 	"github.com/MiviaLabs/mivia-agentkit/internal/runstore"
 )
 
-// PromptBuilder renders a prompt for a step and prior review notes.
-type PromptBuilder func(step config.Step, iteration int, prior []adapter.Verdict) (string, error)
+// PromptBuilder renders a prompt for a step, prior review notes, and any concrete artifact path.
+type PromptBuilder func(step config.Step, iteration int, prior []adapter.Verdict, artifactPath string) (string, error)
 
 // StampChecker validates quality stamps before protected steps.
 type StampChecker func(repo string) (string, error)
 
 // Engine executes resolved loop nodes.
 type Engine struct {
-	Adapters      *adapter.Registry
-	Stamp         StampChecker
-	Policy        policy.Provider
-	Store         runstore.Store
-	Clock         func() time.Time
-	PromptBuilder PromptBuilder
-	Repo          string
-	PriorVerdicts []adapter.Verdict
-	MaxIterations int
+	Adapters        *adapter.Registry
+	Stamp           StampChecker
+	Policy          policy.Provider
+	Store           runstore.Store
+	Clock           func() time.Time
+	PromptBuilder   PromptBuilder
+	Repo            string
+	PriorVerdicts   []adapter.Verdict
+	CurrentArtifact string
+	MaxIterations   int
 }
 
 // StepResult is the output of one executed step.
@@ -69,7 +70,7 @@ func (e Engine) executeProducer(ctx context.Context, runID runstore.RunID, node 
 	if !ok {
 		return StepResult{}, fmt.Errorf("adapter %q not found", node.Step.Producer)
 	}
-	prompt, err := e.prompt(node.Step, iteration)
+	prompt, err := e.prompt(node.Step, iteration, "")
 	if err != nil {
 		return StepResult{}, err
 	}
@@ -79,7 +80,7 @@ func (e Engine) executeProducer(ctx context.Context, runID runstore.RunID, node 
 	if err != nil {
 		return StepResult{}, err
 	}
-	path, err := e.Store.WriteArtifact(runID, node.Step.ID, artifactName(node.Step), result.Stdout)
+	path, err := e.Store.WriteArtifact(runID, node.Step.ID, iteration, artifactName(node.Step), result.Stdout)
 	if err != nil {
 		return StepResult{}, err
 	}
@@ -110,7 +111,7 @@ func (e Engine) executeReview(ctx context.Context, runID runstore.RunID, node No
 				results <- item{i: i, reviewer: reviewer, err: fmt.Errorf("adapter %q not found", reviewer)}
 				return
 			}
-			prompt, err := e.prompt(node.Step, iteration)
+			prompt, err := e.prompt(node.Step, iteration, e.CurrentArtifact)
 			if err != nil {
 				results <- item{i: i, reviewer: reviewer, err: err}
 				return
@@ -162,11 +163,11 @@ func (e Engine) appendTrace(id runstore.RunID, kind, step string, iteration int,
 	return e.Store.AppendTrace(id, runstore.TraceEvent{TS: e.now().UTC().Format(time.RFC3339), Kind: kind, Step: step, Iteration: iteration, Payload: payload})
 }
 
-func (e Engine) prompt(step config.Step, iteration int) (string, error) {
+func (e Engine) prompt(step config.Step, iteration int, artifactPath string) (string, error) {
 	if e.PromptBuilder == nil {
 		return "", nil
 	}
-	return e.PromptBuilder(step, iteration, e.PriorVerdicts)
+	return e.PromptBuilder(step, iteration, e.PriorVerdicts, artifactPath)
 }
 
 func (e Engine) now() time.Time {
