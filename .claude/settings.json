@@ -3,16 +3,16 @@
   "permissions": {
     "allow": [
       "Bash(go test ./...)",
-      "Bash(go test *)",
       "Bash(go vet ./...)",
-      "Bash(go vet *)",
       "Bash(go build ./cmd/mivia-agent)",
+      "Bash(python3 scripts/verify_agent_config.py)",
       "Bash(git diff)",
-      "Bash(git diff *)",
+      "Bash(git diff --check)",
+      "Bash(git diff --stat)",
       "Bash(git status)",
-      "Bash(git status *)",
+      "Bash(git status --short --branch)",
       "Bash(git log)",
-      "Bash(git log *)",
+      "Bash(git log --oneline --decorate -5)",
       "Read(./AGENTS.md)",
       "Read(./.ai/**)",
       "Read(./docs/**)"

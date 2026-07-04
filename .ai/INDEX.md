@@ -39,3 +39,7 @@ The registry at `.agents/skills.json` lists all committed project skill files fr
 ## Runtime Artifacts
 
 `.ai/runs/` is reserved for future workflow traces and summaries and is gitignored. Do not persist raw prompts, raw model outputs, provider payloads, credentials, or plausible secrets there.
+
+## Verification
+
+Run `python3 scripts/verify_agent_config.py` after changing `AGENTS.md`, `.ai/`, `.claude/`, `.codex/`, `.github/`, `.agents/`, or `.gitignore`.

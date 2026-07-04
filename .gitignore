@@ -27,3 +27,7 @@ secrets/
 .vscode/
 *.swp
 *.tmp
+
+# Python verification caches
+__pycache__/
+*.py[cod]

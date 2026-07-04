@@ -78,6 +78,12 @@ go build ./cmd/mivia-agent
 
 For focused workstreams, run the package-specific commands listed in that workstream's `Verification` block before broader checks.
 
+For changes to the agent configuration surface, run:
+
+```bash
+python3 scripts/verify_agent_config.py
+```
+
 Sources: https://agents.md/, https://go.dev/doc/modules/layout. Repo source: `docs/plans/_conventions.md`.
 
 ## Git Workflow
