@@ -42,4 +42,12 @@ The registry at `.agents/skills.json` lists all committed project skill files fr
 
 ## Verification
 
-Run `python3 scripts/verify_agent_config.py` after changing `AGENTS.md`, `.ai/`, `.claude/`, `.codex/`, `.github/`, `.agents/`, `.gitignore`, or `scripts/verify_agent_config.py`.
+Run `python3 scripts/verify_agent_config.py` after changing `AGENTS.md`, `.ai/`, `.claude/`, `.codex/`, `.github/`, `.agents/`, `.githooks/`, `semgrep/`, `.gitignore`, or `scripts/`.
+
+Install local Git hooks with:
+
+```bash
+scripts/install_git_hooks.sh
+```
+
+Hook policy details live in `docs/development-hooks.md`.

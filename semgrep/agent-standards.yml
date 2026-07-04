@@ -1,0 +1,114 @@
+rules:
+  - id: mivia.generic.no-wildcard-bash-allow
+    languages:
+      - generic
+    severity: ERROR
+    message: Do not grant wildcard Bash(...) permissions; allow exact commands only.
+    paths:
+      include:
+        - /AGENTS.md
+        - /CLAUDE.md
+        - /.claude/**
+        - /.codex/**
+        - /.github/**
+    patterns:
+      - pattern-inside: |
+          "allow": [
+            ...
+          ]
+      - pattern-regex: 'Bash\([^)\n]*\*[^)\n]*\)'
+
+  - id: mivia.generic.no-shell-metachar-bash-allow
+    languages:
+      - generic
+    severity: ERROR
+    message: Do not grant Bash(...) permissions containing shell metacharacters.
+    paths:
+      include:
+        - /AGENTS.md
+        - /CLAUDE.md
+        - /.claude/**
+        - /.codex/**
+        - /.github/**
+    patterns:
+      - pattern-inside: |
+          "allow": [
+            ...
+          ]
+      - pattern-regex: 'Bash\([^)\n]*[;&|`$<>][^)\n]*\)'
+
+  - id: mivia.go.no-panic-in-internal
+    languages:
+      - go
+    severity: ERROR
+    message: Return errors from internal packages instead of panicking.
+    paths:
+      include:
+        - /internal/**/*.go
+      exclude:
+        - /**/*_test.go
+    pattern: panic(...)
+
+  - id: mivia.go.no-fatal-exit-in-internal
+    languages:
+      - go
+    severity: ERROR
+    message: Internal packages must return errors instead of terminating the process.
+    paths:
+      include:
+        - /internal/**/*.go
+      exclude:
+        - /**/*_test.go
+    pattern-either:
+      - pattern: log.Fatal(...)
+      - pattern: log.Fatalf(...)
+      - pattern: os.Exit(...)
+
+  - id: mivia.go.no-network-calls
+    languages:
+      - go
+    severity: ERROR
+    message: mivia-agent must not make network calls; adapters use local CLI runners and tests use fakes.
+    paths:
+      include:
+        - /cmd/**/*.go
+        - /internal/**/*.go
+    pattern-either:
+      - pattern: http.Get(...)
+      - pattern: http.Post(...)
+      - pattern: http.PostForm(...)
+      - pattern: http.DefaultClient.Do(...)
+      - pattern: net.Dial(...)
+      - pattern: net.DialTimeout(...)
+      - pattern: grpc.Dial(...)
+      - pattern: websocket.DefaultDialer.Dial(...)
+
+  - id: mivia.go.no-raw-artifact-write
+    languages:
+      - go
+    severity: ERROR
+    message: Do not persist raw prompts, provider payloads, or model output; write scrubbed artifacts only.
+    paths:
+      include:
+        - /cmd/**/*.go
+        - /internal/**/*.go
+    patterns:
+      - pattern-either:
+          - pattern: os.WriteFile(..., $DATA, ...)
+          - pattern: ioutil.WriteFile(..., $DATA, ...)
+      - metavariable-regex:
+          metavariable: $DATA
+          regex: (?i).*(raw|prompt|payload|provider|model).*
+
+  - id: mivia.go.tests-no-real-agent-cli
+    languages:
+      - go
+    severity: ERROR
+    message: Adapter tests must use fake runners, not real agent CLI processes.
+    paths:
+      include:
+        - /**/*_test.go
+    pattern-either:
+      - pattern: exec.Command("codex", ...)
+      - pattern: exec.Command("claude", ...)
+      - pattern: exec.Command("opencode", ...)

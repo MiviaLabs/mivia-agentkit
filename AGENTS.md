@@ -84,7 +84,15 @@ For changes to the agent configuration surface, run:
 python3 scripts/verify_agent_config.py
 ```
 
-Sources: https://agents.md/, https://go.dev/doc/modules/layout. Repo source: `docs/plans/_conventions.md`.
+Install repo-managed Git hooks once per clone:
+
+```bash
+scripts/install_git_hooks.sh
+```
+
+The committed hooks run `gofmt` and Semgrep policy checks before commit, then agent-config validation, full Semgrep, and Go test/vet/build checks before push. The Go checks no-op until `go.mod` exists.
+
+Sources: https://agents.md/, https://go.dev/doc/modules/layout, https://git-scm.com/docs/githooks, https://git-scm.com/docs/git-config, https://pkg.go.dev/cmd/gofmt, https://docs.semgrep.dev/extensions/pre-commit. Repo sources: `docs/plans/_conventions.md`, `docs/development-hooks.md`.
 
 ## Git Workflow
 

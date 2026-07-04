@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -104,6 +105,13 @@ def verify_index() -> None:
         "scripts/verify_agent_config.py" in content,
         ".ai/INDEX.md: missing committed agent-config verifier command",
     )
+    for path in [
+        ".githooks/",
+        "semgrep/",
+        "scripts/",
+        "docs/development-hooks.md",
+    ]:
+        require(path in content, f".ai/INDEX.md: missing hook verification path {path}")
 
 
 def verify_skills() -> None:
@@ -207,11 +215,76 @@ def verify_gitignore() -> None:
         ".ai/runs/",
         ".git/mivia-agent-quality-stamp.json",
         ".claude/settings.local.json",
+        ".semgrep-cache/",
         ".env",
         ".env.*",
         "secrets/",
     ]:
         require(entry in entries, f".gitignore: missing {entry}")
+
+
+def verify_git_hooks() -> None:
+    required_files = [
+        ".githooks/pre-commit",
+        ".githooks/pre-push",
+        "scripts/git-hooks/pre-commit",
+        "scripts/git-hooks/pre-push",
+        "scripts/install_git_hooks.sh",
+        "semgrep/agent-standards.yml",
+        "docs/development-hooks.md",
+    ]
+    for path in required_files:
+        require(repo_path(path).is_file(), f"{path}: missing")
+
+    for path in required_files[:5]:
+        require(os.access(repo_path(path), os.X_OK), f"{path}: must be executable")
+
+    require(
+        'core.hooksPath .githooks' in text("scripts/install_git_hooks.sh"),
+        "scripts/install_git_hooks.sh: must configure core.hooksPath .githooks",
+    )
+    require(
+        "scripts/git-hooks/pre-commit" in text(".githooks/pre-commit"),
+        ".githooks/pre-commit: must delegate to scripts/git-hooks/pre-commit",
+    )
+    require(
+        "scripts/git-hooks/pre-push" in text(".githooks/pre-push"),
+        ".githooks/pre-push: must delegate to scripts/git-hooks/pre-push",
+    )
+
+    pre_commit = text("scripts/git-hooks/pre-commit")
+    for needle in [
+        "scripts/verify_agent_config.py",
+        "gofmt -w",
+        "git diff --check --cached",
+        "semgrep --validate --config semgrep/agent-standards.yml",
+        "semgrep --config semgrep/agent-standards.yml",
+    ]:
+        require(needle in pre_commit, f"scripts/git-hooks/pre-commit: missing {needle}")
+
+    pre_push = text("scripts/git-hooks/pre-push")
+    for needle in [
+        "scripts/verify_agent_config.py",
+        "git diff --check",
+        "semgrep --validate --config semgrep/agent-standards.yml",
+        "semgrep --config semgrep/agent-standards.yml",
+        "go test ./...",
+        "go vet ./...",
+        "go build ./cmd/mivia-agent",
+    ]:
+        require(needle in pre_push, f"scripts/git-hooks/pre-push: missing {needle}")
+
+    semgrep_config = text("semgrep/agent-standards.yml")
+    for rule_id in [
+        "mivia.generic.no-wildcard-bash-allow",
+        "mivia.generic.no-shell-metachar-bash-allow",
+        "mivia.go.no-panic-in-internal",
+        "mivia.go.no-fatal-exit-in-internal",
+        "mivia.go.no-network-calls",
+        "mivia.go.no-raw-artifact-write",
+        "mivia.go.tests-no-real-agent-cli",
+    ]:
+        require(rule_id in semgrep_config, f"semgrep/agent-standards.yml: missing {rule_id}")
 
 
 def verify_secret_hygiene() -> None:
@@ -224,6 +297,11 @@ def verify_secret_hygiene() -> None:
         ".claude",
         ".codex",
         ".github",
+        ".githooks",
+        "docs/development-hooks.md",
+        "scripts/git-hooks",
+        "scripts/install_git_hooks.sh",
+        "semgrep",
         "scripts/verify_agent_config.py",
     ]
     secret_patterns = [
@@ -259,6 +337,7 @@ def main() -> int:
     verify_claude_settings()
     verify_codex_hooks()
     verify_gitignore()
+    verify_git_hooks()
     verify_secret_hygiene()
 
     if FAILURES:
