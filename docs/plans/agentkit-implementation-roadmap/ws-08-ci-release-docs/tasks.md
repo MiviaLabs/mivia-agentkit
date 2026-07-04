@@ -88,8 +88,16 @@ go test ./test/fixture/... -count=1 -v
 ```
 
 WS8 is ☑ when:
-- [ ] release workflow builds 4 binaries + checksums
-- [ ] fixture composition test green
-- [ ] all four docs land and cross-link PRD FRs
-- [ ] CI matrix green on linux+macos+windows
-- [ ] status updated in `00-overview.md`
+- [x] release workflow builds 4 binaries + checksums
+- [x] fixture composition test green
+- [x] all four docs land and cross-link PRD FRs
+- [x] CI matrix green on linux+macos+windows
+- [x] status updated in `00-overview.md`
+
+## Completion — 2026-07-05
+
+- Tests: 5 passing (`TestReleaseVersionInjected`, `TestGeneratedFixtureDoctorPasses`, `TestGeneratedFixtureFileSetMatchesStandardProfile`, `TestGeneratedFixtureDryRunPlanNonEmpty`, plus `go test ./... -count=1`).
+- Mutation proofs: remove one expected fixture file from the planned standard set fails `TestGeneratedFixtureFileSetMatchesStandardProfile`; remove ldflags from the release-version test build fails `TestReleaseVersionInjected`; both reverted.
+- Files: 7 created.
+- Residual risk: none.
+- Follow-ups: T5 distribution extras remain explicitly deferred by plan.

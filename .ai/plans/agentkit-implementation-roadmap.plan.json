@@ -966,6 +966,7 @@
         ],
         "files_edit": [
           "internal/version/version.go",
+          "internal/version/version_test.go",
           ".github/workflows/release.yml",
           ".github/workflows/ci.yml",
           "test/fixture/fixture_test.go",
@@ -995,6 +996,7 @@
         ],
         "mutation": "Drop release ldflags injection or remove one standard-profile expected file; TestReleaseVersionInjected or TestGeneratedFixtureFileSetMatchesStandardProfile must fail.",
         "outputs": [
+          "internal/version/version_test.go",
           ".github/workflows/release.yml",
           ".github/workflows/ci.yml",
           "test/fixture/fixture_test.go",
@@ -1078,6 +1080,11 @@
       "source": "docs/plans/agentkit-implementation-roadmap/ws-07-import-update/tasks.md",
       "gap": "WS7 T2 specified both type Plan and func Plan in the same Go package, which is not a valid Go identifier combination",
       "correction": "renamed the constructor contract to BuildPlan in the task file and implemented that symbol in internal/importer/plan.go"
+    },
+    {
+      "source": ".ai/plans/agentkit-implementation-roadmap.plan.json",
+      "gap": "WS8 listed internal/version/version_test.go in tests but omitted it from files_edit and outputs",
+      "correction": "added internal/version/version_test.go to WS8 files_edit and outputs so the release-version test is inside the permitted DAG scope"
     }
   ],
   "stop_conditions": [

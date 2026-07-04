@@ -1,10 +1,23 @@
 # User Guide
 
-This guide covers the current implemented CLI surface and the flags that actually matter today.
+This guide covers the current local CLI surface and the commands that are fully implemented today.
 
-## Run From Source
+Related PRD requirements:
+- Setup and update: `FR-1.1` to `FR-1.4`
+- Validation and adapters: `FR-2.1` to `FR-3.2`
+- Workflows and review: `FR-4.1` to `FR-5.3`
+- Hooks and governance: `FR-7.1` to `FR-8.3`
+- Portability: `NFR-1`
 
-From this checkout:
+## Install
+
+From source:
+
+```bash
+go install github.com/MiviaLabs/mivia-agentkit/cmd/mivia-agent@latest
+```
+
+From a checkout:
 
 ```bash
 go run ./cmd/mivia-agent --help
@@ -14,19 +27,19 @@ Use `--repo` on commands to point at the target Git repository. If omitted, comm
 
 ## Command Matrix
 
-| Command | Current behavior |
-| --- | --- |
-| `init` | Installs canonical repo files and adapter-specific files. |
-| `doctor` | Validates setup and returns structured findings. |
-| `audit` | Reports advisory quality gaps. |
-| `preflight` | Writes a quality stamp for the current Git diff. |
-| `adapters` | Detects adapters and whether they are approved for `run`. |
-| `run` | Executes a bounded workflow from manifest or workflow file. |
-| `review` | Runs a one-off consensus review for one artifact. |
-| `hook` | Enforces hook policy for Codex and Claude events. |
-| `import` | Reads an existing setup and plans or writes `.ai/` migration files. |
-| `update` | Refreshes managed template regions in an initialized repo. |
-| `version` | Prints the build version. |
+| Command | PRD | Current behavior |
+| --- | --- | --- |
+| `init` | `FR-1.1` to `FR-1.3` | Installs canonical repo files and adapter-specific files. |
+| `doctor` | `FR-2.1`, `FR-5.4`, `FR-10.5` | Validates setup and returns structured findings. |
+| `audit` | `FR-2.3`, `FR-6.4` | Reports advisory quality gaps. |
+| `preflight` | `FR-2.4`, `FR-7.1` | Writes a quality stamp for the current Git diff. |
+| `adapters` | `FR-3.1`, `FR-3.2` | Detects adapters and whether they are approved for `run`. |
+| `run` | `FR-4.1` to `FR-4.4` | Executes a bounded workflow from manifest or workflow file. |
+| `review` | `FR-5.1` to `FR-5.3` | Runs a one-off consensus review for one artifact. |
+| `hook` | `FR-7.1`, `FR-8.1` to `FR-8.3` | Enforces hook policy for Codex and Claude events. |
+| `import` | `FR-9.1`, `FR-9.2` | Reads an existing setup and plans or writes `.ai/` migration files. |
+| `update` | `FR-1.4` | Refreshes managed template regions in an initialized repo. |
+| `version` | `NFR-1` | Prints the build version. |
 
 Flags that exist but are not fully wired yet:
 
@@ -39,6 +52,8 @@ Flags that exist but are not fully wired yet:
 Treat those as reserved surface. They are accepted by the CLI but do not materially change behavior yet.
 
 ## Initialize A Repo
+
+PRD: `FR-1.1`, `FR-1.2`, `FR-1.3`, `FR-10.1` to `FR-10.3`, `FR-10.6`
 
 Preview generated files first:
 
@@ -75,14 +90,9 @@ Current `init` flags:
 - `--json`: emit structured output.
 - `--with-loop <name>` repeated: accepted, but currently reserved.
 
-Example JSON preview:
-
-```bash
-go run ./cmd/mivia-agent init --repo /path/to/repo --profile strict \
-  --adapter codex --adapter claude --dry-run --json
-```
-
 ## Validate With Doctor
+
+PRD: `FR-2.1`, `FR-5.4`, `FR-10.5`
 
 Run:
 
@@ -116,13 +126,9 @@ Exit codes:
 - `1`: at least one error-severity finding.
 - `2`: warning-only findings when `--strict` is set.
 
-Flags:
-
-- `--repo <path>`
-- `--json`
-- `--strict`
-
 ## Audit Quality Gaps
+
+PRD: `FR-2.3`, `FR-6.4`
 
 Run:
 
@@ -152,13 +158,9 @@ go run ./cmd/mivia-agent audit --repo /path/to/repo --json
 
 By default, `audit` exits `0` even when it reports warnings. Use `--strict` to promote warning-only reports to exit code `2`.
 
-Flags:
-
-- `--repo <path>`
-- `--json`
-- `--strict`
-
 ## Write A Quality Stamp
+
+PRD: `FR-2.4`, `FR-7.1`
 
 Run:
 
@@ -187,17 +189,6 @@ What `preflight` does now:
 - Validates proof inputs for the current change set.
 - Writes `.git/mivia-agent-quality-stamp.json`.
 
-Current flags:
-
-- `--repo <path>`
-- `--contract-row <name>` repeated
-- `--focused-verifier <command>` repeated
-- `--broad-verifier <command>` repeated
-- `--mutation-proof <note>` repeated
-- `--not-run <reason>` repeated
-- `--pipeline-preflight`
-- `--json`
-
 Current notes:
 
 - `--not-run` is only accepted when no `--broad-verifier` was provided.
@@ -205,6 +196,8 @@ Current notes:
 - `--pipeline-preflight` is currently accepted but does not materially change validation behavior.
 
 ## Inspect Adapters
+
+PRD: `FR-3.1`, `FR-3.2`
 
 Run:
 
@@ -230,6 +223,8 @@ Current adapter expectations:
 
 ## Run A Workflow
 
+PRD: `FR-4.1` to `FR-4.4`, `FR-6.1` to `FR-6.3`
+
 Preview the plan:
 
 ```bash
@@ -250,19 +245,11 @@ Current `run` behavior:
 - Executes the loop through the orchestrator.
 - Writes run artifacts under `.ai/runs/`.
 
-Flags:
-
-- `--repo <path>`
-- `--workflow <name>`
-- `--max-iterations <n>`
-- `--dry-run`
-- `--json`
-- `--strict`
-- `--step <id>` reserved
-- `--input-artifact <path>` reserved
-- `--var key=value` repeated, reserved
+Loop authoring details live in [loop-authoring.md](./loop-authoring.md).
 
 ## Run A One-Off Review
+
+PRD: `FR-5.1` to `FR-5.3`
 
 Example:
 
@@ -282,18 +269,9 @@ Current review behavior:
 - Runs one review request per reviewer.
 - Applies the configured consensus policy.
 
-Flags:
-
-- `--repo <path>`
-- `--artifact <path>`
-- `--reviewers codex,claude`
-- `--mode <majority|unanimous|weighted|first-pass>`
-- `--min-reviewers <n>`
-- `--weights codex=2,claude=1`
-- `--tie-breaker <strict|manual|prefer:adapter>`
-- `--json`
-
 ## Hook Entry Points
+
+PRD: `FR-7.1`, `FR-8.1` to `FR-8.3`
 
 Codex example:
 
@@ -318,6 +296,8 @@ Current hook behavior:
 
 ## Import An Existing Setup
 
+PRD: `FR-9.1`, `FR-9.2`
+
 Preview the migration plan:
 
 ```bash
@@ -330,12 +310,6 @@ Apply it:
 go run ./cmd/mivia-agent import --repo /path/to/repo --write
 ```
 
-Force conflicting mapped writes:
-
-```bash
-go run ./cmd/mivia-agent import --repo /path/to/repo --write --force
-```
-
 Current import behavior:
 
 - Reads legacy files such as `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.codex/`, `.claude/`, `.agents/skills/`, GitHub instruction files, and simple workflow-shaped files.
@@ -344,14 +318,9 @@ Current import behavior:
 - Preserves source files instead of deleting or rewriting them in place.
 - Runs `doctor` after `--write`.
 
-Flags:
-
-- `--repo <path>`
-- `--write`
-- `--force`
-- `--json`
-
 ## Update Managed Files
+
+PRD: `FR-1.4`, `NFR-1`
 
 Preview differences:
 
@@ -365,12 +334,6 @@ Write updates:
 go run ./cmd/mivia-agent update --repo /path/to/repo --write
 ```
 
-Force conflicted updates:
-
-```bash
-go run ./cmd/mivia-agent update --repo /path/to/repo --write --force
-```
-
 Current update behavior:
 
 - Compares rendered embedded templates against the repo.
@@ -380,19 +343,9 @@ Current update behavior:
 - Reports conflicts instead of overwriting locally edited managed content unless `--force`.
 - Runs `doctor` after `--write`.
 
-Flags:
-
-- `--repo <path>`
-- `--write`
-- `--force`
-- `--json`
-
 ## Recommended Local Flow
 
 ```bash
-go run ./cmd/mivia-agent init --repo /path/to/repo --profile standard \
-  --adapter codex --adapter claude --adapter copilot --dry-run
-
 go run ./cmd/mivia-agent init --repo /path/to/repo --profile standard \
   --adapter codex --adapter claude --adapter copilot --write
 

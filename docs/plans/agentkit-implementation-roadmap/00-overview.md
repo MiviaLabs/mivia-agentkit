@@ -56,7 +56,7 @@ Phase 0                  Phase 1                       Phase 2
 | 5 | [`ws-05-hooks/`](ws-05-hooks/tasks.md) | Hook engine (Codex + Claude) | 4 | WS4, WS12 | ☑ |
 | 6 | [`ws-06-adapter-templates/`](ws-06-adapter-templates/tasks.md) | Adapter templates (incl. Crush) | 4 | WS2, WS9 | ☑ |
 | 7 | [`ws-07-import-update/`](ws-07-import-update/tasks.md) | `import` + `update` | 5 | WS2, WS3 | ☑ |
-| 8 | [`ws-08-ci-release-docs/`](ws-08-ci-release-docs/tasks.md) | CI, release, docs | 5 | all prior | ☐ |
+| 8 | [`ws-08-ci-release-docs/`](ws-08-ci-release-docs/tasks.md) | CI, release, docs | 5 | all prior | ☑ |
 
 Numbering follows the product plan, not execution order. **Execute by phase, not by number.**
 

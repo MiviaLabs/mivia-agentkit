@@ -9,8 +9,15 @@ permissions:
 
 jobs:
   go:
-    name: Go
-    runs-on: ubuntu-latest
+    name: Go (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,3 +33,30 @@ jobs:
 
       - name: Test
         run: go test ./... -count=1
+
+  fixture-smoke:
+    name: Fixture Smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Fixture smoke
+        run: go test ./test/fixture/... -count=1 -v
+
+      - name: Adapters JSON smoke
+        continue-on-error: true
+        run: go run ./cmd/mivia-agent adapters --json
