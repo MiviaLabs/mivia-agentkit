@@ -1,5 +1,5 @@
-// Package adapter defines the Codex CLI adapter.
-// Plan: WS9. PRD: FR-3.1, FR-3.2, FR-7.4.
+// Package adapter tests the Codex CLI adapter.
+// Plan: WS-C. PRD: FR-3.1, FR-3.2, FR-7.4.
 package adapter
 
 import (
@@ -69,6 +69,30 @@ func TestCodexRunRespectsTimeout(t *testing.T) {
 	_, err := (Codex{Runner: errRunner}).Run(context.Background(), Request{Prompt: "x", Approval: "never", Timeout: time.Millisecond})
 	if err == nil {
 		t.Fatalf("Run() error = nil, want timeout")
+	}
+}
+
+func TestCodexRunPassesModelFlag(t *testing.T) {
+	r := codexRunner([]byte("{}"), nil)
+	_, err := (Codex{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: "never", Model: "gpt-5.5"})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	args := strings.Join(r.Calls[0].Args, " ")
+	if !strings.Contains(args, "--model gpt-5.5") {
+		t.Fatalf("args = %q, want model flag", args)
+	}
+}
+
+func TestCodexRunPassesReasoningEffortOverride(t *testing.T) {
+	r := codexRunner([]byte("{}"), nil)
+	_, err := (Codex{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: "never", Effort: "xhigh"})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	args := strings.Join(r.Calls[0].Args, " ")
+	if !strings.Contains(args, `--config model_reasoning_effort="xhigh"`) {
+		t.Fatalf("args = %q, want reasoning effort override", args)
 	}
 }
 

@@ -1,5 +1,5 @@
-// Package adapter defines the Claude Code adapter.
-// Plan: WS9. PRD: FR-3.1, FR-3.2, FR-7.4.
+// Package adapter tests the Claude Code adapter.
+// Plan: WS-C. PRD: FR-3.1, FR-3.2, FR-7.4.
 package adapter
 
 import (
@@ -38,6 +38,30 @@ func TestClaudeRunMapsExitCode(t *testing.T) {
 	got, _ := (Claude{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: "plan"})
 	if got.ExitCode != 5 {
 		t.Fatalf("ExitCode = %d, want 5", got.ExitCode)
+	}
+}
+
+func TestClaudeRunPassesModelFlag(t *testing.T) {
+	r := claudeRunner([]byte("{}"), nil)
+	_, err := (Claude{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: "plan", Model: "claude-sonnet-5"})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	args := strings.Join(r.Calls[0].Args, " ")
+	if !strings.Contains(args, "--model claude-sonnet-5") {
+		t.Fatalf("args = %q, want model flag", args)
+	}
+}
+
+func TestClaudeRunPassesEffortFlag(t *testing.T) {
+	r := claudeRunner([]byte("{}"), nil)
+	_, err := (Claude{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: "plan", Effort: "xhigh"})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	args := strings.Join(r.Calls[0].Args, " ")
+	if !strings.Contains(args, "--effort xhigh") {
+		t.Fatalf("args = %q, want effort flag", args)
 	}
 }
 

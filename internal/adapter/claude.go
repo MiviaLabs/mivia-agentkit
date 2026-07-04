@@ -1,5 +1,5 @@
 // Package adapter defines the Claude Code adapter.
-// Plan: WS9. PRD: FR-3.1, FR-3.2, FR-7.4.
+// Plan: WS-C. PRD: FR-3.1, FR-3.2, FR-7.4.
 //
 // Claude Code docs verified 2026-07-05:
 // https://code.claude.com/docs/en/headless documents `claude -p`
@@ -78,6 +78,12 @@ func (c Claude) runner() Runner {
 
 func (c Claude) runRaw(ctx context.Context, req Request) (RunResult, error) {
 	args := []string{"claude", "-p", "--output-format", "json", "--permission-mode", req.Approval}
+	if req.Model != "" {
+		args = append(args, "--model", req.Model)
+	}
+	if req.Effort != "" {
+		args = append(args, "--effort", req.Effort)
+	}
 	if req.MaxTurns > 0 {
 		args = append(args, "--max-turns", toString(req.MaxTurns))
 	}

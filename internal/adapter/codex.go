@@ -1,5 +1,5 @@
 // Package adapter defines the Codex CLI adapter.
-// Plan: WS9. PRD: FR-3.1, FR-3.2, FR-7.4.
+// Plan: WS-C. PRD: FR-3.1, FR-3.2, FR-7.4.
 //
 // Codex docs verified 2026-07-05:
 // https://developers.openai.com/codex/noninteractive documents `codex exec`
@@ -81,6 +81,12 @@ func (c Codex) runner() Runner {
 
 func (c Codex) runRaw(ctx context.Context, req Request) (RunResult, error) {
 	args := []string{"codex", "exec", "--sandbox", "workspace-write", "--ask-for-approval", req.Approval, "--json"}
+	if req.Model != "" {
+		args = append(args, "--model", req.Model)
+	}
+	if req.Effort != "" {
+		args = append(args, "--config", `model_reasoning_effort="`+req.Effort+`"`)
+	}
 	if req.ArtifactOut != "" {
 		args = append(args, "--output-last-message", req.ArtifactOut)
 	}

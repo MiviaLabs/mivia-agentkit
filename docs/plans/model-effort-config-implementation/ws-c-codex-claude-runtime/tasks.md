@@ -41,3 +41,24 @@ Dependencies:
 
 Mutation proof:
 - Remove `--model` or `--effort`; the matching Claude test must fail.
+
+## Verification
+
+```bash
+go test ./internal/adapter/... -count=1
+go vet ./internal/adapter/...
+```
+
+WS ws-c-codex-claude-runtime is ☑ when:
+- [x] all listed tests pass
+- [x] all mutation proofs executed and reverted (results in completion report)
+- [x] `go vet` clean for this WS's packages
+- [x] no network calls added (grep for `http.`, `net.Dial`, `os/exec` outside adapter fakes)
+
+## Completion — 2026-07-05
+
+- Tests: 50 passing.
+- Mutation proofs: T1 Codex `--model` fail-then-revert ok; T1 Codex `model_reasoning_effort` override fail-then-revert ok; T2 Claude `--model` fail-then-revert ok; T2 Claude `--effort` fail-then-revert ok.
+- Files: 5 updated.
+- Residual risk: none.
+- Follow-ups: continue to the next scoped node for downstream runtime consumers and doc surface.
