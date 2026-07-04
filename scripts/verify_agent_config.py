@@ -218,11 +218,13 @@ def verify_secret_hygiene() -> None:
     scanned_roots = [
         "AGENTS.md",
         "CLAUDE.md",
+        ".gitignore",
         ".agents",
         ".ai",
         ".claude",
         ".codex",
         ".github",
+        "scripts/verify_agent_config.py",
     ]
     secret_patterns = [
         re.compile(r"sk-[A-Za-z0-9_-]{20,}"),

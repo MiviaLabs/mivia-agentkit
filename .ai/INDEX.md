@@ -42,4 +42,4 @@ The registry at `.agents/skills.json` lists all committed project skill files fr
 
 ## Verification
 
-Run `python3 scripts/verify_agent_config.py` after changing `AGENTS.md`, `.ai/`, `.claude/`, `.codex/`, `.github/`, `.agents/`, or `.gitignore`.
+Run `python3 scripts/verify_agent_config.py` after changing `AGENTS.md`, `.ai/`, `.claude/`, `.codex/`, `.github/`, `.agents/`, `.gitignore`, or `scripts/verify_agent_config.py`.
