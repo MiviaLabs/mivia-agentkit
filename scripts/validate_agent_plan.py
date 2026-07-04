@@ -30,6 +30,7 @@ REQUIRED_NODE_FIELDS = [
     "skill",
     "agent",
     "depends_on",
+    "task_dir",
     "files_read",
     "files_edit",
     "allowed_mcp_tools",
@@ -112,6 +113,7 @@ def validate_dag(plan: dict[str, Any]) -> None:
         seen.add(node_id)
         by_id[node_id] = node
         require_string_list(node["depends_on"], f"node {node_id}.depends_on", allow_empty=True)
+        require(isinstance(node["task_dir"], str) and node["task_dir"], f"node {node_id}.task_dir is required")
         require_string_list(node["files_read"], f"node {node_id}.files_read")
         require_string_list(node["files_edit"], f"node {node_id}.files_edit")
         require_string_list(node["allowed_mcp_tools"], f"node {node_id}.allowed_mcp_tools", allow_empty=True)

@@ -2,7 +2,7 @@
   "PlanFormat": "mivia-agent-plan/v1",
   "plan_id": "agentkit-implementation-roadmap",
   "version": 1,
-  "baseline_commit": "dev/e2bd34a",
+  "baseline_commit": "dev/97e6b4c plus current working-tree revalidation",
   "scope": {
     "in": [
       "Mivia AgentKit implementation roadmap",
@@ -66,18 +66,8 @@
   },
   "source_evidence": [
     {
-      "path": "AGENTS.md",
-      "reason": "canonical repo instructions and implementation boundaries",
-      "checked_at": "2026-07-04"
-    },
-    {
       "path": ".ai/INDEX.md",
       "reason": "canonical control-surface registry",
-      "checked_at": "2026-07-04"
-    },
-    {
-      "path": ".ai/templates/agent-plan-v1.json",
-      "reason": "machine plan template contract",
       "checked_at": "2026-07-04"
     },
     {
@@ -86,18 +76,23 @@
       "checked_at": "2026-07-04"
     },
     {
-      "path": "scripts/validate_agent_plan.py",
-      "reason": "real validator for DAG, gaps, verifiers, mutations, and correction log",
+      "path": ".ai/templates/agent-plan-v1.json",
+      "reason": "machine plan template contract",
       "checked_at": "2026-07-04"
     },
     {
-      "path": "scripts/test_agent_plan_contracts.py",
-      "reason": "contract tests for roadmap relocation and real plan artifacts",
+      "path": "AGENTS.md",
+      "reason": "canonical repo instructions and implementation boundaries",
       "checked_at": "2026-07-04"
     },
     {
-      "path": "scripts/plan_hook_guard.py",
-      "reason": "planner Stop-hook PlanArtifact enforcement",
+      "path": "docs/agent-planning.md",
+      "reason": "human-facing DAG task directory contract",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "path": "docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md",
+      "reason": "product implementation contract and external re-verification requirements",
       "checked_at": "2026-07-04"
     },
     {
@@ -186,8 +181,18 @@
       "checked_at": "2026-07-04"
     },
     {
-      "path": "docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md",
-      "reason": "product implementation contract and external re-verification requirements",
+      "path": "scripts/plan_hook_guard.py",
+      "reason": "planner Stop-hook PlanArtifact enforcement",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "scripts/test_agent_plan_contracts.py",
+      "reason": "contract tests for roadmap relocation and real plan artifacts",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "scripts/validate_agent_plan.py",
+      "reason": "real validator for DAG, gaps, verifiers, mutations, and correction log",
       "checked_at": "2026-07-04"
     }
   ],
@@ -195,7 +200,7 @@
     {
       "url": "https://developers.openai.com/codex/hooks",
       "reason": "Codex hook surface must be re-verified before WS5 emitter implementation",
-      "checked_at": "2026-07-04"
+      "checked_at": "2026-07-05"
     },
     {
       "url": "https://developers.openai.com/codex/noninteractive",
@@ -205,12 +210,12 @@
     {
       "url": "https://developers.openai.com/codex/skills",
       "reason": "Codex skill packaging behavior informs generated adapter templates",
-      "checked_at": "2026-07-04"
+      "checked_at": "2026-07-05"
     },
     {
       "url": "https://developers.openai.com/codex/mcp",
       "reason": "Codex MCP configuration informs allow-list and adapter-template boundaries",
-      "checked_at": "2026-07-04"
+      "checked_at": "2026-07-05"
     },
     {
       "url": "https://code.claude.com/docs/en/cli-reference",
@@ -293,7 +298,8 @@
           "internal/templates/templates_test.go",
           "templates/README.md",
           ".github/workflows/ci.yml"
-        ]
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-00-bootstrap/"
       },
       {
         "id": "ws-01-manifest-git-pathpolicy",
@@ -347,7 +353,8 @@
           "internal/gitstate/**",
           "internal/pathpolicy/**",
           "internal/globalconfig/**"
-        ]
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-01-manifest-git-pathpolicy/"
       },
       {
         "id": "ws-02-templates-init",
@@ -404,7 +411,8 @@
           "internal/render/**",
           "internal/cli/init.go",
           "templates/**"
-        ]
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-02-templates-init/"
       },
       {
         "id": "ws-03-doctor-audit",
@@ -457,7 +465,8 @@
           "internal/audit/**",
           "internal/cli/doctor.go",
           "internal/cli/audit.go"
-        ]
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-03-doctor-audit/"
       },
       {
         "id": "ws-04-preflight-stamp",
@@ -504,7 +513,8 @@
         "outputs": [
           "internal/preflight/**",
           "internal/cli/preflight.go"
-        ]
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-04-preflight-stamp/"
       },
       {
         "id": "ws-09-adapters",
@@ -553,7 +563,8 @@
         "mutation": "Remove non-interactive approval flags, allow empty approval, ignore runner context, or empty the scrub pattern set; the named WS9 tests must fail.",
         "outputs": [
           "internal/adapter/**"
-        ]
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-09-adapters/"
       },
       {
         "id": "ws-12-governance",
@@ -602,7 +613,8 @@
         "outputs": [
           "internal/policy/**",
           "internal/doctor/checks_governance.go"
-        ]
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-12-governance/"
       },
       {
         "id": "ws-10-orchestrator",
@@ -652,7 +664,8 @@
         "outputs": [
           "internal/runstore/**",
           "internal/orchestrator/**"
-        ]
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-10-orchestrator/"
       },
       {
         "id": "ws-11-consensus",
@@ -694,7 +707,8 @@
         "mutation": "Flip majority comparison to allow ties, ignore a unanimous reject, or allow first-pass under strict protected loops; the named WS11 tests must fail.",
         "outputs": [
           "internal/consensus/**"
-        ]
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-11-consensus/"
       },
       {
         "id": "ws-13-run-review-adapters",
@@ -748,7 +762,8 @@
           "internal/cli/adapters.go",
           "internal/cli/run.go",
           "internal/cli/review.go"
-        ]
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-13-run-review-adapters/"
       },
       {
         "id": "ws-05-hooks",
@@ -796,7 +811,8 @@
         "outputs": [
           "internal/hooks/**",
           "internal/cli/hook.go"
-        ]
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-05-hooks/"
       },
       {
         "id": "ws-06-adapter-templates",
@@ -850,7 +866,8 @@
           "templates/adapters/gemini/GEMINI.md",
           "templates/adapters/crush/README.md",
           "internal/audit/checks_adapter_policy.go"
-        ]
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-06-adapter-templates/"
       },
       {
         "id": "ws-07-import-update",
@@ -901,7 +918,8 @@
           "internal/update/**",
           "internal/cli/import.go",
           "internal/cli/update.go"
-        ]
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-07-import-update/"
       },
       {
         "id": "ws-08-ci-release-docs",
@@ -967,7 +985,8 @@
           "docs/loop-authoring.md",
           "docs/template-authoring.md",
           "docs/adr/0001-product-boundary.md"
-        ]
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-08-ci-release-docs/"
       }
     ]
   },
@@ -1021,6 +1040,11 @@
       "source": "internal/cli/root.go",
       "gap": "WS0 unknown-command path let Cobra and main both write the same error",
       "correction": "added TestUnknownCommandDoesNotWriteDuplicateError to the WS0 test contract and enabled Cobra SilenceErrors"
+    },
+    {
+      "source": "docs/agent-planning.md",
+      "gap": "agent planning named human and machine artifacts but did not require a task directory per DAG node; the AgentKit roadmap plan relied on implicit workstream folders",
+      "correction": "added a required task_dir field to every DAG node, pointed each AgentKit node at its existing ws-XX task directory, and added validator plus contract-test coverage"
     }
   ],
   "stop_conditions": [

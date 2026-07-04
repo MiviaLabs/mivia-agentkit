@@ -112,8 +112,18 @@ go vet ./internal/policy/...
 ```
 
 WS12 is ☑ when:
-- [ ] T0 AGT re-verification done; findings cited in `agt.go`
-- [ ] noop provider tests pass (MVP path)
-- [ ] AGT provider compiles under `-tags agt` OR the stub path is proven
-- [ ] doctor strict-AGT failure mutation proof executed
-- [ ] status updated in `00-overview.md`
+- [x] T0 AGT re-verification done; findings cited in `agt.go`
+- [x] noop provider tests pass (MVP path)
+- [x] AGT provider compiles under `-tags agt` OR the stub path is proven
+- [x] doctor strict-AGT failure mutation proof executed
+- [x] status updated in `00-overview.md`
+
+## Completion — 2026-07-05
+
+- Tests: 24 passing in `go test ./internal/policy/... ./internal/doctor/... -count=1`.
+- T0 AGT re-verification: public docs confirm Go module path, MIT license, and tamper-evident decision/audit goals; public docs do not expose a stable Go evaluator API, so AGT remains build-tagged and fail-closed until pinned.
+- Mutation proofs: protected-kind requirement removal failed `TestProtectActionRequiresProtectedKind`; noop `Record` no-op failed `TestNoopRecordsToAuditLog`; strict AGT warning downgrade failed `TestDoctorFailsWhenStrictRequiresAGTButUnavailable`; tagged AGT constructor success failed `TestAGTProviderFailsClosedUntilSDKPinned` and `TestDoctorFailsWhenStrictRequiresAGTButSDKUnavailable`.
+- Verification: `go test ./internal/policy/... ./internal/doctor/... -count=1`, `go test -tags agt ./internal/policy/... ./internal/doctor/... -count=1`, `go vet ./internal/policy/...`, no-network grep, and `git diff --check` passed.
+- Files: 11 created, 1 code file updated, 2 docs updated.
+- Residual risk: production AGT evaluator/audit mapping is intentionally not implemented until the Go SDK API is pinned.
+- Follow-ups: implement real AGT mapping when SDK import path and evaluator/audit call shape are stable.

@@ -2,11 +2,11 @@
 
 Agent planning uses two artifacts:
 
-- AgentKit implementation roadmap: `docs/plans/agentkit-implementation-roadmap/**/*.md`
+- Task directory: `docs/plans/<plan-id>/**/tasks.md`
 - Human implementation plan: `docs/plans/*.md`
 - Machine plan: `.ai/plans/*.plan.json`
 
-The human plan explains intent and tradeoffs. The machine plan is the execution contract for agents and hooks.
+The task directory contains executable task files for each DAG node or workstream. The human plan explains intent and tradeoffs. The machine plan is the execution contract for agents and hooks.
 
 ## Skills
 
@@ -14,6 +14,7 @@ The human plan explains intent and tradeoffs. The machine plan is the execution 
 
 - re-read current source, hooks, skills, rules, tests, and relevant docs
 - re-verify existing `docs/plans/agentkit-implementation-roadmap/**/*.md`
+- create or update `docs/plans/<plan-id>/**/tasks.md` for the relevant DAG tasks
 - fill or correct stale, vague, missing, or conflicting plan gaps
 - emit `mivia-agent-plan/v1` under `.ai/plans/`
 - validate the plan with `scripts/validate_agent_plan.py`
@@ -41,13 +42,14 @@ Each node must define:
 - `agent`
 - `files_read`
 - `files_edit`
+- `task_dir`
 - `allowed_mcp_tools`
 - `tests`
 - `verifiers`
 - `mutation`
 - `outputs`
 
-The validator rejects DAG cycles, unknown dependencies, missing node verifiers, missing tests, missing mutation proof, empty correction logs, and any gap status of `open`, `missing`, `shallow`, or `gated`.
+The validator rejects DAG cycles, unknown dependencies, missing task directories, missing node verifiers, missing tests, missing mutation proof, empty correction logs, and any gap status of `open`, `missing`, `shallow`, or `gated`.
 
 ## Hooks
 

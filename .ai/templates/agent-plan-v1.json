@@ -30,6 +30,7 @@
         "skill": "agent-dag-planner|agent-plan-implementer|deep-bug-audit|test-coverage-audit|adversarial-test-review|airtight-feature-delivery",
         "agent": "codex|claude|agents|manual",
         "depends_on": [],
+        "task_dir": "docs/plans/<plan-id>/<task-or-workstream>/",
         "files_read": ["<repo path>"],
         "files_edit": ["<repo path>"],
         "allowed_mcp_tools": ["<server.tool or none>"],

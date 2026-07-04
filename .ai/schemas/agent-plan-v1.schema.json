@@ -44,7 +44,37 @@
     },
     "dag": {
       "type": "object",
-      "required": ["nodes"]
+      "required": ["nodes"],
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "title",
+              "skill",
+              "agent",
+              "depends_on",
+              "task_dir",
+              "files_read",
+              "files_edit",
+              "allowed_mcp_tools",
+              "tests",
+              "verifiers",
+              "mutation",
+              "outputs"
+            ],
+            "properties": {
+              "task_dir": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
     },
     "gaps": {
       "type": "array",

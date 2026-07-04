@@ -74,6 +74,7 @@ VALID_PLAN = {
                 "skill": "agent-dag-planner",
                 "agent": "codex",
                 "depends_on": [],
+                "task_dir": "docs/plans/agent-planning-contracts/plan/",
                 "files_read": ["README.md"],
                 "files_edit": ["docs/agent-planning.md"],
                 "allowed_mcp_tools": ["openaiDeveloperDocs.search"],
@@ -88,6 +89,7 @@ VALID_PLAN = {
                 "skill": "agent-plan-implementer",
                 "agent": "codex",
                 "depends_on": ["plan"],
+                "task_dir": "docs/plans/agent-planning-contracts/implement/",
                 "files_read": [".ai/plans/agent-planning-contracts.plan.json"],
                 "files_edit": ["scripts/plan_hook_guard.py"],
                 "allowed_mcp_tools": [],
@@ -191,6 +193,12 @@ def test_missing_verifier_rejected() -> None:
     plan = json.loads(json.dumps(VALID_PLAN))
     plan["dag"]["nodes"][0]["verifiers"] = []
     assert_fails(plan, "verifier")
+
+
+def test_missing_task_dir_rejected() -> None:
+    plan = json.loads(json.dumps(VALID_PLAN))
+    del plan["dag"]["nodes"][0]["task_dir"]
+    assert_fails(plan, "task_dir")
 
 
 def test_missing_correction_log_rejected() -> None:
@@ -330,11 +338,22 @@ def test_agentkit_implementation_plan_is_named_and_referenced() -> None:
         raise AssertionError("AgentKit machine plan must report zero open gaps")
 
 
+def test_agentkit_plan_nodes_have_existing_task_dirs() -> None:
+    parsed = json.loads(AGENTKIT_PLAN.read_text(encoding="utf-8"))
+    for node in parsed["dag"]["nodes"]:
+        task_dir = ROOT / node["task_dir"]
+        if not task_dir.is_dir():
+            raise AssertionError(f"node {node['id']} task_dir missing: {node['task_dir']}")
+        if not (task_dir / "tasks.md").is_file():
+            raise AssertionError(f"node {node['id']} task_dir has no tasks.md: {node['task_dir']}")
+
+
 def main() -> int:
     test_valid_plan_passes()
     test_cycle_rejected()
     test_open_gap_rejected()
     test_missing_verifier_rejected()
+    test_missing_task_dir_rejected()
     test_missing_correction_log_rejected()
     test_plan_contract_files_exist()
     test_planning_skills_and_docs_are_registered()
@@ -343,6 +362,7 @@ def main() -> int:
     test_planning_markdown_links_resolve()
     test_committed_machine_plan_artifacts_are_real_and_validated()
     test_agentkit_implementation_plan_is_named_and_referenced()
+    test_agentkit_plan_nodes_have_existing_task_dirs()
     print("agent plan contract tests passed")
     return 0
 

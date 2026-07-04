@@ -18,5 +18,6 @@ Use `mivia-agent-report/v1` from `.ai/templates/agent-report-v1.md`; do not defi
 Claude-specific behavior:
 
 - State intended plan/doc edits before modifying files.
+- Create or update the relevant DAG task directories under `docs/plans/<plan-id>/`.
 - Validate `.ai/plans/*.plan.json` before reporting success.
 - End planner reports with `PlanArtifact: .ai/plans/<id>.plan.json`.

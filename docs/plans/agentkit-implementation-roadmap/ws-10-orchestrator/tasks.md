@@ -130,8 +130,17 @@ go test ./internal/orchestrator/ -run TestExecuteReviewStepFansOutConcurrently -
 ```
 
 WS10 is ☑ when:
-- [ ] all listed tests pass
-- [ ] fan-out genuinely concurrent (timing assertion green)
-- [ ] stamp-before-protect, budget-rejection, max-iterations mutation proofs executed (3)
-- [ ] no-leak check integrated
-- [ ] status updated in `00-overview.md`
+- [x] all listed tests pass
+- [x] fan-out genuinely concurrent (timing assertion green)
+- [x] stamp-before-protect, budget-rejection, max-iterations mutation proofs executed (3)
+- [x] no-leak check integrated
+- [x] status updated in `00-overview.md`
+
+## Completion — 2026-07-05
+
+- Tests: 26 passing in `go test ./internal/runstore/... ./internal/orchestrator/... -count=1`.
+- Mutation proofs: runstore traversal failed `TestWriteArtifactRejectsTraversal`; cycle detection removal failed `TestDAGRejectsCycle`; serialized review fan-out failed `TestExecuteReviewStepFansOutConcurrently`; skipped policy decision failed `TestExecuteStepRecordsPolicyDecisionRef`; budget support removal failed `TestLoopRejectsBudgetBoundInMVP`; stamp gate removal failed `TestLoopRequiresFreshStampBeforeProtectedStep`; max-iteration cap removal failed `TestLoopHonorsMaxIterationsOverrideWithinManifestBound`; empty leak patterns failed `TestAssertNoLeaksFlagsSecret`.
+- Verification: `go test ./internal/runstore/... ./internal/orchestrator/... -count=1`, `go vet ./internal/runstore/... ./internal/orchestrator/...`, fan-out focused test, no-network grep, `python3 scripts/validate_agent_plan.py .ai/plans/agentkit-implementation-roadmap.plan.json`, and `git diff --check` passed.
+- Files: 10 created, 2 docs updated.
+- Residual risk: WS10 uses an internal all-reviewers-pass consensus gate until WS11 lands the full consensus package.
+- Follow-ups: implement WS11 consensus modes and replace the temporary internal pass gate.

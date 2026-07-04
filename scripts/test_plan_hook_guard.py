@@ -69,6 +69,7 @@ def write_valid_plan(path: Path) -> None:
                     "skill": "agent-dag-planner",
                     "agent": "codex",
                     "depends_on": [],
+                    "task_dir": "docs/plans/test-valid/guard/",
                     "files_read": ["scripts/plan_hook_guard.py"],
                     "files_edit": ["scripts/plan_hook_guard.py"],
                     "allowed_mcp_tools": [],

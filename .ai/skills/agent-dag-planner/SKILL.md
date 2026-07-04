@@ -31,8 +31,9 @@ triggers:
 4. Identify stale, vague, missing, or conflicting plan content.
 5. Correct those gaps in the new plan artifact; do not merely list them.
 6. Emit a machine plan using `mivia-agent-plan/v1` in `.ai/plans/<id>.plan.json`.
-7. Save or update a human implementation plan in `docs/plans/`.
-8. Run `python3 scripts/validate_agent_plan.py <plan>`.
+7. Create or update task directories under `docs/plans/<plan-id>/` for the relevant DAG tasks.
+8. Save or update a human implementation plan in `docs/plans/`.
+9. Run `python3 scripts/validate_agent_plan.py <plan>`.
 
 ## DAG Requirements
 
@@ -40,6 +41,7 @@ Every DAG node must include:
 
 - stable `id`
 - `depends_on`
+- `task_dir`
 - responsible `skill`
 - target `agent`
 - `files_read`

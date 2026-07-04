@@ -19,5 +19,6 @@ Codex-specific behavior:
 
 - Save the human plan under `docs/plans/`.
 - Save the machine plan under `.ai/plans/*.plan.json`.
+- Create or update the relevant DAG task directories under `docs/plans/<plan-id>/`.
 - Validate the plan with `python3 scripts/validate_agent_plan.py <plan>`.
 - End planner reports with `PlanArtifact: .ai/plans/<id>.plan.json`.

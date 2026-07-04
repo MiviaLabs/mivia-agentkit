@@ -1,0 +1,187 @@
+// Package runstore persists bounded workflow run artifacts.
+// Plan: WS10. PRD: FR-4.5, FR-7.4.
+package runstore
+
+import (
+	"bytes"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/MiviaLabs/mivia-agentkit/internal/pathpolicy"
+)
+
+// RunID identifies one orchestrator run.
+type RunID string
+
+// Store writes run data under <repo>/.ai/runs.
+type Store struct{ Root string }
+
+// TraceEvent is one JSONL trace event.
+type TraceEvent struct {
+	TS        string         `json:"ts"`
+	Kind      string         `json:"kind"`
+	Step      string         `json:"step"`
+	Iteration int            `json:"iteration"`
+	Payload   map[string]any `json:"payload"`
+}
+
+// New returns a store rooted at repo/.ai/runs.
+func New(repo string) Store {
+	if repo == "" {
+		repo = "."
+	}
+	return Store{Root: filepath.Join(repo, ".ai", "runs")}
+}
+
+// NewRun creates and returns a new run ID.
+func (s Store) NewRun() RunID {
+	var b [4]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		copy(b[:], "fail")
+	}
+	id := RunID(time.Now().UTC().Format("20060102T150405Z") + "-" + hex.EncodeToString(b[:]))
+	_ = os.MkdirAll(s.Dir(id), 0o755)
+	return id
+}
+
+// Dir returns the absolute directory for id.
+func (s Store) Dir(id RunID) string {
+	abs, err := filepath.Abs(filepath.Join(s.root(), string(id)))
+	if err != nil {
+		return filepath.Join(s.root(), string(id))
+	}
+	return abs
+}
+
+// WriteArtifact writes one step artifact and returns its absolute path.
+func (s Store) WriteArtifact(id RunID, step, name string, b []byte) (string, error) {
+	rel, abs, err := s.checkedArtifactPath(id, step, name)
+	if err != nil {
+		return "", err
+	}
+	if err := pathpolicy.NewDefault().Check(s.repoRoot(), rel); err != nil {
+		return "", fmt.Errorf("run artifact path: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+		return "", fmt.Errorf("create artifact dir: %w", err)
+	}
+	if err := os.WriteFile(abs, b, 0o644); err != nil {
+		return "", fmt.Errorf("write artifact: %w", err)
+	}
+	return abs, nil
+}
+
+// ReadArtifact reads a step artifact.
+func (s Store) ReadArtifact(id RunID, step, name string) ([]byte, error) {
+	_, abs, err := s.checkedArtifactPath(id, step, name)
+	if err != nil {
+		return nil, err
+	}
+	b, err := os.ReadFile(abs)
+	if err != nil {
+		return nil, fmt.Errorf("read artifact: %w", err)
+	}
+	return b, nil
+}
+
+// AppendTrace appends one deterministic JSON trace line.
+func (s Store) AppendTrace(id RunID, event TraceEvent) error {
+	if event.TS == "" {
+		event.TS = time.Now().UTC().Format(time.RFC3339)
+	}
+	if event.Payload == nil {
+		event.Payload = map[string]any{}
+	}
+	if err := os.MkdirAll(s.Dir(id), 0o755); err != nil {
+		return fmt.Errorf("create run dir: %w", err)
+	}
+	line, err := marshalTrace(event)
+	if err != nil {
+		return err
+	}
+	f, err := os.OpenFile(filepath.Join(s.Dir(id), "trace.jsonl"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return fmt.Errorf("open trace: %w", err)
+	}
+	defer f.Close()
+	if _, err := f.Write(append(line, '\n')); err != nil {
+		return fmt.Errorf("write trace: %w", err)
+	}
+	return nil
+}
+
+func (s Store) checkedArtifactPath(id RunID, step, name string) (string, string, error) {
+	if id == "" || step == "" || name == "" {
+		return "", "", fmt.Errorf("run id, step, and name are required")
+	}
+	for _, raw := range []string{string(id), step, name} {
+		for _, part := range strings.FieldsFunc(raw, func(r rune) bool { return r == '/' || r == '\\' }) {
+			if part == ".." {
+				return "", "", fmt.Errorf("artifact path traverses outside runs")
+			}
+		}
+	}
+	rel := filepath.Join(".ai", "runs", string(id), step, name)
+	abs := filepath.Join(s.repoRoot(), rel)
+	runs, err := filepath.Abs(filepath.Join(s.repoRoot(), ".ai", "runs"))
+	if err != nil {
+		return "", "", err
+	}
+	checked, err := filepath.Abs(abs)
+	if err != nil {
+		return "", "", err
+	}
+	if checked != runs && !strings.HasPrefix(checked, runs+string(filepath.Separator)) {
+		return "", "", fmt.Errorf("artifact path escapes runs")
+	}
+	return rel, checked, nil
+}
+
+func (s Store) root() string {
+	if s.Root == "" {
+		return filepath.Join(".", ".ai", "runs")
+	}
+	return s.Root
+}
+
+func (s Store) repoRoot() string { return filepath.Dir(filepath.Dir(s.root())) }
+
+func marshalTrace(event TraceEvent) ([]byte, error) {
+	var b bytes.Buffer
+	b.WriteString(`{"iteration":`)
+	b.WriteString(fmt.Sprint(event.Iteration))
+	b.WriteString(`,"kind":`)
+	writeJSON(&b, event.Kind)
+	b.WriteString(`,"payload":{`)
+	keys := make([]string, 0, len(event.Payload))
+	for k := range event.Payload {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for i, k := range keys {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		writeJSON(&b, k)
+		b.WriteByte(':')
+		writeJSON(&b, event.Payload[k])
+	}
+	b.WriteString(`},"step":`)
+	writeJSON(&b, event.Step)
+	b.WriteString(`,"ts":`)
+	writeJSON(&b, event.TS)
+	b.WriteByte('}')
+	return b.Bytes(), nil
+}
+
+func writeJSON(b *bytes.Buffer, v any) {
+	data, _ := json.Marshal(v)
+	b.Write(data)
+}

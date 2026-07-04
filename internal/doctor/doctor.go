@@ -61,6 +61,7 @@ func DefaultChecks() []Check {
 		{ID: "loops.known_adapters", Run: checkLoopsKnownAdapters},
 		{ID: "consensus.satisfiable", Run: checkConsensusSatisfiable},
 		{ID: "governance.provider_known", Run: checkGovernanceKnown},
+		{ID: "governance.provider_compilable", Run: checkGovernanceProviderCompilable},
 		{ID: "global.readable", Run: checkGlobalReadable},
 		{ID: "global.no_rule_conflict", Run: checkGlobalRuleConflict},
 	}
