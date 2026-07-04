@@ -242,10 +242,13 @@ def verify_git_hooks() -> None:
     required_files = [
         ".githooks/pre-commit",
         ".githooks/pre-push",
+        ".githooks/prepare-commit-msg",
         "scripts/git-hooks/pre-commit",
         "scripts/git-hooks/pre-push",
+        "scripts/git-hooks/prepare-commit-msg",
         "scripts/install_git_hooks.sh",
         "scripts/test_semgrep_rules.py",
+        "scripts/test_git_hooks.py",
         "semgrep/agent-standards.yml",
         "docs/development-hooks.md",
         "Makefile",
@@ -254,7 +257,18 @@ def verify_git_hooks() -> None:
     for path in required_files:
         require(repo_path(path).is_file(), f"{path}: missing")
 
-    for path in required_files[:6]:
+    executable_files = [
+        ".githooks/pre-commit",
+        ".githooks/pre-push",
+        ".githooks/prepare-commit-msg",
+        "scripts/git-hooks/pre-commit",
+        "scripts/git-hooks/pre-push",
+        "scripts/git-hooks/prepare-commit-msg",
+        "scripts/install_git_hooks.sh",
+        "scripts/test_semgrep_rules.py",
+        "scripts/test_git_hooks.py",
+    ]
+    for path in executable_files:
         require(os.access(repo_path(path), os.X_OK), f"{path}: must be executable")
 
     makefile = text("Makefile")
@@ -263,6 +277,7 @@ def verify_git_hooks() -> None:
         "verify:",
         "semgrep-validate:",
         "semgrep-test:",
+        "hook-test:",
         "pre-commit:",
         "pre-push:",
         "go-check:",
@@ -274,6 +289,7 @@ def verify_git_hooks() -> None:
         "make install-hooks",
         "make verify",
         "make semgrep-test",
+        "make hook-test",
         "semgrep/agent-standards.yml",
         "scripts/test_semgrep_rules.py",
     ]:
@@ -291,6 +307,10 @@ def verify_git_hooks() -> None:
         "scripts/git-hooks/pre-push" in text(".githooks/pre-push"),
         ".githooks/pre-push: must delegate to scripts/git-hooks/pre-push",
     )
+    require(
+        "scripts/git-hooks/prepare-commit-msg" in text(".githooks/prepare-commit-msg"),
+        ".githooks/prepare-commit-msg: must delegate to scripts/git-hooks/prepare-commit-msg",
+    )
 
     pre_commit = text("scripts/git-hooks/pre-commit")
     for needle in [
@@ -299,10 +319,23 @@ def verify_git_hooks() -> None:
         "git diff --check --cached",
         "semgrep --validate --config semgrep/agent-standards.yml",
         "scripts/test_semgrep_rules.py",
+        "scripts/test_git_hooks.py",
         "--disable-nosem",
         "semgrep --config semgrep/agent-standards.yml",
+        "mivia-agent-precommit-summary",
+        "git write-tree",
+        "Quality: pre-commit passed",
     ]:
         require(needle in pre_commit, f"scripts/git-hooks/pre-commit: missing {needle}")
+
+    prepare_commit_msg = text("scripts/git-hooks/prepare-commit-msg")
+    for needle in [
+        "mivia-agent-precommit-summary",
+        "Quality: pre-commit passed",
+        "git write-tree",
+        "merge | squash",
+    ]:
+        require(needle in prepare_commit_msg, f"scripts/git-hooks/prepare-commit-msg: missing {needle}")
 
     pre_push = text("scripts/git-hooks/pre-push")
     for needle in [
@@ -310,6 +343,7 @@ def verify_git_hooks() -> None:
         "git diff --check",
         "semgrep --validate --config semgrep/agent-standards.yml",
         "scripts/test_semgrep_rules.py",
+        "scripts/test_git_hooks.py",
         "--disable-nosem",
         "semgrep --config semgrep/agent-standards.yml",
         "go test ./...",
@@ -363,6 +397,7 @@ def verify_secret_hygiene() -> None:
         "scripts/git-hooks",
         "scripts/install_git_hooks.sh",
         "scripts/test_semgrep_rules.py",
+        "scripts/test_git_hooks.py",
         "semgrep",
         "scripts/verify_agent_config.py",
     ]

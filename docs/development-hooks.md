@@ -15,6 +15,7 @@ This sets `core.hooksPath=.githooks`, so Git runs the committed hooks in this re
 - `make pre-push` runs the committed pre-push hook.
 - `make semgrep` runs the repo Semgrep policy scan.
 - `make semgrep-test` runs Semgrep rule contract tests.
+- `make hook-test` runs Git hook contract tests.
 - `make go-check` runs Go format/test/vet/build checks when `go.mod` exists.
 
 ## Pre-Commit
@@ -24,7 +25,15 @@ This sets `core.hooksPath=.githooks`, so Git runs the committed hooks in this re
 - `git diff --check --cached`
 - Semgrep config validation
 - Semgrep rule contract tests
+- Git hook contract tests
 - `semgrep --config semgrep/agent-standards.yml --error --skip-unknown-extensions --metrics off` on staged files
+- writes a fresh `.git/mivia-agent-precommit-summary` record for `prepare-commit-msg`
+
+## Prepare-Commit-Msg
+
+- appends one short `Quality:` line to regular commit messages when pre-commit passed
+- skips merge and squash messages
+- refuses stale summaries by comparing the current staged tree to the pre-commit tree
 
 ## Pre-Push
 
@@ -32,8 +41,11 @@ This sets `core.hooksPath=.githooks`, so Git runs the committed hooks in this re
 - `git diff --check`
 - Semgrep config validation
 - Semgrep rule contract tests
+- Git hook contract tests
 - full-repo Semgrep policy scan
 - when `go.mod` exists: `gofmt -l`, `go test ./...`, `go vet ./...`, and `go build ./cmd/mivia-agent` once that command exists
+
+Pre-push intentionally keeps the full Semgrep scan. Pre-commit only proves the staged snapshot for one commit; pre-push proves the branch state before it leaves the machine.
 
 ## Policy Shape
 

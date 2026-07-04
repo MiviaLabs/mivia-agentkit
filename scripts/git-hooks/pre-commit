@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
+SUMMARY_FILE="$(git rev-parse --git-path mivia-agent-precommit-summary)"
+rm -f "$SUMMARY_FILE"
 
 fail() {
   printf 'pre-commit: %s\n' "$*" >&2
@@ -16,11 +18,13 @@ require_cmd() {
 require_cmd python3
 python3 scripts/verify_agent_config.py
 
+GOFMT_SUMMARY="gofmt skipped"
 mapfile -d '' GO_FILES < <(git diff --cached --name-only --diff-filter=ACMR -z -- '*.go')
 if ((${#GO_FILES[@]})); then
   require_cmd gofmt
   gofmt -w "${GO_FILES[@]}"
   git add -- "${GO_FILES[@]}"
+  GOFMT_SUMMARY="gofmt ${#GO_FILES[@]} file(s)"
 fi
 
 git diff --check --cached
@@ -28,12 +32,21 @@ git diff --check --cached
 require_cmd semgrep
 semgrep --validate --config semgrep/agent-standards.yml
 python3 scripts/test_semgrep_rules.py
+python3 scripts/test_git_hooks.py
 
 mapfile -d '' STAGED_FILES < <(
   git diff --cached --name-only --diff-filter=ACMR -z \
     -- ':!semgrep/agent-standards.yml'
 )
 
+STAGED_SEMGREP_SUMMARY="staged semgrep skipped"
 if ((${#STAGED_FILES[@]})); then
   semgrep --config semgrep/agent-standards.yml --error --skip-unknown-extensions --metrics off --disable-nosem "${STAGED_FILES[@]}"
+  STAGED_SEMGREP_SUMMARY="staged semgrep 0 findings"
 fi
+
+TREE="$(git write-tree)"
+printf 'tree=%s\nsummary=%s\n' \
+  "$TREE" \
+  "Quality: pre-commit passed (agent config, whitespace, semgrep rules, hook tests, ${STAGED_SEMGREP_SUMMARY}; ${GOFMT_SUMMARY})" \
+  >"$SUMMARY_FILE"

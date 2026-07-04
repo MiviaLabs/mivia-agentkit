@@ -32,6 +32,7 @@ make help
 - `make pre-push` - run the committed pre-push hook.
 - `make semgrep` - run the repo Semgrep policy scan.
 - `make semgrep-test` - run contract tests for repo-local Semgrep rules.
+- `make hook-test` - run contract tests for repo-managed Git hooks.
 - `make go-check` - run `gofmt` check, `go test ./...`, `go vet ./...`, and `go build ./cmd/mivia-agent` when Go code exists.
 
 ## Hook Behavior
@@ -43,7 +44,9 @@ Pre-commit runs:
 - staged whitespace checks
 - Semgrep config validation
 - Semgrep rule contract tests
+- Git hook contract tests
 - Semgrep policy scan on staged files
+- one short `Quality:` line added to the commit message by `prepare-commit-msg`
 
 Pre-push runs:
 
@@ -51,8 +54,11 @@ Pre-push runs:
 - full whitespace checks
 - Semgrep config validation
 - Semgrep rule contract tests
+- Git hook contract tests
 - full-repo Semgrep policy scan
 - Go format/test/vet/build checks once `go.mod` exists
+
+Pre-push keeps the full Semgrep scan even though pre-commit scans staged files. It catches commits made before hooks were installed, commits made with `--no-verify`, rebased or imported commits, and any branch state that differs from the latest staged snapshot.
 
 Go checks intentionally skip while the repo has no `go.mod`.
 
