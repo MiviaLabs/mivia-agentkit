@@ -530,14 +530,15 @@ def verify_git_hooks() -> None:
 
     readme = text("README.md")
     for needle in [
-        "docs/setup/development-environment.md",
-        "docs/agent-hooks.md",
-        "docs/development-hooks.md",
+        "## Docs",
+        "[Development environment](docs/setup/development-environment.md)",
+        "[Development hooks](docs/development-hooks.md)",
+        "[Agent hooks](docs/agent-hooks.md)",
         "make install-hooks",
         "make verify",
         "make help",
-        "docs/prd/0001-mivia-agentkit.md",
-        "docs/plans/00-overview.md",
+        "[Product requirements](docs/prd/0001-mivia-agentkit.md)",
+        "[Workstream roadmap](docs/plans/00-overview.md)",
     ]:
         require(needle in readme, f"README.md: missing {needle}")
 
