@@ -37,6 +37,39 @@ rules:
           ]
       - pattern-regex: 'Bash\([^)\n]*[;&|`$<>][^)\n]*\)'
 
+  - id: mivia.generic.no-semgrep-suppression
+    languages:
+      - generic
+    severity: ERROR
+    message: Do not suppress Semgrep findings; fix the rule or document an explicit policy exception.
+    paths:
+      include:
+        - /cmd/**
+        - /internal/**
+        - /AGENTS.md
+        - /CLAUDE.md
+        - /.claude/**
+        - /.codex/**
+        - /.github/**
+    pattern-regex: '(?i)\bnosemgrep\b'
+
+  - id: mivia.generic.no-unresolved-drift-markers
+    languages:
+      - generic
+    severity: ERROR
+    message: Do not commit unresolved TODO/FIXME/HACK/XXX markers; either finish the work or put it in the workstream task file.
+    paths:
+      include:
+        - /cmd/**
+        - /internal/**
+        - /AGENTS.md
+        - /CLAUDE.md
+        - /.ai/**
+        - /.claude/**
+        - /.codex/**
+        - /.github/**
+    pattern-regex: '(?i)\b(TODO|FIXME|HACK|XXX)\b'
+
   - id: mivia.go.no-panic-in-internal
     languages:
       - go
@@ -64,6 +97,42 @@ rules:
       - pattern: log.Fatalf(...)
       - pattern: os.Exit(...)
 
+  - id: mivia.go.no-shell-exec
+    languages:
+      - go
+    severity: ERROR
+    message: Do not run shell interpreters from Go; use parameterized exec with allowlisted commands or Go APIs.
+    paths:
+      include:
+        - /cmd/**/*.go
+        - /internal/**/*.go
+      exclude:
+        - /**/*_test.go
+    pattern-either:
+      - pattern: exec.Command("sh", "-c", ...)
+      - pattern: exec.Command("bash", "-c", ...)
+      - pattern: exec.Command("/bin/sh", "-c", ...)
+      - pattern: exec.Command("/bin/bash", "-c", ...)
+      - pattern: exec.CommandContext($CTX, "sh", "-c", ...)
+      - pattern: exec.CommandContext($CTX, "bash", "-c", ...)
+      - pattern: exec.CommandContext($CTX, "/bin/sh", "-c", ...)
+      - pattern: exec.CommandContext($CTX, "/bin/bash", "-c", ...)
+
+  - id: mivia.go.no-syscall-exec
+    languages:
+      - go
+    severity: ERROR
+    message: Do not use syscall.Exec/ForkExec in mivia-agent; keep process execution behind reviewed adapters.
+    paths:
+      include:
+        - /cmd/**/*.go
+        - /internal/**/*.go
+      exclude:
+        - /**/*_test.go
+    pattern-either:
+      - pattern: syscall.Exec(...)
+      - pattern: syscall.ForkExec(...)
+
   - id: mivia.go.no-network-calls
     languages:
       - go
@@ -82,6 +151,23 @@ rules:
       - pattern: net.DialTimeout(...)
       - pattern: grpc.Dial(...)
       - pattern: websocket.DefaultDialer.Dial(...)
+
+  - id: mivia.go.no-world-writable-mode
+    languages:
+      - go
+    severity: ERROR
+    message: Do not create world-writable files or directories.
+    paths:
+      include:
+        - /cmd/**/*.go
+        - /internal/**/*.go
+    pattern-either:
+      - pattern: os.WriteFile(..., 0777)
+      - pattern: os.WriteFile(..., 0666)
+      - pattern: os.Mkdir(..., 0777)
+      - pattern: os.MkdirAll(..., 0777)
+      - pattern: os.Chmod(..., 0777)
+      - pattern: os.Chmod(..., 0666)
 
   - id: mivia.go.no-raw-artifact-write
     languages:
@@ -107,8 +193,35 @@ rules:
     message: Adapter tests must use fake runners, not real agent CLI processes.
     paths:
       include:
-        - /**/*_test.go
+        - /cmd/**/*_test.go
+        - /internal/**/*_test.go
     pattern-either:
       - pattern: exec.Command("codex", ...)
       - pattern: exec.Command("claude", ...)
       - pattern: exec.Command("opencode", ...)
+
+  - id: mivia.go.tests-use-t-tempdir
+    languages:
+      - go
+    severity: ERROR
+    message: Tests must use t.TempDir() for temporary filesystem state.
+    paths:
+      include:
+        - /cmd/**/*_test.go
+        - /internal/**/*_test.go
+    pattern-either:
+      - pattern: os.MkdirTemp("", ...)
+      - pattern: os.CreateTemp("", ...)
+      - pattern: ioutil.TempDir("", ...)
+      - pattern: ioutil.TempFile("", ...)
+
+  - id: mivia.go.tests-no-time-sleep
+    languages:
+      - go
+    severity: ERROR
+    message: Tests should use deterministic synchronization or fakes instead of time.Sleep.
+    paths:
+      include:
+        - /cmd/**/*_test.go
+        - /internal/**/*_test.go
+    pattern: time.Sleep(...)

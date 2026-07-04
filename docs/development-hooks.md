@@ -3,10 +3,19 @@
 Install the repo hooks once per clone:
 
 ```bash
-scripts/install_git_hooks.sh
+make install-hooks
 ```
 
-This sets `core.hooksPath=.githooks`, so Git runs the committed hooks in this repo.
+This sets `core.hooksPath=.githooks`, so Git runs the committed hooks in this repo. The underlying installer remains `scripts/install_git_hooks.sh` so automation can call it directly.
+
+## Make Targets
+
+- `make verify` runs the full local quality gate.
+- `make pre-commit` runs the committed pre-commit hook.
+- `make pre-push` runs the committed pre-push hook.
+- `make semgrep` runs the repo Semgrep policy scan.
+- `make semgrep-test` runs Semgrep rule contract tests.
+- `make go-check` runs Go format/test/vet/build checks when `go.mod` exists.
 
 ## Pre-Commit
 
@@ -14,6 +23,7 @@ This sets `core.hooksPath=.githooks`, so Git runs the committed hooks in this re
 - `gofmt -w` on staged Go files, then re-stage those files
 - `git diff --check --cached`
 - Semgrep config validation
+- Semgrep rule contract tests
 - `semgrep --config semgrep/agent-standards.yml --error --skip-unknown-extensions --metrics off` on staged files
 
 ## Pre-Push
@@ -21,6 +31,7 @@ This sets `core.hooksPath=.githooks`, so Git runs the committed hooks in this re
 - `python3 scripts/verify_agent_config.py`
 - `git diff --check`
 - Semgrep config validation
+- Semgrep rule contract tests
 - full-repo Semgrep policy scan
 - when `go.mod` exists: `gofmt -l`, `go test ./...`, `go vet ./...`, and `go build ./cmd/mivia-agent` once that command exists
 
@@ -29,9 +40,14 @@ This sets `core.hooksPath=.githooks`, so Git runs the committed hooks in this re
 Semgrep is used for repo-specific agent drift rules that are cheap to run locally:
 
 - no wildcard or metacharacter-bearing `Bash(...)` tool permissions
+- no Semgrep suppressions or unresolved drift markers in guarded code/instructions
 - no panics or process exits from future `internal/` Go packages
+- no shell execution, `syscall.Exec`, direct network calls, or world-writable file modes
 - no direct network calls from future product code
 - no raw prompt, provider payload, or model-output artifact writes
 - no real Codex/Claude/OpenCode process execution in adapter tests
+- no temp directories outside `t.TempDir()` or sleeps in tests
 
-Sources: https://git-scm.com/docs/githooks, https://git-scm.com/docs/git-config, https://pkg.go.dev/cmd/gofmt, https://docs.semgrep.dev/extensions/pre-commit, https://docs.semgrep.dev/writing-rules/rule-syntax.
+When a repo standard is added, changed, or repeatedly violated, agents must update `semgrep/agent-standards.yml` when the standard can be checked statically, update `scripts/test_semgrep_rules.py`, and run `make semgrep-test`.
+
+Sources: https://git-scm.com/docs/githooks, https://git-scm.com/docs/git-config, https://pkg.go.dev/cmd/gofmt, https://docs.semgrep.dev/extensions/pre-commit, https://docs.semgrep.dev/writing-rules/rule-syntax, https://docs.semgrep.dev/writing-rules/testing-rules, https://docs.semgrep.dev/cli-reference.

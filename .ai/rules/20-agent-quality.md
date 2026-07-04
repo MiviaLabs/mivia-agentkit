@@ -19,6 +19,13 @@
 - Review tests for false positives: remove the implementation guard mentally and verify at least one test would fail.
 - Any residual risk must name the missing test, missing fixture, or external behavior that remains unproven.
 
+## Critical Drift Guard
+
+- When adding or changing a durable repo standard, forbidden pattern, hook policy, security invariant, or repeated agent failure mode, update `semgrep/agent-standards.yml` if the rule can be checked statically.
+- Every Semgrep rule change must update `scripts/test_semgrep_rules.py` with one bad fixture that fails and one good fixture that stays clean.
+- Run `make semgrep-test` and the relevant hook target before committing the rule or standard change.
+- Do not use Semgrep suppression comments to bypass repo policy; fix the code, fix the rule, or document a reviewed policy exception outside the scanned code path.
+
 ## Coverage
 
 - Coverage percentage is secondary. Contract coverage is required.

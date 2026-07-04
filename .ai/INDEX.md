@@ -47,7 +47,9 @@ Run `python3 scripts/verify_agent_config.py` after changing `AGENTS.md`, `.ai/`,
 Install local Git hooks with:
 
 ```bash
-scripts/install_git_hooks.sh
+make install-hooks
 ```
 
 Hook policy details live in `docs/development-hooks.md`.
+
+Makefile usage is documented in `README.md`.

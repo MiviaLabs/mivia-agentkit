@@ -20,7 +20,8 @@ git diff --check
 
 require_cmd semgrep
 semgrep --validate --config semgrep/agent-standards.yml
-semgrep --config semgrep/agent-standards.yml --error --skip-unknown-extensions --metrics off .
+python3 scripts/test_semgrep_rules.py
+semgrep --config semgrep/agent-standards.yml --error --skip-unknown-extensions --metrics off --disable-nosem .
 
 if [[ ! -f go.mod ]]; then
   printf 'pre-push: go.mod not present; skipping Go test/vet/build\n'

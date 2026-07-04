@@ -87,12 +87,14 @@ python3 scripts/verify_agent_config.py
 Install repo-managed Git hooks once per clone:
 
 ```bash
-scripts/install_git_hooks.sh
+make install-hooks
 ```
 
-The committed hooks run `gofmt` and Semgrep policy checks before commit, then agent-config validation, full Semgrep, and Go test/vet/build checks before push. The Go checks no-op until `go.mod` exists.
+The committed hooks run `gofmt`, Semgrep rule tests, and Semgrep policy checks before commit, then agent-config validation, full Semgrep, and Go test/vet/build checks before push. The Go checks no-op until `go.mod` exists. `make verify` runs the full local gate.
 
-Sources: https://agents.md/, https://go.dev/doc/modules/layout, https://git-scm.com/docs/githooks, https://git-scm.com/docs/git-config, https://pkg.go.dev/cmd/gofmt, https://docs.semgrep.dev/extensions/pre-commit. Repo sources: `docs/plans/_conventions.md`, `docs/development-hooks.md`.
+When adding or changing a durable repo standard, forbidden pattern, hook policy, security invariant, or repeated agent failure mode, update `semgrep/agent-standards.yml` if the rule can be checked statically and add coverage in `scripts/test_semgrep_rules.py`.
+
+Sources: https://agents.md/, https://go.dev/doc/modules/layout, https://git-scm.com/docs/githooks, https://git-scm.com/docs/git-config, https://pkg.go.dev/cmd/gofmt, https://docs.semgrep.dev/extensions/pre-commit, https://docs.semgrep.dev/writing-rules/testing-rules, https://docs.semgrep.dev/cli-reference. Repo sources: `docs/plans/_conventions.md`, `docs/development-hooks.md`.
 
 ## Git Workflow
 

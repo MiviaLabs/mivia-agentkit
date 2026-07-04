@@ -27,6 +27,7 @@ git diff --check --cached
 
 require_cmd semgrep
 semgrep --validate --config semgrep/agent-standards.yml
+python3 scripts/test_semgrep_rules.py
 
 mapfile -d '' STAGED_FILES < <(
   git diff --cached --name-only --diff-filter=ACMR -z \
@@ -34,5 +35,5 @@ mapfile -d '' STAGED_FILES < <(
 )
 
 if ((${#STAGED_FILES[@]})); then
-  semgrep --config semgrep/agent-standards.yml --error --skip-unknown-extensions --metrics off "${STAGED_FILES[@]}"
+  semgrep --config semgrep/agent-standards.yml --error --skip-unknown-extensions --metrics off --disable-nosem "${STAGED_FILES[@]}"
 fi

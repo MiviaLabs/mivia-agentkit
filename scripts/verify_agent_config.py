@@ -110,8 +110,22 @@ def verify_index() -> None:
         "semgrep/",
         "scripts/",
         "docs/development-hooks.md",
+        "README.md",
+        "make install-hooks",
     ]:
         require(path in content, f".ai/INDEX.md: missing hook verification path {path}")
+
+
+def verify_agent_quality_rules() -> None:
+    content = text(".ai/rules/20-agent-quality.md")
+    for needle in [
+        "Critical Drift Guard",
+        "semgrep/agent-standards.yml",
+        "scripts/test_semgrep_rules.py",
+        "make semgrep-test",
+        "Do not use Semgrep suppression",
+    ]:
+        require(needle in content, f".ai/rules/20-agent-quality.md: missing {needle}")
 
 
 def verify_skills() -> None:
@@ -216,6 +230,7 @@ def verify_gitignore() -> None:
         ".git/mivia-agent-quality-stamp.json",
         ".claude/settings.local.json",
         ".semgrep-cache/",
+        ".pytest_cache/",
         ".env",
         ".env.*",
         "secrets/",
@@ -230,14 +245,39 @@ def verify_git_hooks() -> None:
         "scripts/git-hooks/pre-commit",
         "scripts/git-hooks/pre-push",
         "scripts/install_git_hooks.sh",
+        "scripts/test_semgrep_rules.py",
         "semgrep/agent-standards.yml",
         "docs/development-hooks.md",
+        "Makefile",
+        "README.md",
     ]
     for path in required_files:
         require(repo_path(path).is_file(), f"{path}: missing")
 
-    for path in required_files[:5]:
+    for path in required_files[:6]:
         require(os.access(repo_path(path), os.X_OK), f"{path}: must be executable")
+
+    makefile = text("Makefile")
+    for needle in [
+        "install-hooks",
+        "verify:",
+        "semgrep-validate:",
+        "semgrep-test:",
+        "pre-commit:",
+        "pre-push:",
+        "go-check:",
+    ]:
+        require(needle in makefile, f"Makefile: missing {needle}")
+
+    readme = text("README.md")
+    for needle in [
+        "make install-hooks",
+        "make verify",
+        "make semgrep-test",
+        "semgrep/agent-standards.yml",
+        "scripts/test_semgrep_rules.py",
+    ]:
+        require(needle in readme, f"README.md: missing {needle}")
 
     require(
         'core.hooksPath .githooks' in text("scripts/install_git_hooks.sh"),
@@ -258,6 +298,8 @@ def verify_git_hooks() -> None:
         "gofmt -w",
         "git diff --check --cached",
         "semgrep --validate --config semgrep/agent-standards.yml",
+        "scripts/test_semgrep_rules.py",
+        "--disable-nosem",
         "semgrep --config semgrep/agent-standards.yml",
     ]:
         require(needle in pre_commit, f"scripts/git-hooks/pre-commit: missing {needle}")
@@ -267,6 +309,8 @@ def verify_git_hooks() -> None:
         "scripts/verify_agent_config.py",
         "git diff --check",
         "semgrep --validate --config semgrep/agent-standards.yml",
+        "scripts/test_semgrep_rules.py",
+        "--disable-nosem",
         "semgrep --config semgrep/agent-standards.yml",
         "go test ./...",
         "go vet ./...",
@@ -278,13 +322,29 @@ def verify_git_hooks() -> None:
     for rule_id in [
         "mivia.generic.no-wildcard-bash-allow",
         "mivia.generic.no-shell-metachar-bash-allow",
+        "mivia.generic.no-semgrep-suppression",
+        "mivia.generic.no-unresolved-drift-markers",
         "mivia.go.no-panic-in-internal",
         "mivia.go.no-fatal-exit-in-internal",
+        "mivia.go.no-shell-exec",
+        "mivia.go.no-syscall-exec",
         "mivia.go.no-network-calls",
+        "mivia.go.no-world-writable-mode",
         "mivia.go.no-raw-artifact-write",
         "mivia.go.tests-no-real-agent-cli",
+        "mivia.go.tests-use-t-tempdir",
+        "mivia.go.tests-no-time-sleep",
     ]:
         require(rule_id in semgrep_config, f"semgrep/agent-standards.yml: missing {rule_id}")
+
+    semgrep_tests = text("scripts/test_semgrep_rules.py")
+    for rule_id in [
+        "mivia.generic.no-semgrep-suppression",
+        "mivia.generic.no-unresolved-drift-markers",
+        "mivia.go.no-shell-exec",
+        "mivia.go.tests-no-time-sleep",
+    ]:
+        require(rule_id in semgrep_tests, f"scripts/test_semgrep_rules.py: missing {rule_id}")
 
 
 def verify_secret_hygiene() -> None:
@@ -299,8 +359,10 @@ def verify_secret_hygiene() -> None:
         ".github",
         ".githooks",
         "docs/development-hooks.md",
+        "README.md",
         "scripts/git-hooks",
         "scripts/install_git_hooks.sh",
+        "scripts/test_semgrep_rules.py",
         "semgrep",
         "scripts/verify_agent_config.py",
     ]
@@ -332,6 +394,7 @@ def main() -> int:
         load_json(path)
     verify_agents_md()
     verify_index()
+    verify_agent_quality_rules()
     verify_skills()
     verify_adapters()
     verify_claude_settings()
