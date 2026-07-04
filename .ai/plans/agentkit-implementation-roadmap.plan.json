@@ -731,12 +731,15 @@
         "files_edit": [
           "internal/cli/prompt.go",
           "internal/cli/prompt_test.go",
+          "internal/cli/root.go",
           "internal/cli/adapters.go",
           "internal/cli/adapters_test.go",
           "internal/cli/run.go",
           "internal/cli/run_test.go",
           "internal/cli/review.go",
           "internal/cli/review_test.go",
+          "internal/orchestrator/engine.go",
+          "internal/orchestrator/engine_test.go",
           "docs/plans/agentkit-implementation-roadmap/ws-13-run-review-adapters/tasks.md",
           "docs/plans/agentkit-implementation-roadmap/00-overview.md"
         ],
@@ -763,7 +766,8 @@
           "internal/cli/prompt.go",
           "internal/cli/adapters.go",
           "internal/cli/run.go",
-          "internal/cli/review.go"
+          "internal/cli/review.go",
+          "internal/orchestrator/engine.go"
         ],
         "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-13-run-review-adapters/"
       },
@@ -1052,6 +1056,11 @@
       "source": ".ai/plans/agentkit-implementation-roadmap.plan.json",
       "gap": "WS11 Evaluate required unique adapter names and prefer:<adapter> tie-breaking, but adapter.Verdict had no adapter identifier and WS11 files_edit omitted the required contract extension",
       "correction": "added internal/adapter/adapter.go to WS11 files_edit and outputs so Verdict can carry the reviewer adapter name used by consensus"
+    },
+    {
+      "source": "internal/orchestrator/engine.go",
+      "gap": "WS13 run/review command integration required review prompt propagation through the orchestrator review path, but WS13 files_edit omitted the engine boundary",
+      "correction": "added internal/orchestrator/engine.go and internal/orchestrator/engine_test.go to WS13 files_edit, and added review-prompt propagation coverage"
     }
   ],
   "stop_conditions": [

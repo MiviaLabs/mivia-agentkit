@@ -32,6 +32,7 @@ Mutation proof:
 
 Create:
 - `internal/cli/adapters.go` — `adaptersCmd`, flags `--repo`, `--json`. Builds a `adapter.Registry` of all known adapters (Codex, Claude, Gemini stub, Crush stub from WS6), calls `Detect` on each.
+- `internal/cli/root.go` — registers `adapters`, `run`, and `review` commands with the root command.
 - `internal/cli/adapters_test.go`
 
 Spec:
@@ -56,6 +57,7 @@ Notes:
 
 Create:
 - `internal/cli/run.go` — `runCmd`, flags `--repo`, `--workflow`, `--step`, `--input-artifact`, `--var key=value` (repeated), `--max-iterations`, `--dry-run`, `--json`, `--strict`.
+- `internal/orchestrator/engine.go` — passes rendered review prompts into adapter review calls for WS13 command integration.
 - `internal/cli/run_test.go`
 
 Spec:
@@ -119,3 +121,11 @@ WS13 is ☑ when:
 - [ ] no-leak assertion green over the runstore
 - [ ] mutation proofs executed (run dry-run, review-bypass) — ≥2
 - [ ] status updated in `00-overview.md`
+
+## Completion — 2026-07-05
+
+- Tests: focused CLI/orchestrator tests passing; `go test ./... -count=1` passing.
+- Mutation proofs: prior-note prompt injection removal fail-then-revert ok; dry-run first-node invocation fail-then-revert ok; review consensus bypass fail-then-revert ok; audit found and covered review prompt propagation, command context propagation, repo-relative review artifact resolution, and guidance-adapter reporting.
+- Files: 12 created/updated.
+- Residual risk: none.
+- Follow-ups: WS6 can extend `runtimeAdapters` with Gemini and Crush once that node lands.

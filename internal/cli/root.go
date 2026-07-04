@@ -28,9 +28,12 @@ func NewRootCommand() *cobra.Command {
 	cmd.SetOut(io.Discard)
 	cmd.SetErr(io.Discard)
 	cmd.AddCommand(newAuditCommand())
+	cmd.AddCommand(newAdaptersCommand())
 	cmd.AddCommand(newDoctorCommand())
 	cmd.AddCommand(newInitCommand())
 	cmd.AddCommand(newPreflightCommand())
+	cmd.AddCommand(newReviewCommand())
+	cmd.AddCommand(newRunCommand())
 	cmd.AddCommand(newVersionCommand())
 	return cmd
 }

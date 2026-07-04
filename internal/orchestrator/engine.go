@@ -110,7 +110,12 @@ func (e Engine) executeReview(ctx context.Context, runID runstore.RunID, node No
 				results <- item{i: i, reviewer: reviewer, err: fmt.Errorf("adapter %q not found", reviewer)}
 				return
 			}
-			v, err := a.Review(ctx, adapter.Request{Workdir: e.Repo, Approval: approval(node.Step), Timeout: stepTimeout(node.Step), MaxTurns: node.Step.MaxTurns})
+			prompt, err := e.prompt(node.Step, iteration)
+			if err != nil {
+				results <- item{i: i, reviewer: reviewer, err: err}
+				return
+			}
+			v, err := a.Review(ctx, adapter.Request{Prompt: prompt, Workdir: e.Repo, Approval: approval(node.Step), Timeout: stepTimeout(node.Step), MaxTurns: node.Step.MaxTurns})
 			results <- item{i: i, reviewer: reviewer, verdict: v, err: err}
 		}()
 	}

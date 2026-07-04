@@ -52,7 +52,7 @@ Phase 0                  Phase 1                       Phase 2
 | 10 | [`ws-10-orchestrator/`](ws-10-orchestrator/tasks.md) | Orchestrator (DAG + loops) | 3 | WS4, WS9 | ☑ |
 | 11 | [`ws-11-consensus/`](ws-11-consensus/tasks.md) | Consensus voting | 3 | WS9 | ☑ |
 | 12 | [`ws-12-governance/`](ws-12-governance/tasks.md) | Governance provider (noop + AGT) | 2,4 | WS1 | ☑ |
-| 13 | [`ws-13-run-review-adapters/`](ws-13-run-review-adapters/tasks.md) | `run`, `review`, `adapters` commands | 2,3 | WS9, WS10, WS11, WS12 | ☐ |
+| 13 | [`ws-13-run-review-adapters/`](ws-13-run-review-adapters/tasks.md) | `run`, `review`, `adapters` commands | 2,3 | WS9, WS10, WS11, WS12 | ☑ |
 | 5 | [`ws-05-hooks/`](ws-05-hooks/tasks.md) | Hook engine (Codex + Claude) | 4 | WS4, WS12 | ☐ |
 | 6 | [`ws-06-adapter-templates/`](ws-06-adapter-templates/tasks.md) | Adapter templates (incl. Crush) | 4 | WS2, WS9 | ☐ |
 | 7 | [`ws-07-import-update/`](ws-07-import-update/tasks.md) | `import` + `update` | 5 | WS2, WS3 | ☐ |

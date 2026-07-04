@@ -65,6 +65,20 @@ func TestExecuteReviewStepSetsVerdictAdapterNames(t *testing.T) {
 	}
 }
 
+func TestExecuteReviewStepSendsReviewPrompt(t *testing.T) {
+	a := &promptRecorderAdapter{name: "a", verdict: adapter.Verdict{Pass: true}}
+	e := testEngine(t, a)
+	e.PromptBuilder = func(step config.Step, iteration int, prior []adapter.Verdict) (string, error) {
+		return "review " + step.Artifact, nil
+	}
+	if _, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "review", Reviewers: []string{"a"}, Artifact: "artifact.md"}}, 1); err != nil {
+		t.Fatalf("ExecuteStep error = %v", err)
+	}
+	if a.prompt != "review artifact.md" {
+		t.Fatalf("review prompt = %q, want rendered prompt", a.prompt)
+	}
+}
+
 func TestExecuteProducerStepAppendsTrace(t *testing.T) {
 	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}})
 	id := e.Store.NewRun()
@@ -133,6 +147,25 @@ func (s scriptedAdapter) Review(ctx context.Context, req adapter.Request) (adapt
 		return adapter.Verdict{}, err
 	}
 	return s.verdict, nil
+}
+
+type promptRecorderAdapter struct {
+	name    string
+	verdict adapter.Verdict
+	prompt  string
+}
+
+func (p *promptRecorderAdapter) Name() string       { return p.name }
+func (p *promptRecorderAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (p *promptRecorderAdapter) Detect(context.Context) (adapter.Detection, error) {
+	return adapter.Detection{Name: p.name, HeadlessCapable: true}, nil
+}
+func (p *promptRecorderAdapter) Run(context.Context, adapter.Request) (adapter.Result, error) {
+	return adapter.Result{}, nil
+}
+func (p *promptRecorderAdapter) Review(_ context.Context, req adapter.Request) (adapter.Verdict, error) {
+	p.prompt = req.Prompt
+	return p.verdict, nil
 }
 
 type recordingPolicy struct{ calls int }
