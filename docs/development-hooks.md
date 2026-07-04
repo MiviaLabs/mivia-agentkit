@@ -18,6 +18,7 @@ This sets `core.hooksPath=.githooks`, so Git runs the committed hooks in this re
 - `make hook-test` runs Git hook contract tests.
 - `make agent-hook-test` runs agent hook guard contract tests.
 - `make audit-loop-test` runs audit loop Stop-hook contract tests.
+- `make plan-contract-test` runs agent plan contract and planning hook tests.
 - `make skill-contract-test` runs skill report contract tests.
 - `make go-check` runs Go format/test/vet/build checks when `go.mod` exists.
 
@@ -31,12 +32,14 @@ This sets `core.hooksPath=.githooks`, so Git runs the committed hooks in this re
 - Git hook contract tests
 - Agent hook guard contract tests
 - Audit loop Stop-hook contract tests
+- Agent plan contract and planning hook tests
 - Skill report contract tests
 - `semgrep --config semgrep/agent-standards.yml --error --skip-unknown-extensions --metrics off` on staged files
 - writes a fresh `.git/mivia-agent-precommit-summary` record for `prepare-commit-msg`
 - records the exact `agent config verification passed` result in the commit-message `Quality:` line
 - records `agent hook tests passed` in the commit-message `Quality:` line
 - records `audit loop tests passed` in the commit-message `Quality:` line
+- records `plan contract tests passed` in the commit-message `Quality:` line
 - records `skill contract tests passed` in the commit-message `Quality:` line
 
 ## Prepare-Commit-Msg
@@ -63,6 +66,7 @@ This sets `core.hooksPath=.githooks`, so Git runs the committed hooks in this re
 - Git hook contract tests
 - Agent hook guard contract tests
 - Audit loop Stop-hook contract tests
+- Agent plan contract and planning hook tests
 - Skill report contract tests
 - full-repo Semgrep policy scan
 - when `go.mod` exists: `gofmt -l`, `go test ./...`, `go vet ./...`, and `go build ./cmd/mivia-agent` once that command exists
@@ -71,13 +75,15 @@ Pre-push intentionally keeps the full Semgrep scan. Pre-commit only proves the s
 
 ## Agent Tool Hooks
 
-`.agents/hooks.json`, `.claude/settings.json`, and `.codex/hooks.json` delegate hook events through `scripts/run_agent_hook_guard.sh`. The wrapper runs `scripts/agent_hook_guard.py` first, then `scripts/audit_loop_guard.py`; if both guards pass silently and the future binary exists, it then calls `mivia-agent hook <agent> <event>` with the same payload.
+`.agents/hooks.json`, `.claude/settings.json`, and `.codex/hooks.json` delegate hook events through `scripts/run_agent_hook_guard.sh`. The wrapper runs `scripts/agent_hook_guard.py` first, then `scripts/audit_loop_guard.py`, then `scripts/plan_hook_guard.py`; if all guards pass silently and the future binary exists, it then calls `mivia-agent hook <agent> <event>` with the same payload.
 
 The guard detects shell commands or permission requests that try to skip Git verification with `--no-verify`, `HUSKY=0`, or legacy Husky skip variables. Tool-level attempts are blocked before execution. Prompt-level requests get corrective context telling the model to run hooks normally, fix the failing validation, retry once, and notify the user with the exact blocker if it cannot be fixed.
 
 The guard policy lives in `.ai/policy/agent-hook-bypass.json`. Update that policy, `scripts/agent_hook_guard.py`, and `scripts/test_agent_hook_guard.py` together.
 
 Audit-loop hook details live in `docs/agent-hooks.md`. Update `.ai/policy/audit-loop.json`, `scripts/audit_loop_guard.py`, and `scripts/test_audit_loop_guard.py` together.
+
+Planning hook details live in `docs/agent-planning.md`. Update `.ai/policy/agent-plan.json`, `scripts/plan_hook_guard.py`, `scripts/test_plan_hook_guard.py`, and `scripts/test_agent_plan_contracts.py` together.
 
 ## Skill Report Contracts
 

@@ -8,7 +8,7 @@
 2. `.ai/INDEX.md`
 3. Relevant `.ai/rules/*.md`
 4. Relevant `.ai/skills/*/SKILL.md`
-5. Tool adapter files only when running that tool: `CLAUDE.md`, `.agents/hooks.json`, `.claude/settings.json`, `.codex/hooks.json`, `.github/copilot-instructions.md`
+5. Tool adapter files only when running that tool: `CLAUDE.md`, `.agents/hooks.json`, `.agents/skills/*/SKILL.md`, `.claude/settings.json`, `.codex/hooks.json`, `.github/copilot-instructions.md`
 
 ## Rules
 
@@ -26,6 +26,13 @@ Canonical project skills:
 - `.ai/skills/test-coverage-audit/SKILL.md`
 - `.ai/skills/adversarial-test-review/SKILL.md`
 - `.ai/skills/airtight-feature-delivery/SKILL.md`
+- `.ai/skills/agent-dag-planner/SKILL.md`
+- `.ai/skills/agent-plan-implementer/SKILL.md`
+
+Codex repo-discovery adapters:
+
+- `.agents/skills/agent-dag-planner/SKILL.md`
+- `.agents/skills/agent-plan-implementer/SKILL.md`
 
 Claude Code adapters:
 
@@ -33,6 +40,8 @@ Claude Code adapters:
 - `.claude/skills/test-coverage-audit/SKILL.md`
 - `.claude/skills/adversarial-test-review/SKILL.md`
 - `.claude/skills/airtight-feature-delivery/SKILL.md`
+- `.claude/skills/agent-dag-planner/SKILL.md`
+- `.claude/skills/agent-plan-implementer/SKILL.md`
 
 The registry at `.agents/skills.json` lists all committed project skill files from both locations.
 
@@ -45,10 +54,16 @@ The registry at `.agents/skills.json` lists all committed project skill files fr
 - `.ai/policy/commit-message.json` - allowed commit message types, scopes, and subject length for the repo `commit-msg` hook.
 - `.ai/policy/agent-hook-bypass.json` - blocked verification-bypass terms and the corrective instruction used by agent hooks.
 - `.ai/policy/audit-loop.json` - strict audit loop policy for structured audit/review Stop hooks.
+- `.ai/policy/agent-plan.json` - strict planning and plan-implementation hook policy.
 
 ## Templates
 
 - `.ai/templates/agent-report-v1.md` - required report shape for audit, coverage, review, delivery, and handoff skills.
+- `.ai/templates/agent-plan-v1.json` - required machine-readable DAG plan shape for agent planning.
+
+## Schemas
+
+- `.ai/schemas/agent-plan-v1.schema.json` - JSON schema for `mivia-agent-plan/v1`.
 
 ## Verification
 
@@ -57,6 +72,8 @@ Run `python3 scripts/verify_agent_config.py` after changing `AGENTS.md`, `.ai/`,
 Run `make agent-hook-test` after changing `.agents/hooks.json`, `.claude/settings.json`, `.codex/hooks.json`, `.ai/policy/agent-hook-bypass.json`, or `scripts/agent_hook_guard.py`.
 
 Run `make audit-loop-test` after changing `.ai/policy/audit-loop.json`, `scripts/audit_loop_guard.py`, `scripts/run_agent_hook_guard.sh`, or audit/review skill report behavior.
+
+Run `make plan-contract-test` after changing `.ai/policy/agent-plan.json`, `.ai/schemas/`, `.ai/templates/agent-plan-v1.json`, planning skills, or `scripts/plan_hook_guard.py`.
 
 Run `make skill-contract-test` after changing `.ai/skills/`, `.claude/skills/`, `.ai/templates/`, or `scripts/test_skill_contracts.py`.
 
@@ -67,5 +84,7 @@ make install-hooks
 ```
 
 Hook policy details live in `docs/development-hooks.md` and `docs/agent-hooks.md`.
+
+Agent planning details live in `docs/agent-planning.md`.
 
 Makefile usage is documented in `README.md`.

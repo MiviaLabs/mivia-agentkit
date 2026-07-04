@@ -96,7 +96,7 @@ def verify_index() -> None:
     rule_paths = sorted(str(p.relative_to(ROOT)) for p in repo_path(".ai/rules").glob("*.md"))
     skill_paths = sorted(
         str(p.relative_to(ROOT))
-        for root in [repo_path(".ai/skills"), repo_path(".claude/skills")]
+        for root in [repo_path(".ai/skills"), repo_path(".agents/skills"), repo_path(".claude/skills")]
         for p in root.glob("*/SKILL.md")
     )
     for path in rule_paths + skill_paths:
@@ -110,16 +110,23 @@ def verify_index() -> None:
         "semgrep/",
         "scripts/",
         ".ai/templates/agent-report-v1.md",
+        ".ai/templates/agent-plan-v1.json",
+        ".ai/schemas/agent-plan-v1.schema.json",
         ".ai/policy/commit-message.json",
         ".ai/policy/agent-hook-bypass.json",
         ".ai/policy/audit-loop.json",
+        ".ai/policy/agent-plan.json",
         ".agents/hooks.json",
+        ".agents/skills/agent-dag-planner/SKILL.md",
+        ".agents/skills/agent-plan-implementer/SKILL.md",
+        "docs/agent-planning.md",
         "docs/agent-hooks.md",
         "docs/development-hooks.md",
         "README.md",
         "make install-hooks",
         "make agent-hook-test",
         "make audit-loop-test",
+        "make plan-contract-test",
         "make skill-contract-test",
     ]:
         require(path in content, f".ai/INDEX.md: missing hook verification path {path}")
@@ -145,7 +152,7 @@ def verify_skills() -> None:
     listed = sorted(item.get("path") for item in skills if isinstance(item, dict))
     actual = sorted(
         str(p.relative_to(ROOT))
-        for root in [repo_path(".ai/skills"), repo_path(".claude/skills")]
+        for root in [repo_path(".ai/skills"), repo_path(".agents/skills"), repo_path(".claude/skills")]
         for p in root.glob("*/SKILL.md")
     )
     require(listed == actual, f".agents/skills.json: listed skills {listed!r} != actual {actual!r}")
@@ -209,7 +216,11 @@ def verify_skill_report_contract() -> None:
             f"{path}: must use ## Required Report instead of free-form ## Output",
         )
 
-    for path in sorted(str(p.relative_to(ROOT)) for p in repo_path(".claude/skills").glob("*/SKILL.md")):
+    for path in sorted(
+        str(p.relative_to(ROOT))
+        for root in [repo_path(".agents/skills"), repo_path(".claude/skills")]
+        for p in root.glob("*/SKILL.md")
+    ):
         content = text(path)
         require(report_format in content, f"{path}: missing {report_format}")
         require(".ai/templates/agent-report-v1.md" in content, f"{path}: missing report template reference")
@@ -441,6 +452,84 @@ def verify_audit_loop_guard() -> None:
         require(needle in tests, f"scripts/test_audit_loop_guard.py: missing {needle}")
 
 
+def verify_agent_plan_contract() -> None:
+    for path in [
+        ".ai/policy/agent-plan.json",
+        ".ai/schemas/agent-plan-v1.schema.json",
+        ".ai/templates/agent-plan-v1.json",
+        "scripts/validate_agent_plan.py",
+        "scripts/plan_hook_guard.py",
+        "scripts/test_agent_plan_contracts.py",
+        "scripts/test_plan_hook_guard.py",
+        "docs/agent-planning.md",
+    ]:
+        require(repo_path(path).is_file(), f"{path}: missing")
+
+    policy = load_json(".ai/policy/agent-plan.json")
+    if isinstance(policy, dict):
+        require(policy.get("version") == 1, ".ai/policy/agent-plan.json: expected version 1")
+        require(policy.get("planFormat") == "mivia-agent-plan/v1", ".ai/policy/agent-plan.json: planFormat drifted")
+        require(policy.get("plannerSkill") == "agent-dag-planner", ".ai/policy/agent-plan.json: plannerSkill drifted")
+        require(
+            policy.get("implementerSkill") == "agent-plan-implementer",
+            ".ai/policy/agent-plan.json: implementerSkill drifted",
+        )
+        require(
+            policy.get("gapStatuses") == ["open", "missing", "shallow", "gated"],
+            ".ai/policy/agent-plan.json: gapStatuses drifted",
+        )
+        for key, needle in [
+            ("plannerInstruction", "fill or correct plan gaps"),
+            ("plannerInstruction", "PlanArtifact"),
+            ("implementerInstruction", "validated .ai/plans/*.plan.json"),
+            ("implementerInstruction", "deep-bug-audit"),
+        ]:
+            value = policy.get(key)
+            require(isinstance(value, str) and needle in value, f".ai/policy/agent-plan.json: {key} missing {needle}")
+
+    for path, needles in {
+        ".ai/skills/agent-dag-planner/SKILL.md": [
+            "Re-verify existing plans",
+            "Correct those gaps",
+            "mivia-agent-plan/v1",
+            "PlanArtifact:",
+        ],
+        ".ai/skills/agent-plan-implementer/SKILL.md": [
+            "Validate the plan first",
+            "deep-bug-audit",
+            "test-coverage-audit",
+            "adversarial-test-review",
+            "allowed_mcp_tools",
+        ],
+        "scripts/validate_agent_plan.py": [
+            "cycle detected",
+            "open gap",
+            "correction_log",
+            "verifiers",
+            "mutation",
+        ],
+        "scripts/plan_hook_guard.py": [
+            "PlanArtifact",
+            "plannerSkill",
+            "implementerSkill",
+            "was_implementation",
+            "validate_agent_plan.py",
+            "report_has_open_gap",
+        ],
+        "scripts/run_agent_hook_guard.sh": [
+            "scripts/plan_hook_guard.py",
+        ],
+        "docs/agent-planning.md": [
+            "mivia-agent-plan/v1",
+            "make plan-contract-test",
+            "Semgrep",
+        ],
+    }.items():
+        content = text(path)
+        for needle in needles:
+            require(needle in content, f"{path}: missing {needle}")
+
+
 def verify_gitignore() -> None:
     entries = set(line.strip() for line in text(".gitignore").splitlines() if line.strip())
     for entry in [
@@ -474,14 +563,22 @@ def verify_git_hooks() -> None:
         "scripts/test_agent_hook_guard.py",
         "scripts/audit_loop_guard.py",
         "scripts/test_audit_loop_guard.py",
+        "scripts/plan_hook_guard.py",
+        "scripts/test_plan_hook_guard.py",
+        "scripts/validate_agent_plan.py",
+        "scripts/test_agent_plan_contracts.py",
         "scripts/test_skill_contracts.py",
         "semgrep/agent-standards.yml",
         ".ai/templates/agent-report-v1.md",
+        ".ai/templates/agent-plan-v1.json",
+        ".ai/schemas/agent-plan-v1.schema.json",
         ".ai/policy/commit-message.json",
         ".ai/policy/agent-hook-bypass.json",
         ".ai/policy/audit-loop.json",
+        ".ai/policy/agent-plan.json",
         ".agents/hooks.json",
         "docs/setup/development-environment.md",
+        "docs/agent-planning.md",
         "docs/agent-hooks.md",
         "docs/development-hooks.md",
         "Makefile",
@@ -507,6 +604,10 @@ def verify_git_hooks() -> None:
         "scripts/test_agent_hook_guard.py",
         "scripts/audit_loop_guard.py",
         "scripts/test_audit_loop_guard.py",
+        "scripts/plan_hook_guard.py",
+        "scripts/test_plan_hook_guard.py",
+        "scripts/validate_agent_plan.py",
+        "scripts/test_agent_plan_contracts.py",
         "scripts/test_skill_contracts.py",
     ]
     for path in executable_files:
@@ -521,6 +622,7 @@ def verify_git_hooks() -> None:
         "hook-test:",
         "agent-hook-test:",
         "audit-loop-test:",
+        "plan-contract-test:",
         "skill-contract-test:",
         "pre-commit:",
         "pre-push:",
@@ -534,6 +636,7 @@ def verify_git_hooks() -> None:
         "[Development environment](docs/setup/development-environment.md)",
         "[Development hooks](docs/development-hooks.md)",
         "[Agent hooks](docs/agent-hooks.md)",
+        "[Agent planning](docs/agent-planning.md)",
         "make install-hooks",
         "make verify",
         "make help",
@@ -588,6 +691,8 @@ def verify_git_hooks() -> None:
         "scripts/test_git_hooks.py",
         "scripts/test_agent_hook_guard.py",
         "scripts/test_audit_loop_guard.py",
+        "scripts/test_agent_plan_contracts.py",
+        "scripts/test_plan_hook_guard.py",
         "scripts/test_skill_contracts.py",
         "--disable-nosem",
         "semgrep --config semgrep/agent-standards.yml",
@@ -597,6 +702,7 @@ def verify_git_hooks() -> None:
         "agent config verification passed",
         "agent hook tests passed",
         "audit loop tests passed",
+        "plan contract tests passed",
         "skill contract tests passed",
     ]:
         require(needle in pre_commit, f"scripts/git-hooks/pre-commit: missing {needle}")
@@ -665,6 +771,8 @@ def verify_git_hooks() -> None:
         "scripts/test_git_hooks.py",
         "scripts/test_agent_hook_guard.py",
         "scripts/test_audit_loop_guard.py",
+        "scripts/test_agent_plan_contracts.py",
+        "scripts/test_plan_hook_guard.py",
         "scripts/test_skill_contracts.py",
         "--disable-nosem",
         "semgrep --config semgrep/agent-standards.yml",
@@ -685,6 +793,9 @@ def verify_git_hooks() -> None:
         "mivia.generic.no-git-hook-bypass-in-agent-config",
         "mivia.generic.no-skill-freeform-output-heading",
         "mivia.generic.no-severity-gated-skill-approval",
+        "mivia.generic.agent-plan-docs-must-reference-machine-plan",
+        "mivia.generic.agent-planner-must-correct-plan-gaps",
+        "mivia.generic.agent-plan-implementation-must-run-audit-loop",
         "mivia.go.no-panic-in-internal",
         "mivia.go.no-fatal-exit-in-internal",
         "mivia.go.no-shell-exec",
@@ -707,6 +818,9 @@ def verify_git_hooks() -> None:
         "mivia.generic.no-git-hook-bypass-in-agent-config",
         "mivia.generic.no-skill-freeform-output-heading",
         "mivia.generic.no-severity-gated-skill-approval",
+        "mivia.generic.agent-plan-docs-must-reference-machine-plan",
+        "mivia.generic.agent-planner-must-correct-plan-gaps",
+        "mivia.generic.agent-plan-implementation-must-run-audit-loop",
         "mivia.go.no-shell-exec",
         "mivia.go.tests-no-time-sleep",
     ]:
@@ -725,6 +839,7 @@ def verify_secret_hygiene() -> None:
         ".github",
         ".githooks",
         "docs/setup/development-environment.md",
+        "docs/agent-planning.md",
         "docs/agent-hooks.md",
         "docs/development-hooks.md",
         "README.md",
@@ -737,6 +852,10 @@ def verify_secret_hygiene() -> None:
         "scripts/test_agent_hook_guard.py",
         "scripts/audit_loop_guard.py",
         "scripts/test_audit_loop_guard.py",
+        "scripts/plan_hook_guard.py",
+        "scripts/test_plan_hook_guard.py",
+        "scripts/validate_agent_plan.py",
+        "scripts/test_agent_plan_contracts.py",
         "scripts/test_skill_contracts.py",
         "semgrep",
         "scripts/verify_agent_config.py",
@@ -776,6 +895,7 @@ def main() -> int:
     verify_agents_hooks()
     verify_agent_hook_guard()
     verify_audit_loop_guard()
+    verify_agent_plan_contract()
     verify_claude_settings()
     verify_codex_hooks()
     verify_gitignore()

@@ -24,6 +24,9 @@ EXPECTED_RULES = {
     "mivia.generic.no-git-hook-bypass-in-agent-config",
     "mivia.generic.no-skill-freeform-output-heading",
     "mivia.generic.no-severity-gated-skill-approval",
+    "mivia.generic.agent-plan-docs-must-reference-machine-plan",
+    "mivia.generic.agent-planner-must-correct-plan-gaps",
+    "mivia.generic.agent-plan-implementation-must-run-audit-loop",
     "mivia.go.no-panic-in-internal",
     "mivia.go.no-fatal-exit-in-internal",
     "mivia.go.no-shell-exec",
@@ -136,6 +139,40 @@ def create_bad_fixture(root: Path) -> None:
 
         Approve when there are no high severity issues.
         Allow a justified exception for remaining gaps.
+        """,
+    )
+    write(
+        root / "docs" / "plans" / "bad-agent-plan.md",
+        """
+        # Bad Agent Plan
+
+        This is a markdown plan only, without machine plan validation.
+        """,
+    )
+    write(
+        root / ".ai" / "skills" / "agent-dag-planner" / "SKILL.md",
+        """
+        ---
+        name: agent-dag-planner
+        description: Bad planner.
+        ---
+
+        # Bad Planner
+
+        Only report gaps and defer plan gaps.
+        """,
+    )
+    write(
+        root / ".ai" / "skills" / "agent-plan-implementer" / "SKILL.md",
+        """
+        ---
+        name: agent-plan-implementer
+        description: Bad implementer.
+        ---
+
+        # Bad Implementer
+
+        Audit loop optional; skip audit loop for speed.
         """,
     )
     write(

@@ -3,9 +3,26 @@
   "schema": "https://dot-agents.com/schemas/skills.json",
   "generated_from": [
     ".ai/skills",
+    ".agents/skills",
     ".claude/skills"
   ],
   "skills": [
+    {
+      "name": "agent-dag-planner",
+      "agent": "canonical",
+      "source": "project",
+      "path": ".ai/skills/agent-dag-planner/SKILL.md",
+      "description": "Re-verify current source and existing plans, correct gaps, and emit a machine-readable DAG plan.",
+      "triggers": ["implementation plan", "dag planning", "dag decomposition", "agent plan", "reverify plans"]
+    },
+    {
+      "name": "agent-plan-implementer",
+      "agent": "canonical",
+      "source": "project",
+      "path": ".ai/skills/agent-plan-implementer/SKILL.md",
+      "description": "Implement a validated DAG plan with scoped edits, verifiers, mutation proofs, hooks, and audit loops.",
+      "triggers": ["implement this plan", "implement the plan", "execute dag plan", "run the plan", "plan implementation"]
+    },
     {
       "name": "adversarial-test-review",
       "agent": "canonical",
@@ -37,6 +54,38 @@
       "path": ".ai/skills/test-coverage-audit/SKILL.md",
       "description": "Coverage-gap workflow for mapping implemented behavior to required tests, mutation proofs, and workstream contracts.",
       "triggers": ["test coverage audit", "missing tests", "is this fully tested", "coverage gaps"]
+    },
+    {
+      "name": "agent-dag-planner",
+      "agent": "codex",
+      "source": "project",
+      "path": ".agents/skills/agent-dag-planner/SKILL.md",
+      "description": "Codex adapter for machine-readable DAG planning.",
+      "triggers": ["implementation plan", "dag planning", "dag decomposition", "agent plan", "reverify plans"]
+    },
+    {
+      "name": "agent-plan-implementer",
+      "agent": "codex",
+      "source": "project",
+      "path": ".agents/skills/agent-plan-implementer/SKILL.md",
+      "description": "Codex adapter for implementing validated DAG plans.",
+      "triggers": ["implement this plan", "implement the plan", "execute dag plan", "run the plan", "plan implementation"]
+    },
+    {
+      "name": "agent-dag-planner",
+      "agent": "claude",
+      "source": "project",
+      "path": ".claude/skills/agent-dag-planner/SKILL.md",
+      "description": "Claude Code adapter for machine-readable DAG planning.",
+      "triggers": ["implementation plan", "dag planning", "dag decomposition", "agent plan", "reverify plans"]
+    },
+    {
+      "name": "agent-plan-implementer",
+      "agent": "claude",
+      "source": "project",
+      "path": ".claude/skills/agent-plan-implementer/SKILL.md",
+      "description": "Claude Code adapter for implementing validated DAG plans.",
+      "triggers": ["implement this plan", "implement the plan", "execute dag plan", "run the plan", "plan implementation"]
     },
     {
       "name": "adversarial-test-review",

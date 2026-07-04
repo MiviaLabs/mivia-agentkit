@@ -43,6 +43,23 @@ if [[ -n "$AUDIT_LOOP_OUTPUT" ]]; then
   exit 0
 fi
 
+set +e
+PLAN_OUTPUT="$(python3 "$ROOT/scripts/plan_hook_guard.py" "$AGENT" "$EVENT" <"$PAYLOAD_FILE")"
+PLAN_STATUS=$?
+set -e
+
+if [[ "$PLAN_STATUS" -ne 0 ]]; then
+  if [[ -n "$PLAN_OUTPUT" ]]; then
+    printf '%s\n' "$PLAN_OUTPUT"
+  fi
+  exit "$PLAN_STATUS"
+fi
+
+if [[ -n "$PLAN_OUTPUT" ]]; then
+  printf '%s\n' "$PLAN_OUTPUT"
+  exit 0
+fi
+
 if command -v mivia-agent >/dev/null 2>&1; then
   exec mivia-agent hook "$AGENT" "$EVENT" <"$PAYLOAD_FILE"
 fi

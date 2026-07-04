@@ -138,6 +138,41 @@ rules:
         - /.claude/skills/**/SKILL.md
     pattern-regex: '(?i)(critical behavior|justified exception|no high severity|high severity issues?)'
 
+  - id: mivia.generic.agent-plan-docs-must-reference-machine-plan
+    languages:
+      - generic
+    severity: ERROR
+    message: Agent planning docs must reference mivia-agent-plan/v1 and a committed .ai/plans/*.plan.json artifact.
+    paths:
+      include:
+        - /docs/plans/*agent*plan*.md
+        - /docs/agent-planning.md
+    pattern-regex: '(?i)(free-form plan only|markdown plan only|without machine plan|no machine-readable plan)'
+
+  - id: mivia.generic.agent-planner-must-correct-plan-gaps
+    languages:
+      - generic
+    severity: ERROR
+    message: Planning skills must re-verify existing plans and correct gaps, not only list or defer them.
+    paths:
+      include:
+        - /.ai/skills/agent-dag-planner/SKILL.md
+        - /.agents/skills/agent-dag-planner/SKILL.md
+        - /.claude/skills/agent-dag-planner/SKILL.md
+    pattern-regex: '(?i)(only report gaps|just list gaps|defer plan gaps|do not correct plan gaps)'
+
+  - id: mivia.generic.agent-plan-implementation-must-run-audit-loop
+    languages:
+      - generic
+    severity: ERROR
+    message: Plan implementation skills must keep bug, coverage, and adversarial review loops in the implementation contract.
+    paths:
+      include:
+        - /.ai/skills/agent-plan-implementer/SKILL.md
+        - /.agents/skills/agent-plan-implementer/SKILL.md
+        - /.claude/skills/agent-plan-implementer/SKILL.md
+    pattern-regex: '(?i)(skip audit loop|audit loop optional|do not run deep-bug-audit|without adversarial-test-review)'
+
   - id: mivia.go.no-panic-in-internal
     languages:
       - go

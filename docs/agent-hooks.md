@@ -15,7 +15,8 @@ Each hook command resolves the Git repo root first, then delegates to the shared
 2. `scripts/run_agent_hook_guard.sh` receives the JSON payload.
 3. `scripts/agent_hook_guard.py` blocks Git-verification bypass attempts.
 4. `scripts/audit_loop_guard.py` controls strict audit loops.
-5. If both guards pass silently and a future `mivia-agent` binary exists, the runner calls `mivia-agent hook <agent> <event>`.
+5. `scripts/plan_hook_guard.py` controls planning and plan-implementation workflows.
+6. If all guards pass silently and a future `mivia-agent` binary exists, the runner calls `mivia-agent hook <agent> <event>`.
 
 ## Verification Bypass Guard
 
@@ -63,6 +64,21 @@ Severity never gates approval. A low-severity row with an open gap still keeps t
 
 State is stored at `.git/mivia-agent-audit-loop-state.json` by default. Tests can override it with `MIVIA_AUDIT_LOOP_STATE`. The state stores counters and hashes only, not raw prompts or raw reports.
 
+## Planning Guard
+
+Policy: `.ai/policy/agent-plan.json`
+
+Script: `scripts/plan_hook_guard.py`
+
+Triggers:
+
+- `UserPromptSubmit`: planning prompts get `agent-dag-planner` context and `mivia-agent-plan/v1` requirements.
+- `UserPromptSubmit`: implementation prompts get `agent-plan-implementer` context and validated `.ai/plans/*.plan.json` requirements.
+- `Stop`: planner reports must include `PlanArtifact: .ai/plans/<id>.plan.json`.
+- `Stop`: planner reports with open gaps or residual risk are blocked.
+
+Details live in `docs/agent-planning.md`.
+
 ## Validation
 
 Use these targets after changing hooks, policies, skills, or report formats:
@@ -70,6 +86,7 @@ Use these targets after changing hooks, policies, skills, or report formats:
 ```bash
 make agent-hook-test
 make audit-loop-test
+make plan-contract-test
 make verify
 ```
 
