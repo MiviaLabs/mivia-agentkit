@@ -1,0 +1,51 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'command -v mivia-agent >/dev/null 2>&1 && exec mivia-agent hook codex user-prompt-submit || exit 0'",
+            "statusMessage": "Checking prompt policy"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'command -v mivia-agent >/dev/null 2>&1 && exec mivia-agent hook codex pre-tool-use || exit 0'",
+            "statusMessage": "Checking tool policy"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'command -v mivia-agent >/dev/null 2>&1 && exec mivia-agent hook codex permission-request || exit 0'",
+            "statusMessage": "Checking permission request"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'command -v mivia-agent >/dev/null 2>&1 && exec mivia-agent hook codex stop || exit 0'",
+            "statusMessage": "Checking completion policy",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

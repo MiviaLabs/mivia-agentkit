@@ -1,0 +1,29 @@
+# Go build output
+bin/
+dist/
+*.exe
+*.test
+*.out
+coverage.out
+
+# Optional vendored dependencies
+vendor/
+
+# Runtime artifacts
+.ai/runs/
+.git/mivia-agent-quality-stamp.json
+
+# Local tool state
+.claude/settings.local.json
+
+# Secrets and local environment
+.env
+.env.*
+secrets/
+
+# Editors and OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.tmp

@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(go test ./...)",
+      "Bash(go test *)",
+      "Bash(go vet ./...)",
+      "Bash(go vet *)",
+      "Bash(go build ./cmd/mivia-agent)",
+      "Bash(git diff)",
+      "Bash(git diff *)",
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git log)",
+      "Bash(git log *)",
+      "Read(./AGENTS.md)",
+      "Read(./.ai/**)",
+      "Read(./docs/**)"
+    ],
+    "ask": [
+      "Edit",
+      "Write",
+      "MultiEdit",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.config/gh/hosts.yml)",
+      "Bash(git push *)",
+      "Bash(git reset *)",
+      "Bash(git clean *)",
+      "Bash(curl *)",
+      "Bash(wget *)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "filesystem": {
+      "denyRead": [
+        "./.env",
+        "./.env.*",
+        "./secrets/**",
+        "~/.aws/**",
+        "~/.config/gh/hosts.yml"
+      ]
+    }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'command -v mivia-agent >/dev/null 2>&1 && exec mivia-agent hook claude pre-tool-use || exit 0'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'command -v mivia-agent >/dev/null 2>&1 && exec mivia-agent hook claude stop || exit 0'"
+          }
+        ]
+      }
+    ]
+  }
+}
