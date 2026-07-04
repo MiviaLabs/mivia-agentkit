@@ -1,12 +1,12 @@
 # WS8 — CI, Release, Docs
 
 - **Phase:** 5
-- **Depends on:** all prior WS
+- **Depends on:** all prior WS, WS14
 - **PRD:** §9 (NFR-1), §11, §14 (Phase 5 gate)
 - **Plan:** WS8
 - **Exit gate (Phase 5):** release binaries build for linux/macOS/windows; docs cover install, init, doctor, preflight, hooks, run, review, loops; CI runs the full suite + a generated-fixture doctor smoke.
 
-Goal: distribution, the fixture that proves the whole system composes, and the docs a new user needs.
+Goal: distribution, the fixture that proves the whole system composes, the docs a new user needs, and CI/docs closure after WS14 real runtime coverage lands.
 
 ## T1 — Version injection + release workflow
 
@@ -59,7 +59,7 @@ Extend `.github/workflows/ci.yml` (WS0):
 
 Create:
 - `docs/user-guide.md` — install, `init`, `doctor`, `preflight`, `adapters`, `run`, `review`, hooks, exit codes. With copy-pasteable examples.
-- `docs/adapter-authoring.md` — the `Adapter` interface, `Detect`/`Run`/`Review`, the `FakeRunner` pattern, how to add a CLI.
+- `docs/adapter-authoring.md` — the `Adapter` interface, `Detect`/`Run`/`Review`, unit-vs-real coverage expectations, how to add a CLI.
 - `docs/loop-authoring.md` — loop YAML schema, `bound`/`exit_when`/`on_exhausted`, consensus modes, `iterate` semantics, a worked research-loop example.
 - `docs/template-authoring.md` — managed blocks, template variables, the `List(profile, adapters)` contract.
 - `docs/adr/0001-product-boundary.md` — records: no network, no service, no raw persistence, AGT optional, adapter-based.
@@ -92,12 +92,11 @@ WS8 is ☑ when:
 - [x] fixture composition test green
 - [x] all four docs land and cross-link PRD FRs
 - [x] CI matrix green on linux+macos+windows
-- [x] status updated in `00-overview.md`
+- [ ] WS14 real runtime coverage has landed and the docs reflect the real-vs-fake test boundary
+- [ ] status updated in `00-overview.md`
 
-## Completion — 2026-07-05
+## Reopened — 2026-07-05
 
-- Tests: 5 passing (`TestReleaseVersionInjected`, `TestGeneratedFixtureDoctorPasses`, `TestGeneratedFixtureFileSetMatchesStandardProfile`, `TestGeneratedFixtureDryRunPlanNonEmpty`, plus `go test ./... -count=1`).
-- Mutation proofs: remove one expected fixture file from the planned standard set fails `TestGeneratedFixtureFileSetMatchesStandardProfile`; remove ldflags from the release-version test build fails `TestReleaseVersionInjected`; both reverted.
-- Files: 7 created.
-- Residual risk: none.
+- Existing closure evidence remains valid for release artifacts, fixture smoke, and docs.
+- WS8 is not considered fully closed until WS14 lands because fake-only adapter and command coverage is no longer an acceptable final proof boundary.
 - Follow-ups: T5 distribution extras remain explicitly deferred by plan.

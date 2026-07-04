@@ -31,3 +31,7 @@
 - Coverage percentage is secondary. Contract coverage is required.
 - Each workstream must cover success paths, error paths, malformed inputs, idempotency, secret hygiene, and no-network constraints where applicable.
 - For hook and adapter code, test the real payload shape and scrubbed output shape.
+- Fake-only closure is not acceptable for the shipped command and adapter surface.
+- Every implemented user-facing command and every approved-for-run adapter must have at least one real subprocess or built-binary integration path in addition to unit coverage.
+- Keep fake runners for unit isolation, fast failure shaping, and edge-case enumeration, but do not treat them as proof that the real CLI or real binary wiring works.
+- If a real integration path is gated on local tool availability, the gate must be explicit, the missing prerequisite must be reported, and CI must still cover the built-binary paths that do not require third-party CLIs.

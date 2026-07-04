@@ -34,8 +34,8 @@ A task is **one production file + its test file**. If a task needs two productio
 
 1. **Test-first where feasible.** Write the listed tests before or alongside the production code. Tests are not optional and not deferred.
 2. **Every guard has a mutation proof.** For any "must reject / must deny / must fail closed" behavior, there is a `Mutation proof:` line. To prove it: make the described code change, confirm the named test fails, then revert. Record the result in the WS completion report.
-3. **No network.** mivia-agent makes zero network calls itself. Tests must not hit the network. Adapter tests use a fake runner (see WS9), never a real CLI.
-4. **No mocking of the thing under test.** If the risk is Git behavior, use a real temp Git repo (`git init` in `t.TempDir()`). If the risk is the hook output shape, assert against the real shape. Mock only collaborators (filesystem is real, the CLI a fake).
+3. **No network.** mivia-agent makes zero network calls itself. Tests must not hit the network. Real integration coverage may execute local binaries and local agent CLIs, but it must stay offline.
+4. **No mocking of the thing under test.** If the risk is Git behavior, use a real temp Git repo (`git init` in `t.TempDir()`). If the risk is the hook output shape, assert against the real shape. Mock only collaborators. Fake runners are allowed for unit tests, but every shipped command and approved adapter also needs a real subprocess or built-binary integration path.
 5. **Idempotency.** Anything that writes must be re-runnable with no diff under the same inputs. There is an idempotency test for every writer.
 6. **Secret hygiene.** No test fixture, sample payload, or persisted artifact contains plausible secrets. Adapter result types never carry raw prompts or raw model output.
 7. **File headers.** Every `.go` file starts with a package doc comment naming the WS that owns it and the plan/PRD sections it implements, e.g.:

@@ -3,22 +3,23 @@
 ReportFormat: mivia-agent-report/v1
 Skill: agent-dag-planner
 Result: PASS
-Scope: docs/plans/agentkit-implementation-roadmap/**, .ai/plans/agentkit-implementation-roadmap.plan.json, docs/agent-planning.md, .ai/skills/agent-dag-planner/SKILL.md, scripts/validate_agent_plan.py
-Baseline: dev/97e6b4c plus current working-tree revalidation
-Summary: The roadmap DAG now requires an explicit task directory for every node and validates the existing AgentKit workstream directories.
+Scope: AGENTS.md, .ai/rules/20-agent-quality.md, docs/plans/agentkit-implementation-roadmap/**, .ai/plans/agentkit-implementation-roadmap.plan.json, semgrep/agent-standards.yml, scripts/test_semgrep_rules.py, docs/adapter-authoring.md
+Baseline: 83e9ba1 plus current working-tree revalidation
+Summary: The roadmap and repo policy now require real runtime coverage for every implemented command and approved-for-run adapter, and Phase 5 closure is reopened until WS14 lands.
 
 | ID | Severity | Status | File:Line | Finding | Required Fix | Required Test | Mutation |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| PLAN-TASK-DIR | high | closed | docs/agent-planning.md:3 | Planning docs and the machine DAG did not require a task directory per DAG node. | Added `task_dir` to the plan template, validator, schema, skill, AgentKit machine plan, and contract tests. | `python3 scripts/test_agent_plan_contracts.py` | Remove `task_dir` from one node; validator and contract tests must fail. |
+| PLAN-REAL-COVERAGE | high | closed | AGENTS.md:45 | Canonical repo guidance and roadmap closure still allowed fake-only tests to stand in for shipped command and adapter proof. | Update canonical rules, add a dedicated real-runtime-coverage workstream, reopen WS8 behind it, and add static policy coverage that rejects stale fake-only guidance. | `python3 scripts/validate_agent_plan.py .ai/plans/agentkit-implementation-roadmap.plan.json`; `python3 scripts/test_agent_plan_contracts.py`; `python3 scripts/test_semgrep_rules.py`; `python3 scripts/verify_agent_config.py` | Reintroduce the stale fake-only guidance or remove WS14 from the DAG; validators or Semgrep contract tests must fail. |
 
 | Command | Result | Notes |
 | --- | --- | --- |
-| python3 scripts/validate_agent_plan.py .ai/plans/agentkit-implementation-roadmap.plan.json | PASS | Machine DAG validates. |
-| python3 scripts/test_agent_plan_contracts.py | PASS | Roadmap task-directory and plan artifact contracts pass. |
-| python3 scripts/test_plan_hook_guard.py | PASS | PlanArtifact Stop-hook contract passes. |
-| python3 scripts/verify_agent_config.py | PASS | README and agent-config references pass. |
-| mutation: remove machine-plan task_dir | PASS | Plan validator rejected missing node task_dir, then mutation was reverted. |
+| python3 scripts/validate_agent_plan.py .ai/plans/agentkit-implementation-roadmap.plan.json | PASS | Machine DAG validates with WS14 and reopened WS8 dependency closure. |
+| python3 scripts/test_agent_plan_contracts.py | PASS | Plan artifact and roadmap contract tests pass. |
+| python3 scripts/test_plan_hook_guard.py | PASS | Planner Stop-hook PlanArtifact contract still passes. |
+| python3 scripts/test_semgrep_rules.py | PASS | Static policy now rejects stale fake-only guidance and fake-runner use in real integration test files. |
+| python3 scripts/verify_agent_config.py | PASS | Repo config and doc references still validate after the roadmap/rule updates. |
+| mutation: reintroduce fake-only closure guidance | PASS | Semgrep contract fixtures failed until the mutation was reverted. |
 
-ResidualRisk: none
-NextAction: Implement the next dependency-ready node, `docs/plans/agentkit-implementation-roadmap/ws-11-consensus/tasks.md`.
+ResidualRisk: WS14 is planned but not implemented; current repo coverage still relies on existing fake-runner-heavy suites until that workstream lands.
+NextAction: Implement the next dependency-ready node, `docs/plans/agentkit-implementation-roadmap/ws-14-real-runtime-coverage/tasks.md`.
 PlanArtifact: .ai/plans/agentkit-implementation-roadmap.plan.json

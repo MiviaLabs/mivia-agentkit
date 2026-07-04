@@ -2,7 +2,7 @@
   "PlanFormat": "mivia-agent-plan/v1",
   "plan_id": "agentkit-implementation-roadmap",
   "version": 1,
-  "baseline_commit": "dev/97e6b4c plus current working-tree revalidation",
+  "baseline_commit": "83e9ba1 plus current working-tree revalidation",
   "scope": {
     "in": [
       "Mivia AgentKit implementation roadmap",
@@ -47,6 +47,7 @@
       "docs/plans/agentkit-implementation-roadmap/ws-05-hooks/tasks.md",
       "docs/plans/agentkit-implementation-roadmap/ws-06-adapter-templates/tasks.md",
       "docs/plans/agentkit-implementation-roadmap/ws-07-import-update/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-14-real-runtime-coverage/tasks.md",
       "docs/plans/agentkit-implementation-roadmap/ws-08-ci-release-docs/tasks.md",
       "docs/plans/agentkit-implementation-roadmap/ws-09-adapters/tasks.md",
       "docs/plans/agentkit-implementation-roadmap/ws-10-orchestrator/tasks.md",
@@ -98,12 +99,12 @@
     {
       "path": "docs/plans/agentkit-implementation-roadmap/00-overview.md",
       "reason": "AgentKit workstream dependency graph and phase order",
-      "checked_at": "2026-07-04"
+      "checked_at": "2026-07-05"
     },
     {
       "path": "docs/plans/agentkit-implementation-roadmap/_conventions.md",
       "reason": "task, verifier, and mutation-proof format",
-      "checked_at": "2026-07-04"
+      "checked_at": "2026-07-05"
     },
     {
       "path": "docs/plans/agentkit-implementation-roadmap/ws-00-bootstrap/tasks.md",
@@ -146,9 +147,14 @@
       "checked_at": "2026-07-04"
     },
     {
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-14-real-runtime-coverage/tasks.md",
+      "reason": "WS14 implementation tasks and real-runtime-coverage verification contract",
+      "checked_at": "2026-07-05"
+    },
+    {
       "path": "docs/plans/agentkit-implementation-roadmap/ws-08-ci-release-docs/tasks.md",
       "reason": "WS8 implementation tasks and verification",
-      "checked_at": "2026-07-04"
+      "checked_at": "2026-07-05"
     },
     {
       "path": "docs/plans/agentkit-implementation-roadmap/ws-09-adapters/tasks.md",
@@ -208,6 +214,11 @@
       "checked_at": "2026-07-04"
     },
     {
+      "url": "https://developers.openai.com/codex/cli/reference",
+      "reason": "Codex CLI command surface and flags must be re-verified before WS14 real subprocess coverage",
+      "checked_at": "2026-07-05"
+    },
+    {
       "url": "https://developers.openai.com/codex/skills",
       "reason": "Codex skill packaging behavior informs generated adapter templates",
       "checked_at": "2026-07-05"
@@ -220,7 +231,12 @@
     {
       "url": "https://code.claude.com/docs/en/cli-reference",
       "reason": "Claude Code CLI flags must be re-verified before WS9 adapter implementation",
-      "checked_at": "2026-07-04"
+      "checked_at": "2026-07-05"
+    },
+    {
+      "url": "https://developers.googleblog.com/an-important-update-transitioning-gemini-cli-to-antigravity-cli/",
+      "reason": "Antigravity CLI naming and transition status must be re-verified before WS14 adapter subprocess coverage",
+      "checked_at": "2026-07-05"
     },
     {
       "url": "https://code.claude.com/docs/en/hooks",
@@ -940,6 +956,90 @@
         "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-07-import-update/"
       },
       {
+        "id": "ws-14-real-runtime-coverage",
+        "title": "Real runtime coverage for commands and adapters",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-02-templates-init",
+          "ws-03-doctor-audit",
+          "ws-04-preflight-stamp",
+          "ws-05-hooks",
+          "ws-06-adapter-templates",
+          "ws-07-import-update",
+          "ws-09-adapters",
+          "ws-10-orchestrator",
+          "ws-11-consensus",
+          "ws-12-governance",
+          "ws-13-run-review-adapters"
+        ],
+        "files_read": [
+          "AGENTS.md",
+          ".ai/rules/20-agent-quality.md",
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-14-real-runtime-coverage/tasks.md",
+          "docs/prd/0001-mivia-agentkit.md",
+          "docs/adapter-authoring.md"
+        ],
+        "files_edit": [
+          "internal/integration/gate.go",
+          "internal/integration/gate_test.go",
+          "internal/cli/integration_harness.go",
+          "internal/cli/integration_harness_test.go",
+          "internal/cli/version.go",
+          "test/integration/core_commands_test.go",
+          "test/integration/core_commands_test_helpers.go",
+          "test/integration/orchestrated_commands_test.go",
+          "test/integration/orchestrated_commands_test_helpers.go",
+          "test/integration/adapters_real_test.go",
+          "test/integration/adapters_real_test_helpers.go",
+          "semgrep/agent-standards.yml",
+          "scripts/test_semgrep_rules.py",
+          "docs/adapter-authoring.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-14-real-runtime-coverage/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
+        ],
+        "allowed_mcp_tools": [
+          "none"
+        ],
+        "tests": [
+          "internal/integration/gate_test.go::TestGateRequireBinaryReportsMissingTool",
+          "internal/integration/gate_test.go::TestGateRequireEnvReportsMissingVariable",
+          "internal/integration/gate_test.go::TestGateAllowsExplicitlyEnabledRun",
+          "internal/cli/integration_harness_test.go::TestBuildBinaryProducesRunnableExecutable",
+          "internal/cli/integration_harness_test.go::TestRunBinaryCapturesExitCodeAndStreams",
+          "test/integration/core_commands_test.go::TestInitDoctorAuditPreflightFlow",
+          "test/integration/core_commands_test.go::TestUpdatePreservesUserContentOutsideManagedRegions",
+          "test/integration/core_commands_test.go::TestImportInspectsWithoutWriting",
+          "test/integration/core_commands_test.go::TestVersionCommandOutputsStructuredBuildInfo",
+          "test/integration/orchestrated_commands_test.go::TestHookRejectsProtectedActionWithoutFreshStamp",
+          "test/integration/orchestrated_commands_test.go::TestRunDryRunProducesBoundedPlan",
+          "test/integration/orchestrated_commands_test.go::TestReviewProducesConsensusReport",
+          "test/integration/adapters_real_test.go::TestCodexAdapterRealSubprocessContract",
+          "test/integration/adapters_real_test.go::TestClaudeAdapterRealSubprocessContract",
+          "test/integration/adapters_real_test.go::TestAntigravityAdapterRealSubprocessContract",
+          "test/integration/adapters_real_test.go::TestCrushAdapterRealSubprocessContract"
+        ],
+        "verifiers": [
+          "go test ./internal/integration ./internal/cli/... ./test/integration/... -count=1",
+          "go vet ./internal/integration ./internal/cli/... ./test/integration/...",
+          "MIVIA_AGENT_REAL_CLI_TESTS=1 go test ./test/integration/... -count=1",
+          "python3 scripts/test_semgrep_rules.py"
+        ],
+        "mutation": "Allow the integration gate to pass missing binaries, replace the built-binary harness with in-process execution, remove hook stamp enforcement, or drop adapter non-interactive flags at the subprocess boundary; the named WS14 tests must fail.",
+        "outputs": [
+          "internal/integration/**",
+          "internal/cli/integration_harness.go",
+          "internal/cli/integration_harness_test.go",
+          "internal/cli/version.go",
+          "test/integration/**",
+          "semgrep/agent-standards.yml",
+          "scripts/test_semgrep_rules.py",
+          "docs/adapter-authoring.md"
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-14-real-runtime-coverage/"
+      },
+      {
         "id": "ws-08-ci-release-docs",
         "title": "CI, release, fixture smoke, and user docs",
         "skill": "agent-plan-implementer",
@@ -953,6 +1053,7 @@
           "ws-05-hooks",
           "ws-06-adapter-templates",
           "ws-07-import-update",
+          "ws-14-real-runtime-coverage",
           "ws-09-adapters",
           "ws-10-orchestrator",
           "ws-11-consensus",
@@ -1085,6 +1186,16 @@
       "source": ".ai/plans/agentkit-implementation-roadmap.plan.json",
       "gap": "WS8 listed internal/version/version_test.go in tests but omitted it from files_edit and outputs",
       "correction": "added internal/version/version_test.go to WS8 files_edit and outputs so the release-version test is inside the permitted DAG scope"
+    },
+    {
+      "source": "AGENTS.md",
+      "gap": "canonical repo guidance and Phase 5 roadmap closure still treated fake-runner coverage as sufficient proof for shipped commands and adapters",
+      "correction": "updated repo policy to require real subprocess or built-binary coverage, added WS14 for that work, reopened WS8 behind WS14, and added Semgrep contract coverage for stale fake-only guidance"
+    },
+    {
+      "source": ".ai/plans/agentkit-implementation-roadmap.plan.json",
+      "gap": "WS14 requires a structured real-binary version command assertion but omitted internal/cli/version.go from the permitted edit scope",
+      "correction": "added internal/cli/version.go to WS14 files_edit and outputs so the built-binary version contract can land without widening to unrelated CLI files"
     }
   ],
   "stop_conditions": [

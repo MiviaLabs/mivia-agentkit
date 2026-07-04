@@ -22,9 +22,9 @@ The runtime adapter boundary lives in [internal/adapter/adapter.go](../internal/
 - Do not persist raw prompts, raw model output, or provider payloads.
 - Return structured metadata that can be written safely into `.ai/runs/`.
 
-## FakeRunner Pattern
+## Unit Coverage With FakeRunner
 
-Tests use [internal/adapter/fake_runner.go](../internal/adapter/fake_runner.go) instead of real CLIs. The fake runner lets tests assert:
+Use [internal/adapter/fake_runner.go](../internal/adapter/fake_runner.go) for unit isolation. The fake runner lets tests assert:
 
 - command arguments
 - environment shaping
@@ -32,7 +32,17 @@ Tests use [internal/adapter/fake_runner.go](../internal/adapter/fake_runner.go) 
 - timeout and approval-mode enforcement
 - returned artifacts and verdicts
 
-Adapter tests should prove both the success path and the fail-closed path where headless execution is unavailable.
+Unit tests should prove both the success path and the fail-closed path where headless execution is unavailable.
+
+## Required Real Runtime Coverage
+
+FakeRunner coverage is necessary but not sufficient for shipped adapters.
+
+- Every approved-for-run adapter needs at least one real subprocess integration path.
+- Reuse [internal/integration/gate.go](../internal/integration/gate.go) for opt-in installed-CLI checks so missing local tools skip with a named prerequisite instead of failing opaquely.
+- Reuse [internal/cli/integration_harness.go](../internal/cli/integration_harness.go) for built-binary command coverage whenever the contract under test is the shipped CLI surface rather than an adapter in isolation.
+- Real integration coverage may use stub executables for argv/env assertions and opt-in installed-CLI runs for contract checks that require the real tool.
+- Integration coverage must verify non-interactive flags, approval settings, scrubbed output handling, and detect/run/review behavior at the subprocess boundary.
 
 ## Adding A CLI
 

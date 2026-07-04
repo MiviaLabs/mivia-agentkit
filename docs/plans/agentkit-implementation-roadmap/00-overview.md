@@ -35,6 +35,7 @@ Phase 0                  Phase 1                       Phase 2
                                          ┌────────────────────────┐
                                          │ WS6 adapter templates   │
                                          │ WS7 import/update       │
+                                         │ WS14 real coverage      │
                                          │ WS8 CI/release/docs     │
                                          └────────────────────────┘
 ```
@@ -56,7 +57,8 @@ Phase 0                  Phase 1                       Phase 2
 | 5 | [`ws-05-hooks/`](ws-05-hooks/tasks.md) | Hook engine (Codex + Claude) | 4 | WS4, WS12 | ☑ |
 | 6 | [`ws-06-adapter-templates/`](ws-06-adapter-templates/tasks.md) | Adapter templates (incl. Crush) | 4 | WS2, WS9 | ☑ |
 | 7 | [`ws-07-import-update/`](ws-07-import-update/tasks.md) | `import` + `update` | 5 | WS2, WS3 | ☑ |
-| 8 | [`ws-08-ci-release-docs/`](ws-08-ci-release-docs/tasks.md) | CI, release, docs | 5 | all prior | ☑ |
+| 14 | [`ws-14-real-runtime-coverage/`](ws-14-real-runtime-coverage/tasks.md) | Real runtime coverage for commands and adapters | 5 | WS2, WS3, WS4, WS5, WS6, WS7, WS9, WS10, WS11, WS12, WS13 | ☑ |
+| 8 | [`ws-08-ci-release-docs/`](ws-08-ci-release-docs/tasks.md) | CI, release, docs | 5 | all prior, WS14 | ☐ |
 
 Numbering follows the product plan, not execution order. **Execute by phase, not by number.**
 
@@ -75,4 +77,4 @@ Numbering follows the product plan, not execution order. **Execute by phase, not
 - **Phase 2:** FR-2.4, 3.1–3.5, 7.4 green; approval-enforcement + scrubbing tests.
 - **Phase 3:** FR-4.1–4.5, 5.1–5.3, 6.3 green; loop-bound + stamp-before-protect + consensus-threshold mutation proofs.
 - **Phase 4:** FR-2.2, 6.4, 7.1, 7.2, 8.1–8.3 green; strict-requires-AGT doctor failure.
-- **Phase 5:** FR-1.4, 9.1, 9.2; release binaries build for linux/macOS/windows.
+- **Phase 5:** FR-1.4, 9.1, 9.2; release binaries build for linux/macOS/windows and every implemented command plus approved adapter has real runtime coverage beyond fake-only tests.

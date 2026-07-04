@@ -42,7 +42,7 @@ Sources: https://agents.md/, https://developers.openai.com/codex/learn/best-prac
 - Return errors instead of panicking in library code. Use `%w` for wrapping and `errors.Is` / `errors.As` for checks across error chains.
 - Keep initialisms consistent: `URL`, `HTTP`, `ID`, and `API`, not `Url`, `Http`, `Id`, or `Api`.
 - Use `//go:embed` only at package scope; patterns must be module-local and deterministic.
-- Do not add network calls to `mivia-agent` itself. Adapter tests use fake runners, not real CLIs.
+- Do not add network calls to `mivia-agent` itself. Fake runners are valid for unit tests, but shipped command and adapter behavior must also be covered by real subprocess or built-binary integration tests wherever the product surface is implemented.
 
 Sources: https://go.dev/doc/effective_go, https://go.dev/doc/modules/layout, https://go.dev/doc/comment, https://go.dev/blog/go1.13-errors, https://go.dev/wiki/CodeReviewComments, https://pkg.go.dev/embed. Repo source: `docs/plans/agentkit-implementation-roadmap/_conventions.md`.
 
@@ -52,6 +52,7 @@ Sources: https://go.dev/doc/effective_go, https://go.dev/doc/modules/layout, htt
 - Use table-driven tests for multi-case behavior, with named subtests and failure messages that include got/want context.
 - Use `t.TempDir()` for any test that writes files; never write fixtures into the repo tree during tests.
 - Do not mock the thing under test. If Git behavior is the risk, use a real temp Git repo. If hook output shape is the risk, assert the real shape.
+- Fake runners, stub executables, and in-process fakes may support unit coverage, but they are not sufficient closure for implemented commands or approved adapters; add at least one real subprocess or built-binary integration path for each shipped surface.
 - Test helpers must call `t.Helper()` and must not hide failures behind booleans or swallowed errors.
 - Every guard, rejection path, fail-closed path, and idempotent writer needs a mutation proof recorded in the workstream completion report.
 

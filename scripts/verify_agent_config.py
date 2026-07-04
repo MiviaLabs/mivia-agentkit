@@ -794,6 +794,7 @@ def verify_git_hooks() -> None:
         "mivia.generic.agent-plan-docs-must-reference-machine-plan",
         "mivia.generic.agent-planner-must-correct-plan-gaps",
         "mivia.generic.agent-plan-implementation-must-run-audit-loop",
+        "mivia.generic.no-fake-only-runtime-coverage-guidance",
         "mivia.go.no-panic-in-internal",
         "mivia.go.no-fatal-exit-in-internal",
         "mivia.go.no-shell-exec",
@@ -801,7 +802,7 @@ def verify_git_hooks() -> None:
         "mivia.go.no-network-calls",
         "mivia.go.no-world-writable-mode",
         "mivia.go.no-raw-artifact-write",
-        "mivia.go.tests-no-real-agent-cli",
+        "mivia.generic.real-integration-tests-no-fake-runner",
         "mivia.go.tests-use-t-tempdir",
         "mivia.go.tests-no-time-sleep",
     ]:
@@ -819,7 +820,9 @@ def verify_git_hooks() -> None:
         "mivia.generic.agent-plan-docs-must-reference-machine-plan",
         "mivia.generic.agent-planner-must-correct-plan-gaps",
         "mivia.generic.agent-plan-implementation-must-run-audit-loop",
+        "mivia.generic.no-fake-only-runtime-coverage-guidance",
         "mivia.go.no-shell-exec",
+        "mivia.generic.real-integration-tests-no-fake-runner",
         "mivia.go.tests-no-time-sleep",
     ]:
         require(rule_id in semgrep_tests, f"scripts/test_semgrep_rules.py: missing {rule_id}")
