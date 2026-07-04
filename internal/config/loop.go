@@ -1,5 +1,5 @@
 // Package config implements mivia-agent.yaml parsing.
-// Plan: WS1. PRD: FR-4.2, FR-6.1.
+// Plan: WS-A. PRD: FR-4.2, FR-6.1.
 package config
 
 import "fmt"
@@ -19,6 +19,8 @@ type Step struct {
 	ID        string    `yaml:"id"`
 	Producer  string    `yaml:"producer"`
 	Reviewers []string  `yaml:"reviewers"`
+	Model     string    `yaml:"model"`
+	Effort    string    `yaml:"effort"`
 	Artifact  string    `yaml:"artifact"`
 	Approval  string    `yaml:"approval"`
 	MaxTurns  int       `yaml:"max_turns"`
@@ -59,6 +61,9 @@ func (l *Loop) Validate(enabledAdapters map[string]AdapterRole) error {
 		seen[step.ID] = struct{}{}
 		if step.Producer == "" && len(step.Reviewers) == 0 {
 			return fmt.Errorf("step %q has neither producer nor reviewers", step.ID)
+		}
+		if err := validateEffort(fmt.Sprintf("step %q", step.ID), step.Effort); err != nil {
+			return err
 		}
 		if step.Producer != "" {
 			role, ok := enabledAdapters[step.Producer]

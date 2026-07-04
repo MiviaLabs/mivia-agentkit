@@ -1,3 +1,5 @@
+// Package config tests manifest parsing and validation.
+// Plan: WS-A. PRD: FR-1.1, FR-4.2, FR-10.2.
 package config
 
 import (
@@ -47,6 +49,28 @@ adapters:
 	}
 }
 
+func TestManifestParsesAdapterModelDefaults(t *testing.T) {
+	got, err := Parse([]byte(`
+version: "1"
+profile: standard
+adapters:
+  codex:
+    enabled: true
+    role: orchestrable
+    model: gpt-5.5
+    effort: high
+`))
+	if err != nil {
+		t.Fatalf("Parse() error = %v, want nil", err)
+	}
+	if got.Adapters["codex"].Model != "gpt-5.5" {
+		t.Fatalf("Model = %q, want gpt-5.5", got.Adapters["codex"].Model)
+	}
+	if got.Adapters["codex"].Effort != "high" {
+		t.Fatalf("Effort = %q, want high", got.Adapters["codex"].Effort)
+	}
+}
+
 func TestManifestRejectsUnknownProfile(t *testing.T) {
 	m := Defaults()
 	m.Profile = "enterprise"
@@ -60,6 +84,45 @@ func TestManifestRejectsUnknownAdapterRole(t *testing.T) {
 	m.Adapters["codex"] = AdapterConfig{Enabled: true, Role: "chatty"}
 	if err := m.Validate(); err == nil || !strings.Contains(err.Error(), "unknown role") {
 		t.Fatalf("Validate() error = %v, want unknown role", err)
+	}
+}
+
+func TestManifestRejectsUnknownEffort(t *testing.T) {
+	tests := []struct {
+		name     string
+		manifest Manifest
+	}{
+		{
+			name: "adapter default",
+			manifest: func() Manifest {
+				m := Defaults()
+				m.Adapters["codex"] = AdapterConfig{
+					Enabled: true,
+					Role:    AdapterRoleOrchestrable,
+					Effort:  "turbo",
+				}
+				return m
+			}(),
+		},
+		{
+			name: "step override",
+			manifest: func() Manifest {
+				m := Defaults()
+				m.Loops = map[string]Loop{"research": validLoop()}
+				loop := m.Loops["research"]
+				loop.Steps[0].Effort = "turbo"
+				m.Loops["research"] = loop
+				return m
+			}(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.manifest.Validate(); err == nil || !strings.Contains(err.Error(), "unknown effort") {
+				t.Fatalf("Validate() error = %v, want unknown effort", err)
+			}
+		})
 	}
 }
 
@@ -94,6 +157,33 @@ func TestManifestRejectsUnknownYAMLField(t *testing.T) {
 	_, err := Parse([]byte("profile: standard\nsurprise: true\n"))
 	if err == nil || !strings.Contains(err.Error(), "field surprise not found") {
 		t.Fatalf("Parse() error = %v, want unknown field rejection", err)
+	}
+}
+
+func TestManifestParsesCrushParams(t *testing.T) {
+	got, err := Parse([]byte(`
+version: "1"
+profile: standard
+adapters:
+  crush:
+    enabled: true
+    role: guidance
+    model: openai/gpt-5.5
+    params:
+      provider: openai
+      base_url: https://api.openai.com/v1
+`))
+	if err != nil {
+		t.Fatalf("Parse() error = %v, want nil", err)
+	}
+	if got.Adapters["crush"].Model != "openai/gpt-5.5" {
+		t.Fatalf("Model = %q, want openai/gpt-5.5", got.Adapters["crush"].Model)
+	}
+	if got.Adapters["crush"].Params["provider"] != "openai" {
+		t.Fatalf("provider = %q, want openai", got.Adapters["crush"].Params["provider"])
+	}
+	if got.Adapters["crush"].Params["base_url"] != "https://api.openai.com/v1" {
+		t.Fatalf("base_url = %q, want https://api.openai.com/v1", got.Adapters["crush"].Params["base_url"])
 	}
 }
 

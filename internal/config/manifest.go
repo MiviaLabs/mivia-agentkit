@@ -1,5 +1,5 @@
 // Package config implements mivia-agent.yaml parsing.
-// Plan: WS1. PRD: FR-1.1, FR-4.2, FR-10.2.
+// Plan: WS-A. PRD: FR-1.1, FR-4.2, FR-10.2.
 package config
 
 import (
@@ -45,8 +45,11 @@ type Project struct {
 
 // AdapterConfig configures one adapter.
 type AdapterConfig struct {
-	Enabled bool        `yaml:"enabled"`
-	Role    AdapterRole `yaml:"role"`
+	Enabled bool              `yaml:"enabled"`
+	Role    AdapterRole       `yaml:"role"`
+	Model   string            `yaml:"model"`
+	Effort  string            `yaml:"effort"`
+	Params  map[string]string `yaml:"params"`
 }
 
 // Routing is the default workflow routing policy.
@@ -171,6 +174,9 @@ func (m *Manifest) Validate() error {
 		if adapter.Role != AdapterRoleOrchestrable && adapter.Role != AdapterRoleGuidance {
 			return fmt.Errorf("adapter %q has unknown role %q", name, adapter.Role)
 		}
+		if err := validateEffort(fmt.Sprintf("adapter %q", name), adapter.Effort); err != nil {
+			return err
+		}
 	}
 
 	if m.Routing.Consensus.Mode != "" && !validConsensusMode(m.Routing.Consensus.Mode) {
@@ -204,5 +210,17 @@ func validConsensusMode(mode string) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func validateEffort(scope string, effort string) error {
+	if effort == "" {
+		return nil
+	}
+	switch effort {
+	case "low", "medium", "high", "xhigh":
+		return nil
+	default:
+		return fmt.Errorf("%s has unknown effort %q", scope, effort)
 	}
 }

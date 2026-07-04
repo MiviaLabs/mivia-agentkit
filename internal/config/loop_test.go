@@ -1,9 +1,39 @@
+// Package config tests loop parsing and validation.
+// Plan: WS-A. PRD: FR-4.2, FR-6.1.
 package config
 
 import (
 	"strings"
 	"testing"
 )
+
+func TestLoopParsesStepModelOverrides(t *testing.T) {
+	got, err := Parse([]byte(`
+adapters:
+  codex:
+    enabled: true
+    role: orchestrable
+loops:
+  research:
+    bound: iterations
+    max_iterations: 2
+    steps:
+      - id: produce
+        producer: codex
+        model: gpt-5.5
+        effort: xhigh
+`))
+	if err != nil {
+		t.Fatalf("Parse() error = %v, want nil", err)
+	}
+	step := got.Loops["research"].Steps[0]
+	if step.Model != "gpt-5.5" {
+		t.Fatalf("Model = %q, want gpt-5.5", step.Model)
+	}
+	if step.Effort != "xhigh" {
+		t.Fatalf("Effort = %q, want xhigh", step.Effort)
+	}
+}
 
 func TestLoopValidateRejectsUnknownAdapter(t *testing.T) {
 	loop := validLoop()
