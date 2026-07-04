@@ -78,3 +78,5 @@ make help
 - [Agent planning](docs/agent-planning.md) - DAG planning skill, machine plan contract, and implementation hooks
 - [Product requirements](docs/prd/0001-mivia-agentkit.md) - product requirements
 - [Workstream roadmap](docs/plans/agentkit-implementation-roadmap/00-overview.md) - AgentKit implementation roadmap
+
+![Mivia AgentKit](docs/mivia-agentkit.jpeg)
