@@ -54,6 +54,17 @@ func TestExecuteReviewStepCollectsAllVerdicts(t *testing.T) {
 	}
 }
 
+func TestExecuteReviewStepSetsVerdictAdapterNames(t *testing.T) {
+	e := testEngine(t, scriptedAdapter{name: "a", verdict: adapter.Verdict{Pass: true}}, scriptedAdapter{name: "b", verdict: adapter.Verdict{Pass: false}})
+	res, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "review", Reviewers: []string{"a", "b"}}}, 1)
+	if err != nil {
+		t.Fatalf("ExecuteStep error = %v", err)
+	}
+	if len(res.Verdicts) != 2 || res.Verdicts[0].Adapter != "a" || res.Verdicts[1].Adapter != "b" {
+		t.Fatalf("verdict adapters = %#v, want reviewer names in order", res.Verdicts)
+	}
+}
+
 func TestExecuteProducerStepAppendsTrace(t *testing.T) {
 	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}})
 	id := e.Store.NewRun()

@@ -121,6 +121,7 @@ func (e Engine) executeReview(ctx context.Context, runID runstore.RunID, node No
 		if item.err != nil {
 			return StepResult{}, item.err
 		}
+		item.verdict.Adapter = item.reviewer
 		verdicts[item.i] = item.verdict
 		if err := e.appendTrace(runID, "step.reviewed", node.Step.ID, iteration, map[string]any{"reviewer": item.reviewer, "pass": item.verdict.Pass}); err != nil {
 			return StepResult{}, err
