@@ -15,12 +15,12 @@ ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "scripts" / "validate_agent_plan.py"
 SCHEMA = ROOT / ".ai" / "schemas" / "agent-plan-v1.schema.json"
 TEMPLATE = ROOT / ".ai" / "templates" / "agent-plan-v1.json"
-HUMAN_PLAN_ROOT = ROOT / "docs" / "plans" / "human"
+ROADMAP_PLAN_ROOT = ROOT / "docs" / "plans" / "agentkit-implementation-roadmap"
 MACHINE_PLAN_ROOT = ROOT / ".ai" / "plans"
 AGENTKIT_PLAN = MACHINE_PLAN_ROOT / "agentkit-implementation-roadmap.plan.json"
 AGENTKIT_HUMAN_PLAN = ROOT / "docs" / "plans" / "agentkit-implementation-roadmap.md"
 
-EXPECTED_HUMAN_PLAN_FILES = [
+EXPECTED_ROADMAP_PLAN_FILES = [
     "00-overview.md",
     "_conventions.md",
     "ws-00-bootstrap/tasks.md",
@@ -110,7 +110,7 @@ VALID_PLAN = {
     ],
     "correction_log": [
         {
-            "source": "docs/plans/human/00-overview.md",
+            "source": "docs/plans/agentkit-implementation-roadmap/00-overview.md",
             "gap": "human-only roadmap",
             "correction": "added machine-readable DAG contract",
         }
@@ -230,19 +230,19 @@ def test_planning_skills_and_docs_are_registered() -> None:
         raise AssertionError("README Docs TOC missing Agent planning link")
 
 
-def test_human_roadmap_files_moved_under_human_root() -> None:
-    for rel in EXPECTED_HUMAN_PLAN_FILES:
-        moved = HUMAN_PLAN_ROOT / rel
+def test_roadmap_files_moved_under_named_root() -> None:
+    for rel in EXPECTED_ROADMAP_PLAN_FILES:
+        moved = ROADMAP_PLAN_ROOT / rel
         if not moved.is_file():
-            raise AssertionError(f"moved human plan file missing: {moved.relative_to(ROOT)}")
+            raise AssertionError(f"moved roadmap file missing: {moved.relative_to(ROOT)}")
         old = ROOT / "docs" / "plans" / rel
         if old.exists():
-            raise AssertionError(f"human roadmap file still exists at old path: {old.relative_to(ROOT)}")
+            raise AssertionError(f"roadmap file still exists at old path: {old.relative_to(ROOT)}")
 
 
 def test_readme_docs_toc_points_to_moved_roadmap() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    expected = "[Workstream roadmap](docs/plans/human/00-overview.md)"
+    expected = "[Workstream roadmap](docs/plans/agentkit-implementation-roadmap/00-overview.md)"
     stale = "[Workstream roadmap](docs/plans/00-overview.md)"
     if expected not in readme:
         raise AssertionError("README Docs TOC missing moved workstream roadmap link")
@@ -257,7 +257,7 @@ def test_planning_markdown_links_resolve() -> None:
         ROOT / "docs" / "agent-planning.md",
         AGENTKIT_HUMAN_PLAN,
     ]
-    docs.extend(sorted((ROOT / "docs" / "plans" / "human").rglob("*.md")))
+    docs.extend(sorted(ROADMAP_PLAN_ROOT.rglob("*.md")))
 
     for path in docs:
         if not path.is_file():
@@ -341,7 +341,7 @@ def main() -> int:
     test_missing_correction_log_rejected()
     test_plan_contract_files_exist()
     test_planning_skills_and_docs_are_registered()
-    test_human_roadmap_files_moved_under_human_root()
+    test_roadmap_files_moved_under_named_root()
     test_readme_docs_toc_points_to_moved_roadmap()
     test_planning_markdown_links_resolve()
     test_committed_machine_plan_artifacts_are_real_and_validated()

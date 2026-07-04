@@ -6,7 +6,7 @@
   "scope": {
     "in": [
       "Mivia AgentKit implementation roadmap",
-      "docs/plans/human/**",
+      "docs/plans/agentkit-implementation-roadmap/**",
       "cmd/mivia-agent/**",
       "internal/**",
       "templates/**",
@@ -37,22 +37,22 @@
       ".ai/plans/agentkit-implementation-roadmap.plan.json",
       "docs/agent-planning.md",
       "docs/plans/agentkit-implementation-roadmap.md",
-      "docs/plans/human/00-overview.md",
-      "docs/plans/human/_conventions.md",
-      "docs/plans/human/ws-00-bootstrap/tasks.md",
-      "docs/plans/human/ws-01-manifest-git-pathpolicy/tasks.md",
-      "docs/plans/human/ws-02-templates-init/tasks.md",
-      "docs/plans/human/ws-03-doctor-audit/tasks.md",
-      "docs/plans/human/ws-04-preflight-stamp/tasks.md",
-      "docs/plans/human/ws-05-hooks/tasks.md",
-      "docs/plans/human/ws-06-adapter-templates/tasks.md",
-      "docs/plans/human/ws-07-import-update/tasks.md",
-      "docs/plans/human/ws-08-ci-release-docs/tasks.md",
-      "docs/plans/human/ws-09-adapters/tasks.md",
-      "docs/plans/human/ws-10-orchestrator/tasks.md",
-      "docs/plans/human/ws-11-consensus/tasks.md",
-      "docs/plans/human/ws-12-governance/tasks.md",
-      "docs/plans/human/ws-13-run-review-adapters/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/00-overview.md",
+      "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-00-bootstrap/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-01-manifest-git-pathpolicy/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-02-templates-init/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-03-doctor-audit/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-04-preflight-stamp/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-05-hooks/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-06-adapter-templates/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-07-import-update/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-08-ci-release-docs/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-09-adapters/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-10-orchestrator/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-11-consensus/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-12-governance/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-13-run-review-adapters/tasks.md",
       "docs/prd/0001-mivia-agentkit.md",
       "docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md",
       "scripts/validate_agent_plan.py",
@@ -101,82 +101,82 @@
       "checked_at": "2026-07-04"
     },
     {
-      "path": "docs/plans/human/00-overview.md",
-      "reason": "human workstream dependency graph and phase order",
+      "path": "docs/plans/agentkit-implementation-roadmap/00-overview.md",
+      "reason": "AgentKit workstream dependency graph and phase order",
       "checked_at": "2026-07-04"
     },
     {
-      "path": "docs/plans/human/_conventions.md",
+      "path": "docs/plans/agentkit-implementation-roadmap/_conventions.md",
       "reason": "task, verifier, and mutation-proof format",
       "checked_at": "2026-07-04"
     },
     {
-      "path": "docs/plans/human/ws-00-bootstrap/tasks.md",
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-00-bootstrap/tasks.md",
       "reason": "WS0 implementation tasks and verification",
       "checked_at": "2026-07-04"
     },
     {
-      "path": "docs/plans/human/ws-01-manifest-git-pathpolicy/tasks.md",
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-01-manifest-git-pathpolicy/tasks.md",
       "reason": "WS1 implementation tasks and verification",
       "checked_at": "2026-07-04"
     },
     {
-      "path": "docs/plans/human/ws-02-templates-init/tasks.md",
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-02-templates-init/tasks.md",
       "reason": "WS2 implementation tasks and verification",
       "checked_at": "2026-07-04"
     },
     {
-      "path": "docs/plans/human/ws-03-doctor-audit/tasks.md",
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-03-doctor-audit/tasks.md",
       "reason": "WS3 implementation tasks and verification",
       "checked_at": "2026-07-04"
     },
     {
-      "path": "docs/plans/human/ws-04-preflight-stamp/tasks.md",
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-04-preflight-stamp/tasks.md",
       "reason": "WS4 implementation tasks and verification",
       "checked_at": "2026-07-04"
     },
     {
-      "path": "docs/plans/human/ws-05-hooks/tasks.md",
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-05-hooks/tasks.md",
       "reason": "WS5 implementation tasks and verification",
       "checked_at": "2026-07-04"
     },
     {
-      "path": "docs/plans/human/ws-06-adapter-templates/tasks.md",
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-06-adapter-templates/tasks.md",
       "reason": "WS6 implementation tasks and verification",
       "checked_at": "2026-07-04"
     },
     {
-      "path": "docs/plans/human/ws-07-import-update/tasks.md",
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-07-import-update/tasks.md",
       "reason": "WS7 implementation tasks and verification",
       "checked_at": "2026-07-04"
     },
     {
-      "path": "docs/plans/human/ws-08-ci-release-docs/tasks.md",
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-08-ci-release-docs/tasks.md",
       "reason": "WS8 implementation tasks and verification",
       "checked_at": "2026-07-04"
     },
     {
-      "path": "docs/plans/human/ws-09-adapters/tasks.md",
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-09-adapters/tasks.md",
       "reason": "WS9 implementation tasks and verification",
       "checked_at": "2026-07-04"
     },
     {
-      "path": "docs/plans/human/ws-10-orchestrator/tasks.md",
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-10-orchestrator/tasks.md",
       "reason": "WS10 implementation tasks and verification",
       "checked_at": "2026-07-04"
     },
     {
-      "path": "docs/plans/human/ws-11-consensus/tasks.md",
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-11-consensus/tasks.md",
       "reason": "WS11 implementation tasks and verification",
       "checked_at": "2026-07-04"
     },
     {
-      "path": "docs/plans/human/ws-12-governance/tasks.md",
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-12-governance/tasks.md",
       "reason": "WS12 implementation tasks and verification",
       "checked_at": "2026-07-04"
     },
     {
-      "path": "docs/plans/human/ws-13-run-review-adapters/tasks.md",
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-13-run-review-adapters/tasks.md",
       "reason": "WS13 implementation tasks and verification",
       "checked_at": "2026-07-04"
     },
@@ -243,8 +243,8 @@
         "depends_on": [],
         "files_read": [
           "AGENTS.md",
-          "docs/plans/human/_conventions.md",
-          "docs/plans/human/ws-00-bootstrap/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-00-bootstrap/tasks.md",
           "docs/prd/0001-mivia-agentkit.md"
         ],
         "files_edit": [
@@ -259,8 +259,8 @@
           "templates/README.md",
           "templates/**",
           ".github/workflows/ci.yml",
-          "docs/plans/human/ws-00-bootstrap/tasks.md",
-          "docs/plans/human/00-overview.md"
+          "docs/plans/agentkit-implementation-roadmap/ws-00-bootstrap/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
         ],
         "allowed_mcp_tools": [
           "none"
@@ -299,8 +299,8 @@
           "ws-00-bootstrap"
         ],
         "files_read": [
-          "docs/plans/human/_conventions.md",
-          "docs/plans/human/ws-01-manifest-git-pathpolicy/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-01-manifest-git-pathpolicy/tasks.md",
           "docs/prd/0001-mivia-agentkit.md"
         ],
         "files_edit": [
@@ -316,8 +316,8 @@
           "internal/pathpolicy/pathpolicy_test.go",
           "internal/globalconfig/globalconfig.go",
           "internal/globalconfig/globalconfig_test.go",
-          "docs/plans/human/ws-01-manifest-git-pathpolicy/tasks.md",
-          "docs/plans/human/00-overview.md"
+          "docs/plans/agentkit-implementation-roadmap/ws-01-manifest-git-pathpolicy/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
         ],
         "allowed_mcp_tools": [
           "none"
@@ -353,8 +353,8 @@
           "ws-01-manifest-git-pathpolicy"
         ],
         "files_read": [
-          "docs/plans/human/_conventions.md",
-          "docs/plans/human/ws-02-templates-init/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-02-templates-init/tasks.md",
           "docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md"
         ],
         "files_edit": [
@@ -373,8 +373,8 @@
           "internal/render/init_integration_test.go",
           "internal/render/managedblock.go",
           "internal/render/managedblock_test.go",
-          "docs/plans/human/ws-02-templates-init/tasks.md",
-          "docs/plans/human/00-overview.md"
+          "docs/plans/agentkit-implementation-roadmap/ws-02-templates-init/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
         ],
         "allowed_mcp_tools": [
           "none"
@@ -410,8 +410,8 @@
           "ws-02-templates-init"
         ],
         "files_read": [
-          "docs/plans/human/_conventions.md",
-          "docs/plans/human/ws-03-doctor-audit/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-03-doctor-audit/tasks.md",
           "docs/prd/0001-mivia-agentkit.md"
         ],
         "files_edit": [
@@ -425,8 +425,8 @@
           "internal/audit/audit_test.go",
           "internal/cli/doctor.go",
           "internal/cli/audit.go",
-          "docs/plans/human/ws-03-doctor-audit/tasks.md",
-          "docs/plans/human/00-overview.md"
+          "docs/plans/agentkit-implementation-roadmap/ws-03-doctor-audit/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
         ],
         "allowed_mcp_tools": [
           "none"
@@ -463,8 +463,8 @@
           "ws-01-manifest-git-pathpolicy"
         ],
         "files_read": [
-          "docs/plans/human/_conventions.md",
-          "docs/plans/human/ws-04-preflight-stamp/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-04-preflight-stamp/tasks.md",
           "docs/prd/0001-mivia-agentkit.md"
         ],
         "files_edit": [
@@ -476,8 +476,8 @@
           "internal/cli/preflight.go",
           "internal/preflight/check.go",
           "internal/preflight/check_test.go",
-          "docs/plans/human/ws-04-preflight-stamp/tasks.md",
-          "docs/plans/human/00-overview.md"
+          "docs/plans/agentkit-implementation-roadmap/ws-04-preflight-stamp/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
         ],
         "allowed_mcp_tools": [
           "none"
@@ -510,8 +510,8 @@
           "ws-01-manifest-git-pathpolicy"
         ],
         "files_read": [
-          "docs/plans/human/_conventions.md",
-          "docs/plans/human/ws-09-adapters/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-09-adapters/tasks.md",
           "docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md"
         ],
         "files_edit": [
@@ -526,8 +526,8 @@
           "internal/adapter/codex_test.go",
           "internal/adapter/claude.go",
           "internal/adapter/claude_test.go",
-          "docs/plans/human/ws-09-adapters/tasks.md",
-          "docs/plans/human/00-overview.md"
+          "docs/plans/agentkit-implementation-roadmap/ws-09-adapters/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
         ],
         "allowed_mcp_tools": [
           "none"
@@ -559,8 +559,8 @@
           "ws-01-manifest-git-pathpolicy"
         ],
         "files_read": [
-          "docs/plans/human/_conventions.md",
-          "docs/plans/human/ws-12-governance/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-12-governance/tasks.md",
           "docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md"
         ],
         "files_edit": [
@@ -575,8 +575,8 @@
           "internal/policy/factory.go",
           "internal/policy/factory_test.go",
           "internal/doctor/checks_governance.go",
-          "docs/plans/human/ws-12-governance/tasks.md",
-          "docs/plans/human/00-overview.md"
+          "docs/plans/agentkit-implementation-roadmap/ws-12-governance/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
         ],
         "allowed_mcp_tools": [
           "none"
@@ -609,8 +609,8 @@
           "ws-09-adapters"
         ],
         "files_read": [
-          "docs/plans/human/_conventions.md",
-          "docs/plans/human/ws-10-orchestrator/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-10-orchestrator/tasks.md",
           "docs/prd/0001-mivia-agentkit.md"
         ],
         "files_edit": [
@@ -623,8 +623,8 @@
           "internal/orchestrator/loop.go",
           "internal/orchestrator/loop_test.go",
           "internal/orchestrator/leakcheck.go",
-          "docs/plans/human/ws-10-orchestrator/tasks.md",
-          "docs/plans/human/00-overview.md"
+          "docs/plans/agentkit-implementation-roadmap/ws-10-orchestrator/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
         ],
         "allowed_mcp_tools": [
           "none"
@@ -658,8 +658,8 @@
           "ws-09-adapters"
         ],
         "files_read": [
-          "docs/plans/human/_conventions.md",
-          "docs/plans/human/ws-11-consensus/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-11-consensus/tasks.md",
           "docs/prd/0001-mivia-agentkit.md"
         ],
         "files_edit": [
@@ -669,8 +669,8 @@
           "internal/consensus/evaluate_test.go",
           "internal/consensus/profile.go",
           "internal/consensus/profile_test.go",
-          "docs/plans/human/ws-11-consensus/tasks.md",
-          "docs/plans/human/00-overview.md"
+          "docs/plans/agentkit-implementation-roadmap/ws-11-consensus/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
         ],
         "allowed_mcp_tools": [
           "none"
@@ -703,8 +703,8 @@
           "ws-12-governance"
         ],
         "files_read": [
-          "docs/plans/human/_conventions.md",
-          "docs/plans/human/ws-13-run-review-adapters/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-13-run-review-adapters/tasks.md",
           "docs/prd/0001-mivia-agentkit.md"
         ],
         "files_edit": [
@@ -716,8 +716,8 @@
           "internal/cli/run_test.go",
           "internal/cli/review.go",
           "internal/cli/review_test.go",
-          "docs/plans/human/ws-13-run-review-adapters/tasks.md",
-          "docs/plans/human/00-overview.md"
+          "docs/plans/agentkit-implementation-roadmap/ws-13-run-review-adapters/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
         ],
         "allowed_mcp_tools": [
           "none"
@@ -755,8 +755,8 @@
           "ws-12-governance"
         ],
         "files_read": [
-          "docs/plans/human/_conventions.md",
-          "docs/plans/human/ws-05-hooks/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-05-hooks/tasks.md",
           "docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md"
         ],
         "files_edit": [
@@ -769,8 +769,8 @@
           "internal/hooks/testdata/**",
           "internal/cli/hook.go",
           "internal/cli/hook_test.go",
-          "docs/plans/human/ws-05-hooks/tasks.md",
-          "docs/plans/human/00-overview.md"
+          "docs/plans/agentkit-implementation-roadmap/ws-05-hooks/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
         ],
         "allowed_mcp_tools": [
           "none"
@@ -803,8 +803,8 @@
           "ws-09-adapters"
         ],
         "files_read": [
-          "docs/plans/human/_conventions.md",
-          "docs/plans/human/ws-06-adapter-templates/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-06-adapter-templates/tasks.md",
           "docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md"
         ],
         "files_edit": [
@@ -818,8 +818,8 @@
           "internal/audit/audit_test.go",
           "internal/templates/templates.go",
           "internal/templates/templates_test.go",
-          "docs/plans/human/ws-06-adapter-templates/tasks.md",
-          "docs/plans/human/00-overview.md"
+          "docs/plans/agentkit-implementation-roadmap/ws-06-adapter-templates/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
         ],
         "allowed_mcp_tools": [
           "none"
@@ -857,8 +857,8 @@
           "ws-03-doctor-audit"
         ],
         "files_read": [
-          "docs/plans/human/_conventions.md",
-          "docs/plans/human/ws-07-import-update/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-07-import-update/tasks.md",
           "docs/prd/0001-mivia-agentkit.md"
         ],
         "files_edit": [
@@ -870,8 +870,8 @@
           "internal/update/update.go",
           "internal/update/update_test.go",
           "internal/cli/update.go",
-          "docs/plans/human/ws-07-import-update/tasks.md",
-          "docs/plans/human/00-overview.md"
+          "docs/plans/agentkit-implementation-roadmap/ws-07-import-update/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
         ],
         "allowed_mcp_tools": [
           "none"
@@ -919,8 +919,8 @@
           "ws-13-run-review-adapters"
         ],
         "files_read": [
-          "docs/plans/human/_conventions.md",
-          "docs/plans/human/ws-08-ci-release-docs/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-08-ci-release-docs/tasks.md",
           "docs/prd/0001-mivia-agentkit.md"
         ],
         "files_edit": [
@@ -933,8 +933,8 @@
           "docs/loop-authoring.md",
           "docs/template-authoring.md",
           "docs/adr/0001-product-boundary.md",
-          "docs/plans/human/ws-08-ci-release-docs/tasks.md",
-          "docs/plans/human/00-overview.md"
+          "docs/plans/agentkit-implementation-roadmap/ws-08-ci-release-docs/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
         ],
         "allowed_mcp_tools": [
           "none"
@@ -978,29 +978,29 @@
   ],
   "correction_log": [
     {
-      "source": "docs/plans/human/00-overview.md",
-      "gap": "human roadmap lived at the same root as future machine-oriented planner reports",
-      "correction": "moved the existing human roadmap to docs/plans/human and updated canonical references"
+      "source": "docs/plans/agentkit-implementation-roadmap/00-overview.md",
+      "gap": "roadmap files lived at the same root as future machine-oriented planner reports",
+      "correction": "moved the existing roadmap files to docs/plans/agentkit-implementation-roadmap and updated canonical references"
     },
     {
-      "source": "docs/plans/human/ws-00-bootstrap/tasks.md",
+      "source": "docs/plans/agentkit-implementation-roadmap/ws-00-bootstrap/tasks.md",
       "gap": "WS0 duplicated the CI task under Verification and used invalid go vet -count syntax",
       "correction": "removed duplicate prose and changed the verifier to go vet ./..."
     },
     {
       "source": "docs/agent-planning.md",
       "gap": "planning docs described all human plans as docs/plans/*.md and did not name the AgentKit roadmap artifact",
-      "correction": "split human roadmap, human planner report, and machine plan locations and named the AgentKit artifact"
+      "correction": "split roadmap directory, planner report, and machine plan locations and named the AgentKit artifact"
     },
     {
       "source": "scripts/test_agent_plan_contracts.py",
       "gap": "contract tests did not fail on missing moved roadmap files, stale README roadmap links, broken planning links, placeholder plan artifacts, or invalid AgentKit plan references",
-      "correction": "added tests for moved human roadmap files, README TOC, planning markdown links, real validated .ai/plans artifacts, and the named AgentKit plan"
+      "correction": "added tests for moved roadmap files, README TOC, planning markdown links, real validated .ai/plans artifacts, and the named AgentKit plan"
     },
     {
       "source": "semgrep/agent-standards.yml",
       "gap": "Markdown-only agent-plan drift was only checked at docs/plans root",
-      "correction": "extended the Semgrep include path and fixture to cover nested docs/plans/human agent-plan files"
+      "correction": "extended the Semgrep include path and fixture to cover nested docs/plans/agentkit-implementation-roadmap agent-plan files"
     }
   ],
   "stop_conditions": [

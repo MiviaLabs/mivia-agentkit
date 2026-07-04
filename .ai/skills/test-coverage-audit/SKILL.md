@@ -15,7 +15,7 @@ triggers:
 - `AGENTS.md`
 - `.ai/rules/20-agent-quality.md`
 - `.ai/rules/30-go-standards.md`
-- `docs/plans/human/_conventions.md`
+- `docs/plans/agentkit-implementation-roadmap/_conventions.md`
 - Relevant workstream task files
 
 ## Method

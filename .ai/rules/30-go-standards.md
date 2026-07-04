@@ -3,7 +3,7 @@
 ## Layout
 
 - Keep command entrypoints under `cmd/mivia-agent/`.
-- Keep reusable implementation under `internal/` according to `docs/plans/human/_conventions.md`.
+- Keep reusable implementation under `internal/` according to `docs/plans/agentkit-implementation-roadmap/_conventions.md`.
 - Do not create public packages until a task requires an external API.
 
 ## Errors
@@ -21,7 +21,7 @@
 
 ## Comments And Headers
 
-- Every `.go` file starts with the package doc header required by `docs/plans/human/_conventions.md`.
+- Every `.go` file starts with the package doc header required by `docs/plans/agentkit-implementation-roadmap/_conventions.md`.
 - Every exported identifier has a doc comment that starts with the identifier name.
 - Comments explain contracts, edge cases, and invariants; they do not narrate obvious assignments.
 

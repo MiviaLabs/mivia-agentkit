@@ -54,7 +54,7 @@ Create:
 - `.gitignore` — Go defaults: `/dist/`, `/bin/`, `*.test`, `coverage.out`, `.ai/runs/` (run artifacts never committed).
 
 Spec:
-- README links to PRD and to `docs/plans/human/00-overview.md`.
+- README links to PRD and to `docs/plans/agentkit-implementation-roadmap/00-overview.md`.
 - `.gitignore` excludes generated run artifacts.
 
 Dependencies: none.

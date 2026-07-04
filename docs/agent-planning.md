@@ -2,7 +2,7 @@
 
 Agent planning uses two artifacts:
 
-- Human roadmap: `docs/plans/human/**/*.md`
+- AgentKit implementation roadmap: `docs/plans/agentkit-implementation-roadmap/**/*.md`
 - Human implementation plan: `docs/plans/*.md`
 - Machine plan: `.ai/plans/*.plan.json`
 
@@ -13,7 +13,7 @@ The human plan explains intent and tradeoffs. The machine plan is the execution 
 `agent-dag-planner` creates or updates plans. It must:
 
 - re-read current source, hooks, skills, rules, tests, and relevant docs
-- re-verify existing `docs/plans/human/**/*.md`
+- re-verify existing `docs/plans/agentkit-implementation-roadmap/**/*.md`
 - fill or correct stale, vague, missing, or conflicting plan gaps
 - emit `mivia-agent-plan/v1` under `.ai/plans/`
 - validate the plan with `scripts/validate_agent_plan.py`

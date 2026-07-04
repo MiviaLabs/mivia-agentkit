@@ -20,13 +20,13 @@ triggers:
 - `.ai/templates/agent-report-v1.md`
 - `.ai/templates/agent-plan-v1.json`
 - `.ai/schemas/agent-plan-v1.schema.json`
-- `docs/plans/human/_conventions.md`
-- Existing roadmap files under `docs/plans/human/`
+- `docs/plans/agentkit-implementation-roadmap/_conventions.md`
+- Existing roadmap files under `docs/plans/agentkit-implementation-roadmap/`
 
 ## Method
 
 1. Define exact scope and exclusions before writing a plan.
-2. Re-read current source, tests, hooks, skills, rules, policies, docs, and existing `docs/plans/human/**/*.md` relevant to the requested scope.
+2. Re-read current source, tests, hooks, skills, rules, policies, docs, and existing `docs/plans/agentkit-implementation-roadmap/**/*.md` relevant to the requested scope.
 3. Re-verify current external behavior from official docs when agent surfaces, Codex, Claude, MCP, GitHub, Semgrep, Go, or other tool behavior affects the plan.
 4. Identify stale, vague, missing, or conflicting plan content.
 5. Correct those gaps in the new plan artifact; do not merely list them.
