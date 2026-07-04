@@ -27,12 +27,16 @@ NextAction: none|<exact task>
 
 ## Field Rules
 
-- `Result: PASS` only when all required checks ran and no blocking gaps remain.
-- `Result: BLOCK` when any correctness, security, coverage, or verification gap must be fixed before merge or handoff.
+- Severity never gates approval; every open gap must be fixed.
+- `PASS` requires zero gap rows and `ResidualRisk: none`.
+- Gap statuses are `open`, `missing`, `shallow`, and `gated`.
+- Low-severity gaps still require `BLOCK` or `PARTIAL` until fixed.
+- `Result: PASS` only when all required checks ran, no finding row has a gap status, and no residual risk remains.
+- `Result: BLOCK` when any correctness, security, coverage, or verification gap can be fixed before merge or handoff.
 - `Result: PARTIAL` when useful work completed but a named blocker, gated dependency, or user decision remains.
 - `Result: NOT_RUN` only for a pure planning response or when verification could not start.
 - `Severity` values are `critical`, `high`, `medium`, `low`, `info`, or `none`.
-- `Status` values are `open`, `fixed`, `closed`, `missing`, `shallow`, `gated`, `justified`, or `none`.
+- `Status` values are `open`, `fixed`, `closed`, `missing`, `shallow`, `gated`, or `none`.
 - `File:Line` must be an exact repo path with line number when possible, or `none`.
 - `Required Test` must name the exact test file and test name for open gaps, or `none`.
 - `Mutation` must name the guard or branch that should fail when changed, or `none`.

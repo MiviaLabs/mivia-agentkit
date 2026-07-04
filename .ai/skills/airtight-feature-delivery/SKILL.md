@@ -41,6 +41,8 @@ Result semantics:
 - `PARTIAL` means a useful slice landed but a named dependency, user decision, or gated proof remains.
 - `NOT_RUN` means the response is only a plan or implementation could not start.
 
+Severity never gates approval; every open gap must be fixed. Low-severity gaps still require `BLOCK` or `PARTIAL` until fixed.
+
 ```md
 ReportFormat: mivia-agent-report/v1
 Skill: airtight-feature-delivery

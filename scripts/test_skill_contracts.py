@@ -29,6 +29,13 @@ REQUIRED_TEMPLATE_NEEDLES = [
     "ResidualRisk: none|<short exact risk>",
     "NextAction: none|<exact task>",
 ]
+GAP_POLICY_NEEDLES = [
+    "Severity never gates approval; every open gap must be fixed.",
+    "`PASS` requires zero gap rows and `ResidualRisk: none`.",
+    "Gap statuses are `open`, `missing`, `shallow`, and `gated`.",
+    "Low-severity gaps still require `BLOCK` or `PARTIAL` until fixed.",
+    "`Status` values are `open`, `fixed`, `closed`, `missing`, `shallow`, `gated`, or `none`.",
+]
 
 
 def read(path: Path) -> str:
@@ -50,6 +57,9 @@ def test_report_template_has_required_contract() -> None:
         fail("report template does not define the strict result enum")
     if "Keep every cell to one short sentence or `none`." not in content:
         fail("report template does not require terse parseable cells")
+    for needle in GAP_POLICY_NEEDLES:
+        if needle not in content:
+            fail(f"report template missing gap-fix policy: {needle}")
 
 
 def test_canonical_skills_require_report_v1_template() -> None:
@@ -65,6 +75,7 @@ def test_canonical_skills_require_report_v1_template() -> None:
             f"Result: {RESULT_ENUM}",
             FINDINGS_HEADER,
             COMMAND_HEADER,
+            "Severity never gates approval; every open gap must be fixed.",
             "ResidualRisk:",
             "NextAction:",
         ]:

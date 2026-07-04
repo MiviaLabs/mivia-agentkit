@@ -126,6 +126,18 @@ rules:
         - /.claude/skills/**/SKILL.md
     pattern-regex: '^## Output\s*$'
 
+  - id: mivia.generic.no-severity-gated-skill-approval
+    languages:
+      - generic
+    severity: ERROR
+    message: Skill reports must fix all gaps; do not approve based on severity thresholds or justified exceptions.
+    paths:
+      include:
+        - /.ai/templates/**
+        - /.ai/skills/**/SKILL.md
+        - /.claude/skills/**/SKILL.md
+    pattern-regex: '(?i)(critical behavior|justified exception|no high severity|high severity issues?)'
+
   - id: mivia.go.no-panic-in-internal
     languages:
       - go

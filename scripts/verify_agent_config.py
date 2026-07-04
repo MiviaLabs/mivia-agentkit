@@ -179,6 +179,11 @@ def verify_skill_report_contract() -> None:
         "NextAction: none|<exact task>",
         "Result enum is exactly `PASS`, `BLOCK`, `PARTIAL`, or `NOT_RUN`.",
         "Keep every cell to one short sentence or `none`.",
+        "Severity never gates approval; every open gap must be fixed.",
+        "`PASS` requires zero gap rows and `ResidualRisk: none`.",
+        "Gap statuses are `open`, `missing`, `shallow`, and `gated`.",
+        "Low-severity gaps still require `BLOCK` or `PARTIAL` until fixed.",
+        "`Status` values are `open`, `fixed`, `closed`, `missing`, `shallow`, `gated`, or `none`.",
     ]:
         require(needle in template, f"{template_path}: missing {needle}")
 
@@ -191,6 +196,7 @@ def verify_skill_report_contract() -> None:
             f"Result: {result_enum}",
             findings_header,
             command_header,
+            "Severity never gates approval; every open gap must be fixed.",
             "ResidualRisk:",
             "NextAction:",
         ]:
@@ -588,6 +594,7 @@ def verify_git_hooks() -> None:
         "mivia.generic.commit-policy-no-optional-scope-wording",
         "mivia.generic.no-git-hook-bypass-in-agent-config",
         "mivia.generic.no-skill-freeform-output-heading",
+        "mivia.generic.no-severity-gated-skill-approval",
         "mivia.go.no-panic-in-internal",
         "mivia.go.no-fatal-exit-in-internal",
         "mivia.go.no-shell-exec",
@@ -609,6 +616,7 @@ def verify_git_hooks() -> None:
         "mivia.generic.commit-policy-no-optional-scope-wording",
         "mivia.generic.no-git-hook-bypass-in-agent-config",
         "mivia.generic.no-skill-freeform-output-heading",
+        "mivia.generic.no-severity-gated-skill-approval",
         "mivia.go.no-shell-exec",
         "mivia.go.tests-no-time-sleep",
     ]:

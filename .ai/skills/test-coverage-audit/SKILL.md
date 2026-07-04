@@ -32,10 +32,12 @@ Always use `mivia-agent-report/v1` from `.ai/templates/agent-report-v1.md`. Keep
 
 Result semantics:
 
-- `PASS` means every critical behavior has a named real test, verifier, and mutation target or justified exception.
-- `BLOCK` means any critical behavior is missing, shallow, unverified, or falsely mocked.
+- `PASS` means every behavior has a named real test, verifier, and mutation target with no gap rows remaining.
+- `BLOCK` means any behavior is missing, shallow, unverified, or falsely mocked.
 - `PARTIAL` means the coverage map is useful but gated proof or source access is incomplete.
 - `NOT_RUN` means the response is only a plan or coverage mapping could not start.
+
+Severity never gates approval; every open gap must be fixed. Low-severity gaps still require `BLOCK` or `PARTIAL` until fixed.
 
 ```md
 ReportFormat: mivia-agent-report/v1

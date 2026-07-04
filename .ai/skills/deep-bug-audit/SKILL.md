@@ -38,6 +38,8 @@ Result semantics:
 - `PARTIAL` means the audit found useful evidence but scope, tooling, or gated runtime proof is incomplete.
 - `NOT_RUN` means the response is only a plan or the audit could not start.
 
+Severity never gates approval; every open gap must be fixed. Low-severity gaps still require `BLOCK` or `PARTIAL` until fixed.
+
 ```md
 ReportFormat: mivia-agent-report/v1
 Skill: deep-bug-audit

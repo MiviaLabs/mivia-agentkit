@@ -23,6 +23,7 @@ EXPECTED_RULES = {
     "mivia.generic.commit-policy-no-optional-scope-wording",
     "mivia.generic.no-git-hook-bypass-in-agent-config",
     "mivia.generic.no-skill-freeform-output-heading",
+    "mivia.generic.no-severity-gated-skill-approval",
     "mivia.go.no-panic-in-internal",
     "mivia.go.no-fatal-exit-in-internal",
     "mivia.go.no-shell-exec",
@@ -126,6 +127,15 @@ def create_bad_fixture(root: Path) -> None:
         ## Output
 
         Free-form report text.
+        """,
+    )
+    write(
+        root / ".ai" / "templates" / "bad-report.md",
+        """
+        # Bad Report
+
+        Approve when there are no high severity issues.
+        Allow a justified exception for remaining gaps.
         """,
     )
     write(
