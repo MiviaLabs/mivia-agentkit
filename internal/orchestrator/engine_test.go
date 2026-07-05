@@ -43,6 +43,25 @@ func TestExecuteProducerStepUsesIterationArtifactPath(t *testing.T) {
 	}
 }
 
+func TestExecuteProducerStepPassesArtifactOutAndStoresAdapterFile(t *testing.T) {
+	producer := &artifactOutAdapter{name: "codex", stdout: []byte(`{"type":"event"}`), fileContent: []byte("final artifact")}
+	e := testEngine(t, producer)
+	res, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "produce", Producer: "codex", Artifact: "out.md"}}, 1)
+	if err != nil {
+		t.Fatalf("ExecuteStep error = %v", err)
+	}
+	if !strings.Contains(producer.artifactOut, filepath.Join(".ai", "runs")) || !strings.Contains(producer.artifactOut, filepath.Join("produce", "iter-001", "out.md")) {
+		t.Fatalf("ArtifactOut = %q, want concrete run artifact path", producer.artifactOut)
+	}
+	got, err := os.ReadFile(res.Artifact)
+	if err != nil {
+		t.Fatalf("read artifact: %v", err)
+	}
+	if string(got) != "final artifact" {
+		t.Fatalf("artifact = %q, want adapter-written final artifact", got)
+	}
+}
+
 func TestExecuteReviewStepFansOutConcurrently(t *testing.T) {
 	e := testEngine(t, scriptedAdapter{name: "a", delay: 200 * time.Millisecond, verdict: adapter.Verdict{Pass: true}}, scriptedAdapter{name: "b", delay: 200 * time.Millisecond, verdict: adapter.Verdict{Pass: true}})
 	start := time.Now()
@@ -268,6 +287,29 @@ func (s scriptedAdapter) Review(ctx context.Context, req adapter.Request) (adapt
 		return adapter.Verdict{}, err
 	}
 	return s.verdict, nil
+}
+
+type artifactOutAdapter struct {
+	name        string
+	stdout      []byte
+	fileContent []byte
+	artifactOut string
+}
+
+func (a *artifactOutAdapter) Name() string       { return a.name }
+func (a *artifactOutAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (a *artifactOutAdapter) Detect(context.Context) (adapter.Detection, error) {
+	return adapter.Detection{Name: a.name, HeadlessCapable: true}, nil
+}
+func (a *artifactOutAdapter) Run(_ context.Context, req adapter.Request) (adapter.Result, error) {
+	a.artifactOut = req.ArtifactOut
+	if err := os.WriteFile(req.ArtifactOut, a.fileContent, 0o644); err != nil {
+		return adapter.Result{}, err
+	}
+	return adapter.Result{Stdout: a.stdout}, nil
+}
+func (a *artifactOutAdapter) Review(context.Context, adapter.Request) (adapter.Verdict, error) {
+	return adapter.Verdict{}, nil
 }
 
 type promptRecorderAdapter struct {

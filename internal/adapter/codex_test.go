@@ -84,6 +84,18 @@ func TestCodexRunPassesModelFlag(t *testing.T) {
 	}
 }
 
+func TestCodexRunPassesArtifactOutFlag(t *testing.T) {
+	r := codexRunner([]byte("{}"), nil)
+	_, err := (Codex{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: "never", ArtifactOut: "/tmp/out.md"})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	args := strings.Join(r.Calls[0].Args, " ")
+	if !strings.Contains(args, "--output-last-message /tmp/out.md") {
+		t.Fatalf("args = %q, want output-last-message artifact path", args)
+	}
+}
+
 func TestCodexRunPassesReasoningEffortOverride(t *testing.T) {
 	r := codexRunner([]byte("{}"), nil)
 	_, err := (Codex{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: "never", Effort: "xhigh"})

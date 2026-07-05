@@ -5,6 +5,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -78,6 +79,11 @@ func (e Engine) executeProducer(ctx context.Context, runID runstore.RunID, node 
 	ctx, cancel := context.WithTimeout(ctx, stepTimeout(node.Step))
 	defer cancel()
 	req := e.requestFor(node.Step.Producer, node.Step, prompt, true)
+	path, err := e.Store.WriteArtifact(runID, node.Step.ID, iteration, artifactName(node.Step), nil)
+	if err != nil {
+		return StepResult{}, err
+	}
+	req.ArtifactOut = path
 	if err := validateAdapterRequest(a, req); err != nil {
 		return StepResult{}, err
 	}
@@ -85,7 +91,11 @@ func (e Engine) executeProducer(ctx context.Context, runID runstore.RunID, node 
 	if err != nil {
 		return StepResult{}, err
 	}
-	path, err := e.Store.WriteArtifact(runID, node.Step.ID, iteration, artifactName(node.Step), result.Stdout)
+	content := result.Stdout
+	if written, readErr := os.ReadFile(path); readErr == nil && len(written) > 0 {
+		content = written
+	}
+	path, err = e.Store.WriteArtifact(runID, node.Step.ID, iteration, artifactName(node.Step), content)
 	if err != nil {
 		return StepResult{}, err
 	}
@@ -245,9 +255,6 @@ func (e Engine) requestFor(adapterName string, step config.Step, prompt string, 
 		Params:   copyParams(defaults.Params),
 		Timeout:  stepTimeout(step),
 		MaxTurns: step.MaxTurns,
-	}
-	if producer {
-		req.ArtifactOut = artifactName(step)
 	}
 	return req
 }
