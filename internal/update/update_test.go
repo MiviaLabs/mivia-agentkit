@@ -98,6 +98,23 @@ func TestUpdateNoOpWhenAlreadyCurrent(t *testing.T) {
 	}
 }
 
+func TestUpdateNoOpKeepsMiviaAgentWorkflowSkillRegistry(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	repo := freshRepo(t)
+	changes, err := Diff(repo)
+	if err != nil {
+		t.Fatalf("Diff() error = %v", err)
+	}
+	if len(changes) != 0 {
+		t.Fatalf("Diff() = %#v, want no changes after init", changes)
+	}
+	got := readFile(t, filepath.Join(repo, ".agents", "skills.json"))
+	if !strings.Contains(got, `"name": "mivia-agent-workflows"`) ||
+		!strings.Contains(got, `"path": ".ai/skills/mivia-agent-workflows/SKILL.md"`) {
+		t.Fatalf("skills.json = %q, want mivia-agent-workflows project entry", got)
+	}
+}
+
 func freshRepo(t *testing.T) string {
 	t.Helper()
 	repo := t.TempDir()

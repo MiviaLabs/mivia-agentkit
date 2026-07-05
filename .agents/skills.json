@@ -56,6 +56,14 @@
       "triggers": ["test coverage audit", "missing tests", "is this fully tested", "coverage gaps"]
     },
     {
+      "name": "mivia-agent-workflows",
+      "agent": "canonical",
+      "source": "project",
+      "path": ".ai/skills/mivia-agent-workflows/SKILL.md",
+      "description": "Workflow execution skill for mivia-agent init/run/review behavior, desktop-agent workflow routing, run artifacts, and adapter-loop verification.",
+      "triggers": ["mivia-agent workflow", "workflow artifacts", "desktop agent workflow", "run-store", "crush research loop"]
+    },
+    {
       "name": "agent-dag-planner",
       "agent": "codex",
       "source": "project",
@@ -70,6 +78,14 @@
       "path": ".agents/skills/agent-plan-implementer/SKILL.md",
       "description": "Codex adapter for implementing validated DAG plans.",
       "triggers": ["implement this plan", "implement the plan", "execute dag plan", "run the plan", "plan implementation"]
+    },
+    {
+      "name": "mivia-agent-workflows",
+      "agent": "codex",
+      "source": "project",
+      "path": ".agents/skills/mivia-agent-workflows/SKILL.md",
+      "description": "Codex adapter for mivia-agent workflow execution and desktop-agent workflow routing.",
+      "triggers": ["mivia-agent workflow", "workflow artifacts", "desktop agent workflow", "run-store", "crush research loop"]
     },
     {
       "name": "agent-dag-planner",
@@ -118,6 +134,14 @@
       "path": ".claude/skills/test-coverage-audit/SKILL.md",
       "description": "Claude Code adapter for coverage gap analysis.",
       "triggers": ["test coverage audit", "missing tests", "coverage gaps"]
+    },
+    {
+      "name": "mivia-agent-workflows",
+      "agent": "claude",
+      "source": "project",
+      "path": ".claude/skills/mivia-agent-workflows/SKILL.md",
+      "description": "Claude Code adapter for mivia-agent workflow execution and desktop-agent workflow routing.",
+      "triggers": ["mivia-agent workflow", "workflow artifacts", "desktop agent workflow", "run-store", "crush research loop"]
     }
   ]
 }

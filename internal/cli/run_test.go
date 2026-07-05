@@ -294,12 +294,16 @@ func (s *sequenceAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: s.name, HeadlessCapable: true}, nil
 }
 func (s *sequenceAdapter) Run(_ context.Context, req adapter.Request) (adapter.Result, error) {
+	fakeAdapterMu.Lock()
+	defer fakeAdapterMu.Unlock()
 	if s.prompts != nil {
 		*s.prompts = append(*s.prompts, req.Prompt)
 	}
 	return s.run, nil
 }
 func (s *sequenceAdapter) Review(_ context.Context, req adapter.Request) (adapter.Verdict, error) {
+	fakeAdapterMu.Lock()
+	defer fakeAdapterMu.Unlock()
 	if s.prompts != nil {
 		*s.prompts = append(*s.prompts, req.Prompt)
 	}

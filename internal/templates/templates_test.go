@@ -64,6 +64,7 @@ func TestListStandardProfileReturnsExpectedFiles(t *testing.T) {
 	}
 	want := []string{
 		".agents/skills.json",
+		".agents/skills/mivia-agent-workflows/SKILL.md",
 		".ai/INDEX.md",
 		".ai/quality/contracts/project-runtime.yaml",
 		".ai/quality/review-policies/default.yaml",
@@ -74,10 +75,12 @@ func TestListStandardProfileReturnsExpectedFiles(t *testing.T) {
 		".ai/skills/adversarial-test-review/SKILL.md",
 		".ai/skills/airtight-feature-delivery/SKILL.md",
 		".ai/skills/deep-bug-audit/SKILL.md",
+		".ai/skills/mivia-agent-workflows/SKILL.md",
 		".ai/skills/test-coverage-audit/SKILL.md",
 		".ai/workflows/bug-audit-loop.yaml",
 		".ai/workflows/research-loop.yaml",
 		".claude/settings.json",
+		".claude/skills/mivia-agent-workflows/SKILL.md",
 		".codex/AGENTS.md",
 		".codex/hooks.json",
 		".github/copilot-instructions.md",
@@ -261,6 +264,54 @@ func TestWorkflowTemplatesUseRoutingVars(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestMiviaAgentWorkflowSkillTemplates(t *testing.T) {
+	for _, path := range []string{
+		"core/skills/mivia-agent-workflows/SKILL.md.tmpl",
+		"adapters/agents/skills/mivia-agent-workflows/SKILL.md.tmpl",
+		"adapters/claude/skills/mivia-agent-workflows/SKILL.md.tmpl",
+	} {
+		if _, err := FS().Open(path); err != nil {
+			t.Fatalf("FS().Open(%q) error = %v, want nil", path, err)
+		}
+		data, err := fs.ReadFile(FS(), path)
+		if err != nil {
+			t.Fatalf("ReadFile(%q) error = %v", path, err)
+		}
+		for _, want := range []string{"triggers:", "mivia-agent workflow", "workflow artifacts"} {
+			if !strings.Contains(string(data), want) {
+				t.Fatalf("%s = %q, want frontmatter trigger %q", path, data, want)
+			}
+		}
+	}
+	canonical, err := fs.ReadFile(FS(), "core/skills/mivia-agent-workflows/SKILL.md.tmpl")
+	if err != nil {
+		t.Fatalf("ReadFile(canonical) error = %v", err)
+	}
+	agents, err := fs.ReadFile(FS(), "adapters/agents/skills/mivia-agent-workflows/SKILL.md.tmpl")
+	if err != nil {
+		t.Fatalf("ReadFile(.agents mirror) error = %v", err)
+	}
+	if string(agents) != string(canonical) {
+		t.Fatalf(".agents mivia-agent-workflows skill differs from .ai canonical")
+	}
+	claude, err := fs.ReadFile(FS(), "adapters/claude/skills/mivia-agent-workflows/SKILL.md.tmpl")
+	if err != nil {
+		t.Fatalf("ReadFile(claude pointer) error = %v", err)
+	}
+	for _, want := range []string{
+		"name: mivia-agent-workflows",
+		".ai/skills/mivia-agent-workflows/SKILL.md",
+		"discovery pointer",
+	} {
+		if !strings.Contains(string(claude), want) {
+			t.Fatalf("Claude workflow skill = %q, want %q", claude, want)
+		}
+	}
+	if len(strings.Split(strings.TrimSpace(string(claude)), "\n")) > 20 {
+		t.Fatalf("Claude workflow skill has too many lines; want concise pointer")
 	}
 }
 

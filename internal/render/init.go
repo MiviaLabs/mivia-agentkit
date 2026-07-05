@@ -74,6 +74,7 @@ func PlanInit(cfg InitConfig) (RenderPlan, Vars, error) {
 		"test-coverage-audit":       "project",
 		"deep-bug-audit":            "project",
 		"adversarial-test-review":   "project",
+		"mivia-agent-workflows":     "project",
 	}
 	effective := globalconfig.Layer(global, manifest, globalconfig.ProjectContent{Skills: projectSkills})
 	outPaths, err := templates.List(effective.Manifest.Profile, cfg.Adapters)

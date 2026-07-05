@@ -1,0 +1,69 @@
+---
+name: mivia-agent-workflows
+description: Use when a user asks to run, configure, inspect, or explain mivia-agent workflows, including CLI workflow runs, adapter routing, review loops, run artifacts, or desktop-agent workflow integration.
+triggers:
+  - mivia-agent workflow
+  - workflow artifacts
+  - desktop agent workflow
+  - run-store
+  - crush research loop
+---
+
+# Mivia Agent Workflows
+
+Use this skill when the task is about workflows driven by `mivia-agent`.
+
+## Read First
+
+- `AGENTS.md`
+- `.ai/INDEX.md`
+- `mivia-agent.yaml`
+- `.ai/workflows/*.yaml`
+
+## Workflow Contract
+
+Treat `mivia-agent` as the runtime boundary. Do not simulate a workflow in chat when the CLI can prove it.
+
+Start with:
+
+```bash
+./mivia-agent adapters --repo . --json
+./mivia-agent run --repo . --workflow <name> --dry-run --json
+```
+
+Run live only after the dry-run resolves the expected producer, reviewer, model, and effort:
+
+```bash
+./mivia-agent run --repo . --workflow <name> --json
+```
+
+Workflow `artifact` values are logical artifact names such as `bug-audit.md`, not repo output paths. The engine writes them under:
+
+```text
+.ai/runs/<run-id>/<step-id>/iter-<nnn>/<artifact>
+```
+
+Never commit `.ai/runs/`, `.ai/audit.jsonl`, raw prompts, provider payloads, model transcripts, secrets, or credentials.
+
+## Shipped And Common Workflows
+
+- `research-loop`: a producer creates `research.md`; configured reviewers review it.
+- `bug-audit-loop`: a producer creates `bug-audit.md`; configured reviewers review it.
+- `crush-research-loop`: if configured by the repo, local Crush/Qwen produces a context artifact and another adapter reviews it.
+
+## Desktop-Agent Rules
+
+Codex, Claude, and generic desktop agents should use this skill for workflow intent. Hooks may remind the agent to use the skill, but hooks should not auto-run long model workflows.
+
+A passing workflow means the artifact was accepted as useful workflow output. It does not approve the repository to merge, release, deploy, push, or skip quality gates.
+
+## Final Report
+
+Report:
+
+- Workflow name.
+- Dry-run result.
+- Live run result if executed.
+- Artifact path under `.ai/runs/...`.
+- Whether review consensus passed.
+- Residual risk and any not-run reason.

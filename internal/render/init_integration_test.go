@@ -57,6 +57,44 @@ func TestInitWriteCreatesExpectedFiles(t *testing.T) {
 	}
 }
 
+func TestInitWriteCreatesMiviaAgentWorkflowSkills(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	repo := tempGitRepo(t)
+	if _, err := WriteInit(InitConfig{Repo: repo, Profile: "standard", Adapters: []string{"codex", "claude"}}); err != nil {
+		t.Fatalf("WriteInit() error = %v, want nil", err)
+	}
+	canonical := readFile(t, filepath.Join(repo, ".ai", "skills", "mivia-agent-workflows", "SKILL.md"))
+	agents := readFile(t, filepath.Join(repo, ".agents", "skills", "mivia-agent-workflows", "SKILL.md"))
+	claude := readFile(t, filepath.Join(repo, ".claude", "skills", "mivia-agent-workflows", "SKILL.md"))
+	skillsJSON := readFile(t, filepath.Join(repo, ".agents", "skills.json"))
+
+	for _, want := range []string{
+		"name: mivia-agent-workflows",
+		"triggers:",
+		"./mivia-agent run --repo . --workflow <name> --dry-run --json",
+		".ai/runs/<run-id>/<step-id>/iter-<nnn>/<artifact>",
+		"crush-research-loop",
+	} {
+		if !strings.Contains(canonical, want) {
+			t.Fatalf("canonical workflow skill = %q, want %q", canonical, want)
+		}
+	}
+	if agents != canonical {
+		t.Fatalf(".agents workflow skill differs from canonical .ai skill")
+	}
+	if !strings.Contains(claude, ".ai/skills/mivia-agent-workflows/SKILL.md") ||
+		!strings.Contains(claude, "triggers:") ||
+		!strings.Contains(claude, "discovery pointer") ||
+		strings.Contains(claude, "./mivia-agent run --repo . --workflow <name>") {
+		t.Fatalf("Claude workflow skill = %q, want concise canonical pointer", claude)
+	}
+	if !strings.Contains(skillsJSON, `"name": "mivia-agent-workflows"`) ||
+		!strings.Contains(skillsJSON, `"path": ".ai/skills/mivia-agent-workflows/SKILL.md"`) ||
+		!strings.Contains(skillsJSON, `"source": "project"`) {
+		t.Fatalf("skills.json = %q, want mivia-agent-workflows project entry", skillsJSON)
+	}
+}
+
 func TestInitWriteCreatesGitignoreWithAIRuns(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	repo := tempGitRepo(t)

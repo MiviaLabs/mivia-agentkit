@@ -91,8 +91,13 @@ func coreOutputs(profile string, enabled map[string]bool) []string {
 		".ai/skills/test-coverage-audit/SKILL.md",
 		".ai/skills/deep-bug-audit/SKILL.md",
 		".ai/skills/adversarial-test-review/SKILL.md",
+		".ai/skills/mivia-agent-workflows/SKILL.md",
+		".agents/skills/mivia-agent-workflows/SKILL.md",
 		".ai/quality/contracts/project-runtime.yaml",
 		".ai/quality/review-policies/default.yaml",
+	}
+	if enabled["claude"] {
+		out = append(out, ".claude/skills/mivia-agent-workflows/SKILL.md")
 	}
 	if profile != "starter" && hasRuntimeAdapter(enabled) {
 		out = append(out, ".ai/workflows/research-loop.yaml", ".ai/workflows/bug-audit-loop.yaml")
@@ -122,6 +127,8 @@ var outputTemplates = map[string]string{
 	".ai/skills/test-coverage-audit/SKILL.md":            "core/skills/test-coverage-audit/SKILL.md.tmpl",
 	".ai/skills/deep-bug-audit/SKILL.md":                 "core/skills/deep-bug-audit/SKILL.md.tmpl",
 	".ai/skills/adversarial-test-review/SKILL.md":        "core/skills/adversarial-test-review/SKILL.md.tmpl",
+	".ai/skills/mivia-agent-workflows/SKILL.md":          "core/skills/mivia-agent-workflows/SKILL.md.tmpl",
+	".agents/skills/mivia-agent-workflows/SKILL.md":      "adapters/agents/skills/mivia-agent-workflows/SKILL.md.tmpl",
 	".ai/quality/contracts/project-runtime.yaml":         "core/quality/contracts/project-runtime.yaml.tmpl",
 	".ai/quality/review-policies/default.yaml":           "core/quality/review-policies/default.yaml.tmpl",
 	".ai/workflows/research-loop.yaml":                   "workflows/research-loop.yaml.tmpl",
@@ -130,6 +137,7 @@ var outputTemplates = map[string]string{
 	".codex/AGENTS.md":                                   "adapters/codex/AGENTS.md.tmpl",
 	"CLAUDE.md":                                          "adapters/claude/CLAUDE.md.tmpl",
 	".claude/settings.json":                              "adapters/claude/settings.json.tmpl",
+	".claude/skills/mivia-agent-workflows/SKILL.md":      "adapters/claude/skills/mivia-agent-workflows/SKILL.md.tmpl",
 	".github/copilot-instructions.md":                    "adapters/copilot/copilot-instructions.md.tmpl",
 	".github/instructions/agent-quality.instructions.md": "adapters/copilot/agent-quality.instructions.md.tmpl",
 	"GEMINI.md":        "adapters/antigravity/GEMINI.md.tmpl",

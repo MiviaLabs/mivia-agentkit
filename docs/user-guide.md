@@ -78,6 +78,7 @@ go run ./cmd/mivia-agent init --repo /path/to/repo --profile standard \
 - Tool adapter files under `.codex/`, `.claude/`, and `.github/` for selected adapters.
 - `--adapter antigravity` targets Google Antigravity CLI (`agy`), not the retired consumer Gemini CLI.
 - `.agents/skills.json`, including project skills and any readable global skills from `~/.agents/skills/`.
+- The `mivia-agent-workflows` skill under `.ai/skills/`, `.agents/skills/`, and, when `--adapter claude` is selected, `.claude/skills/`.
 
 `init --write` is idempotent for the same inputs. Existing user-owned files are reported as conflicts and are not overwritten unless `--force` is passed. Managed files preserve text outside the `mivia-agent:managed` block.
 
@@ -91,6 +92,34 @@ Current `init` flags:
 - `--force`: overwrite conflicting user-owned files.
 - `--json`: emit structured output.
 - `--with-loop <name>` repeated: accepted, but currently reserved.
+
+## Use Workflow Skills
+
+After `init --write`, desktop agents can use the generated workflow skill instead of relying on chat-only instructions.
+
+Generated files:
+
+```text
+.ai/skills/mivia-agent-workflows/SKILL.md
+.agents/skills/mivia-agent-workflows/SKILL.md
+.claude/skills/mivia-agent-workflows/SKILL.md
+```
+
+Use the skill when asking an agent to run or inspect a workflow:
+
+```text
+Use $mivia-agent-workflows. Check adapters, dry-run the workflow, then run it only if the dry-run resolves the expected producer and reviewer.
+```
+
+The skill tells agents to prove the CLI boundary with:
+
+```bash
+mivia-agent adapters --repo . --json
+mivia-agent run --repo . --workflow <name> --dry-run --json
+mivia-agent run --repo . --workflow <name> --json
+```
+
+Use hooks as fast reminders and policy gates only. Keep long operational instructions in the skill. A passing workflow accepts the artifact, not the repository for merge or release.
 
 ## Validate With Doctor
 

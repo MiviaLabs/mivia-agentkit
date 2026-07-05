@@ -33,6 +33,12 @@ Use skills for workflow intent. A repo skill such as `mivia-agent-workflows` sho
 
 Use hooks for fast deterministic policy. Hooks should add context, block protected actions without evidence, or point the agent to the skill. They should not start long model workflows on every prompt or tool event.
 
+To ask a desktop agent to use the generated skill:
+
+```text
+Use $mivia-agent-workflows. Check adapters, run the workflow dry-run, then run the workflow only if the dry-run resolves the expected producer, reviewer, model, and effort.
+```
+
 ## Codex
 
 Codex should read `AGENTS.md`, then the repo skill. Project prompt hooks can inject a short reminder such as:

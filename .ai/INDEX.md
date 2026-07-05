@@ -28,11 +28,13 @@ Canonical project skills:
 - `.ai/skills/airtight-feature-delivery/SKILL.md`
 - `.ai/skills/agent-dag-planner/SKILL.md`
 - `.ai/skills/agent-plan-implementer/SKILL.md`
+- `.ai/skills/mivia-agent-workflows/SKILL.md`
 
 Codex repo-discovery adapters:
 
 - `.agents/skills/agent-dag-planner/SKILL.md`
 - `.agents/skills/agent-plan-implementer/SKILL.md`
+- `.agents/skills/mivia-agent-workflows/SKILL.md`
 
 Claude Code adapters:
 
@@ -42,6 +44,7 @@ Claude Code adapters:
 - `.claude/skills/airtight-feature-delivery/SKILL.md`
 - `.claude/skills/agent-dag-planner/SKILL.md`
 - `.claude/skills/agent-plan-implementer/SKILL.md`
+- `.claude/skills/mivia-agent-workflows/SKILL.md`
 
 The registry at `.agents/skills.json` lists all committed project skill files from both locations.
 

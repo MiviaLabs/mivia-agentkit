@@ -5,6 +5,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"testing"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
@@ -79,6 +80,8 @@ type fakeCLIAdapter struct {
 	reviews  *[]adapter.Request
 }
 
+var fakeAdapterMu sync.Mutex
+
 func (f fakeCLIAdapter) Name() string { return f.name }
 func (f fakeCLIAdapter) Role() adapter.Role {
 	return adapter.RoleOrchestrable
@@ -87,6 +90,8 @@ func (f fakeCLIAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: f.name, Version: "fake-1", HeadlessCapable: f.headless}, nil
 }
 func (f fakeCLIAdapter) Run(_ context.Context, req adapter.Request) (adapter.Result, error) {
+	fakeAdapterMu.Lock()
+	defer fakeAdapterMu.Unlock()
 	if f.calls != nil {
 		*f.calls++
 	}
@@ -99,6 +104,8 @@ func (f fakeCLIAdapter) Run(_ context.Context, req adapter.Request) (adapter.Res
 	return f.run, nil
 }
 func (f fakeCLIAdapter) Review(_ context.Context, req adapter.Request) (adapter.Verdict, error) {
+	fakeAdapterMu.Lock()
+	defer fakeAdapterMu.Unlock()
 	if f.calls != nil {
 		*f.calls++
 	}
