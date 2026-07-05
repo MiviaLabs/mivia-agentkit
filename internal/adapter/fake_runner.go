@@ -12,6 +12,7 @@ type RecordedCall struct {
 	Args    []string
 	Env     []string
 	Workdir string
+	Stdin   []byte
 }
 
 // FakeRunner scripts adapter process calls for tests.
@@ -28,10 +29,16 @@ type FakeResponse struct {
 
 // Run records and returns a scripted response by command name.
 func (f *FakeRunner) Run(ctx context.Context, args []string, env []string, workdir string) (RunResult, error) {
+	return f.RunWithInput(ctx, args, env, workdir, nil)
+}
+
+// RunWithInput records and returns a scripted response by command name.
+func (f *FakeRunner) RunWithInput(_ context.Context, args []string, env []string, workdir string, stdin []byte) (RunResult, error) {
 	f.Calls = append(f.Calls, RecordedCall{
 		Args:    append([]string(nil), args...),
 		Env:     append([]string(nil), env...),
 		Workdir: workdir,
+		Stdin:   append([]byte(nil), stdin...),
 	})
 	if len(args) == 0 {
 		return RunResult{ExitCode: -1}, fmt.Errorf("missing command")

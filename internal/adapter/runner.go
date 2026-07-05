@@ -19,6 +19,11 @@ type Runner interface {
 	Run(ctx context.Context, args []string, env []string, workdir string) (RunResult, error)
 }
 
+// InputRunner executes a local process with stdin.
+type InputRunner interface {
+	RunWithInput(ctx context.Context, args []string, env []string, workdir string, stdin []byte) (RunResult, error)
+}
+
 // RunResult captures process output.
 type RunResult struct {
 	ExitCode int
@@ -31,12 +36,20 @@ type OSRunner struct{}
 
 // Run executes args[0] with args[1:].
 func (OSRunner) Run(ctx context.Context, args []string, env []string, workdir string) (RunResult, error) {
+	return (OSRunner{}).RunWithInput(ctx, args, env, workdir, nil)
+}
+
+// RunWithInput executes args[0] with args[1:] and stdin.
+func (OSRunner) RunWithInput(ctx context.Context, args []string, env []string, workdir string, stdin []byte) (RunResult, error) {
 	if len(args) == 0 {
 		return RunResult{ExitCode: -1}, errors.New("missing command")
 	}
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	cmd.Dir = workdir
 	cmd.Env = env
+	if stdin != nil {
+		cmd.Stdin = bytes.NewReader(stdin)
+	}
 	var stdout, stderr limitedBuffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

@@ -49,6 +49,17 @@ func TestFakeRunnerRecordsInvocation(t *testing.T) {
 	}
 }
 
+func TestFakeRunnerRecordsStdin(t *testing.T) {
+	r := &FakeRunner{Scripts: map[string]FakeResponse{"crush": {Result: RunResult{ExitCode: 0}}}}
+	_, err := r.RunWithInput(context.Background(), []string{"crush", "run"}, nil, "/tmp/x", []byte("prompt"))
+	if err != nil {
+		t.Fatalf("RunWithInput() error = %v", err)
+	}
+	if len(r.Calls) != 1 || string(r.Calls[0].Stdin) != "prompt" {
+		t.Fatalf("Calls = %#v, want recorded stdin", r.Calls)
+	}
+}
+
 func TestFakeRunnerScriptsByCommandName(t *testing.T) {
 	r := &FakeRunner{Scripts: map[string]FakeResponse{"claude": {Result: RunResult{Stdout: []byte("ok")}}}}
 	res, err := r.Run(context.Background(), []string{"claude", "-p", "x"}, nil, "")

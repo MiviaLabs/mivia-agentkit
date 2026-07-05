@@ -4,7 +4,7 @@
 - **Depends on:** WS2 (templates), WS9 (adapter interface)
 - **PRD:** FR-1.1, FR-3.1, FR-3.4
 - **Plan:** WS6, "Adapter Templates"
-- **Exit gate (Phase 4):** Antigravity adapter template renders when selected; Crush template renders only when headless-verified (else ships as `interactive-only` shim with a clear note); adapters do not duplicate long policy.
+- **Exit gate (Phase 4):** Antigravity adapter template renders when selected; Crush template renders when selected and can be orchestrated only when local `crush run --help` verifies noninteractive support; adapters do not duplicate long policy.
 
 Goal: the file-generation side for the remaining adapters (Antigravity, Crush) plus the runtime adapter implementations for Antigravity/Crush that WS9 deferred. WS9 already shipped Codex + Claude.
 
@@ -12,7 +12,7 @@ Goal: the file-generation side for the remaining adapters (Antigravity, Crush) p
 
 Before coding, confirm:
 - **Antigravity CLI** — current Google transition state and `agy -p` one-shot mode. Gemini CLI is not a supported target for this workstream. Record in `antigravity.go`.
-- **Crush** — **does a true headless/non-TUI mode exist?** (`crush run`? `--once`? confirm from `github.com/charmbracelet/crush` README + source). This is the gating question. Record findings in `crush.go`.
+- **Crush** — **does a true headless/non-TUI mode exist?** Current local v0.79.1 exposes `crush run [prompt...]` with stdin, `--cwd`, `--model`, and `--quiet`. The adapter must still gate headless capability on `crush run --help` at detection time and record findings in `crush.go`.
 
 ## T1 — Antigravity runtime adapter
 
@@ -59,7 +59,7 @@ Create:
 - `internal/adapter/crush_test.go`
 
 Spec — split by T0 finding:
-- **If Crush has a headless mode:** implement like WS9 (`Name="crush"`, `Role=Orchestrable`, `Detect.HeadlessCapable=true`, headless command per T0).
+- **If Crush has a headless mode:** implement like WS9 (`Name="crush"`, `Role=Orchestrable`, `Detect.HeadlessCapable=true` only when `crush run --help` confirms support, headless command per T0).
 - **If Crush has NO headless mode:** `Name="crush"`, `Role=Guidance`, `Detect.HeadlessCapable=false`. `Run` returns `ErrNotHeadlessCapable`. `Review` likewise. The adapter exists in the registry (so `adapters` lists it) but is excluded from `run` (WS9 FR-3.4 path).
 
 Tests that must pass:
@@ -75,11 +75,11 @@ Mutation proof:
 ## T4 — Crush template (shim + README)
 
 Create:
-- `templates/adapters/crush/README.md` — a note placed at `<repo>/.crush/README.md` explaining mivia-agent manages Crush config and pointing to `.ai/INDEX.md`. No policy duplication.
+- `templates/adapters/crush/README.md` — a note placed at `<repo>/.crush/README.md` explaining mivia-agent can orchestrate Crush through `crush run`, documents Ollama/Qwen setup, and points to `.ai/INDEX.md`. No policy duplication.
 - Update WS2 `templates.List` to include Crush files when `crush` enabled (regardless of headless — guidance files are still useful).
 
 Spec:
-- The Crush template renders for `crush` enabled even when Crush is not headless (it's guidance/config, not orchestration).
+- The Crush template renders for `crush` enabled and documents that orchestration is gated by local `crush run --help` support.
 
 Tests that must pass:
 - `TestCrushAdapterShimRendersWhenSelected`
@@ -123,5 +123,14 @@ WS6 is ☑ when:
 - Tests: focused config, adapter, templates, render, audit, and CLI packages passing.
 - Mutation proofs: Antigravity legacy-flag reintroduction fail-then-revert ok; Antigravity always-render fail-then-revert ok; Crush `Run` success fail-then-revert ok; duplicate-policy threshold raise fail-then-revert ok.
 - Files: Antigravity runtime adapter, Crush guidance adapter, adapter-policy audit check, template/catalog updates, manifest parser fix, and CLI adapter listing update.
-- Residual risk: `doctor` smoke reports the expected temp-repo CI warning; no WS6 blocker.
+- Residual risk: `doctor` smoke reports the expected temp-repo CI warning; no WS6 blocker. Later local Crush v0.79.1 evidence found `crush run` support and superseded the previous guidance-only Crush branch.
+- Follow-ups: none.
+
+## Completion addendum — 2026-07-05
+
+- Tests: focused adapter, CLI, and template packages passing with Crush as an orchestrable runtime adapter.
+- Live smoke: default Crush model failed because local `codestral:latest` is not installed; explicit `--model ollama/qwen3-coder:latest` passed through `crush run --quiet --cwd <repo>` with stdin and returned parseable JSON.
+- Mutation proofs: removing `crush run --help` detection failed `TestCrushDetectHeadlessRunSupport`; dropping `--cwd` failed `TestCrushRunInvokesCrushRunWithCWDModelAndPrompt`; ignoring unsupported effort failed `TestCrushRunRejectsUnsupportedEffort`; breaking JSON verdict parsing failed `TestCrushReviewParsesJSONVerdict`; all reverted.
+- Files: Crush adapter, runner stdin support, CLI subprocess seam test, and Crush templates updated.
+- Residual risk: installed Crush runtime still depends on local model/provider configuration; verified working with `ollama/qwen3-coder:latest`.
 - Follow-ups: none.

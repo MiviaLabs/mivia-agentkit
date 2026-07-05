@@ -101,7 +101,7 @@ func coreOutputs(profile string, enabled map[string]bool) []string {
 }
 
 func hasRuntimeAdapter(enabled map[string]bool) bool {
-	for _, name := range []string{"codex", "claude", "antigravity"} {
+	for _, name := range []string{"codex", "claude", "antigravity", "crush"} {
 		if enabled[name] {
 			return true
 		}

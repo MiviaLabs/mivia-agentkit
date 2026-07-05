@@ -164,31 +164,35 @@ func TestCrushShimDoesNotDuplicateLongPolicy(t *testing.T) {
 	assertThinAdapterPointer(t, string(data))
 }
 
-func TestCrushTemplateIncludesModelConfigGuidance(t *testing.T) {
+func TestCrushTemplateIncludesRuntimeConfigGuidance(t *testing.T) {
 	readme, err := fs.ReadFile(FS(), "adapters/crush/README.md.tmpl")
 	if err != nil {
 		t.Fatalf("ReadFile() error = %v", err)
 	}
-	if !strings.Contains(string(readme), "adapters.crush.model") || !strings.Contains(string(readme), "adapters.crush.params") || !strings.Contains(string(readme), "guidance-only") {
-		t.Fatalf("crush README = %q, want model/params guidance and guidance-only note", readme)
+	if !strings.Contains(string(readme), "crush run --quiet --cwd <repo>") ||
+		!strings.Contains(string(readme), "adapters.crush.model") ||
+		!strings.Contains(string(readme), "ollama/qwen3:14b") ||
+		!strings.Contains(string(readme), "http://localhost:11434/v1/") ||
+		strings.Contains(string(readme), "guidance-only") {
+		t.Fatalf("crush README = %q, want runtime and Ollama/Qwen guidance without guidance-only wording", readme)
 	}
 
 	manifest, err := fs.ReadFile(FS(), "core/mivia-agent.yaml.tmpl")
 	if err != nil {
 		t.Fatalf("ReadFile() error = %v", err)
 	}
-	if !strings.Contains(string(manifest), "# model: openai/gpt-5.5") || !strings.Contains(string(manifest), "# params:") || !strings.Contains(string(manifest), "#   provider: openai") {
-		t.Fatalf("mivia-agent.yaml template = %q, want crush model/params example", manifest)
+	if !strings.Contains(string(manifest), "# model: ollama/qwen3:14b") || strings.Contains(string(manifest), "# params:") {
+		t.Fatalf("mivia-agent.yaml template = %q, want crush model example without params", manifest)
 	}
 }
 
-func TestCrushAdapterRendersGuidanceRole(t *testing.T) {
+func TestCrushAdapterRendersOrchestrableRole(t *testing.T) {
 	data, err := fs.ReadFile(FS(), "core/mivia-agent.yaml.tmpl")
 	if err != nil {
 		t.Fatalf("ReadFile() error = %v", err)
 	}
-	if !strings.Contains(string(data), `(eq $name "crush")`) || !strings.Contains(string(data), "guidance") {
-		t.Fatalf("mivia-agent.yaml template = %q, want crush guidance role", data)
+	if strings.Contains(string(data), `(eq $name "crush")`) || !strings.Contains(string(data), "orchestrable") {
+		t.Fatalf("mivia-agent.yaml template = %q, want crush to use orchestrable role path", data)
 	}
 }
 
@@ -232,14 +236,14 @@ func TestListIncludesWorkflowTemplatesWithAnyRuntimeAdapter(t *testing.T) {
 	}
 }
 
-func TestListOmitsWorkflowTemplatesWithoutRuntimeAdapter(t *testing.T) {
+func TestListIncludesWorkflowTemplatesWithCrushRuntimeAdapter(t *testing.T) {
 	got, err := List("standard", []string{"crush"})
 	if err != nil {
 		t.Fatalf("List() error = %v, want nil", err)
 	}
-	for _, path := range got {
-		if path == ".ai/workflows/research-loop.yaml" || path == ".ai/workflows/bug-audit-loop.yaml" {
-			t.Fatalf("List() includes %q without an orchestrable adapter: %#v", path, got)
+	for _, want := range []string{".ai/workflows/research-loop.yaml", ".ai/workflows/bug-audit-loop.yaml"} {
+		if !containsTemplatePath(got, want) {
+			t.Fatalf("List() missing %q with crush runtime adapter: %#v", want, got)
 		}
 	}
 }

@@ -4,7 +4,7 @@ package integration
 
 import (
 	"context"
-	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -165,19 +165,14 @@ func TestCrushAdapterRealSubprocessContract(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Detect() error = %v", err)
 		}
-		if d.HeadlessCapable {
-			t.Fatalf("Detect() = %#v, want guidance-only crush install", d)
+		if !d.HeadlessCapable {
+			t.Fatalf("Detect() = %#v, want headless crush install with run support", d)
 		}
 	})
 
 	toolsDir := t.TempDir()
 	logPath := filepath.Join(toolsDir, "crush.log")
-	buildStubCLI(t, toolsDir, stubCLI{
-		Name:    "crush",
-		Version: "crush 0.12.0",
-		Stdout:  `guidance`,
-		LogPath: logPath,
-	})
+	buildCrushRunStub(t, toolsDir, logPath)
 	prependPath(t, toolsDir)
 
 	a := adapter.Crush{}
@@ -185,18 +180,60 @@ func TestCrushAdapterRealSubprocessContract(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Detect() error = %v", err)
 	}
-	if d.HeadlessCapable || d.Version != "crush 0.12.0" {
-		t.Fatalf("Detect() = %#v, want non-headless crush version", d)
+	if !d.HeadlessCapable || d.Version != "crush version v0.79.1" {
+		t.Fatalf("Detect() = %#v, want headless crush version", d)
 	}
 
-	if _, err := a.Run(context.Background(), adapter.Request{Prompt: "run", Approval: "never", Workdir: toolsDir}); !errors.Is(err, adapter.ErrNotHeadlessCapable) {
-		t.Fatalf("Run() error = %v, want ErrNotHeadlessCapable", err)
+	result, err := a.Run(context.Background(), adapter.Request{Prompt: "run", Approval: "never", Workdir: toolsDir, Model: "ollama/qwen3:14b"})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
 	}
-	if _, err := a.Review(context.Background(), adapter.Request{Prompt: "review", Approval: "never", Workdir: toolsDir}); !errors.Is(err, adapter.ErrNotHeadlessCapable) {
-		t.Fatalf("Review() error = %v, want ErrNotHeadlessCapable", err)
+	if string(result.Stdout) != "crush artifact\n" {
+		t.Fatalf("Run() stdout = %q, want artifact", result.Stdout)
 	}
-	logData := readFile(t, logPath)
-	if logData != "--version\n" {
-		t.Fatalf("crush log = %q, want detect-only subprocess call", logData)
+	readLogContains(t, logPath, "run --quiet --cwd "+toolsDir+" --model ollama/qwen3:14b", "stdin:run")
+
+	verdict, err := a.Review(context.Background(), adapter.Request{Prompt: "review", Approval: "never", Workdir: toolsDir})
+	if err != nil {
+		t.Fatalf("Review() error = %v", err)
 	}
+	if !verdict.Pass || verdict.Severity != "low" {
+		t.Fatalf("Review() verdict = %#v, want passing low severity", verdict)
+	}
+	readLogContains(t, logPath, "stdin:review")
+}
+
+func buildCrushRunStub(t *testing.T, dir, logPath string) string {
+	t.Helper()
+	bin := filepath.Join(dir, "crush"+exeSuffix())
+	script := `#!/bin/sh
+set -eu
+if [ "$#" -eq 1 ] && [ "$1" = "--version" ]; then
+  printf 'crush version v0.79.1\n'
+  exit 0
+fi
+if [ "$#" -eq 2 ] && [ "$1" = "run" ] && [ "$2" = "--help" ]; then
+  printf 'Run a single prompt in non-interactive mode and exit.\n'
+  printf 'The prompt can be provided as arguments or piped from stdin.\n'
+  printf 'USAGE\n  crush run [prompt...] [--flags]\n'
+  exit 0
+fi
+if [ "$#" -gt 0 ] && [ "$1" = "run" ]; then
+  printf '%s\n' "$*" >> "$CRUSH_LOG"
+  stdin=$(cat)
+  printf 'stdin:%s\n' "$stdin" >> "$CRUSH_LOG"
+  case "$stdin" in
+    *"Return JSON only"*) printf '{"pass":true,"severity":"low","notes":"ok"}\n' ;;
+    *) printf 'crush artifact\n' ;;
+  esac
+  exit 0
+fi
+exit 64
+`
+	mustWriteFile(t, bin, script)
+	if err := os.Chmod(bin, 0o755); err != nil {
+		t.Fatalf("Chmod(%s) error = %v", bin, err)
+	}
+	t.Setenv("CRUSH_LOG", logPath)
+	return bin
 }

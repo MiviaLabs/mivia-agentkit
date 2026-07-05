@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
@@ -168,6 +169,42 @@ func TestRunPassesManifestAdapterDefaultsToRuntime(t *testing.T) {
 	}
 }
 
+func TestRunWithCrushUsesRealSubprocessBoundary(t *testing.T) {
+	repo := t.TempDir()
+	stubDir := t.TempDir()
+	writeCrushStub(t, stubDir)
+	t.Setenv("PATH", stubDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("CRUSH_STUB_DIR", stubDir)
+	withRuntimeAdapters(t, adapter.Crush{})
+	mustWrite(t, filepath.Join(repo, "mivia-agent.yaml"), "version: \"1\"\nadapters:\n  crush:\n    enabled: true\n    role: orchestrable\n    model: ollama/qwen3:14b\nloops:\n  build:\n    bound: iterations\n    max_iterations: 1\n    steps:\n      - id: build\n        producer: crush\n        artifact: build.md\n      - id: review\n        reviewers: [crush]\n        artifact: build.md\n    exit_when: review-pass\n    on_exhausted: fail\n")
+	mustWrite(t, filepath.Join(repo, ".ai/workflows/build.yaml"), "bound: iterations\nmax_iterations: 1\nsteps:\n- id: build\n  producer: crush\n  artifact: build.md\n- id: review\n  reviewers: [crush]\n  artifact: build.md\nexit_when: review-pass\non_exhausted: fail\n")
+
+	cmd := newRunCommand()
+	cmd.SetArgs([]string{"--repo", repo, "--workflow", "build", "--json"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("run error = %v", err)
+	}
+
+	argsData, err := os.ReadFile(filepath.Join(stubDir, "run.args"))
+	if err != nil {
+		t.Fatalf("ReadFile(run.args) error = %v", err)
+	}
+	args := string(argsData)
+	if !strings.Contains(args, "run\n--quiet\n--cwd\n"+repo+"\n--model\nollama/qwen3:14b\n") {
+		t.Fatalf("run args = %q, want crush run with quiet cwd and model", args)
+	}
+	stdinData, err := os.ReadFile(filepath.Join(stubDir, "run.stdin"))
+	if err != nil {
+		t.Fatalf("ReadFile(run.stdin) error = %v", err)
+	}
+	if !strings.Contains(string(stdinData), "Produce artifact build.md") {
+		t.Fatalf("stdin = %q, want generated producer prompt through real process stdin", stdinData)
+	}
+	if matches, _ := filepath.Glob(filepath.Join(repo, ".ai", "runs", "*", "build", "iter-001", "build.md")); len(matches) != 1 {
+		t.Fatalf("artifact files = %v, want one build artifact from crush stdout", matches)
+	}
+}
+
 func TestRunPropagatesCommandContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -278,6 +315,39 @@ func mustWrite(t *testing.T, path, data string) {
 	}
 	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
 		t.Fatalf("write %s: %v", path, err)
+	}
+}
+
+func writeCrushStub(t *testing.T, dir string) {
+	t.Helper()
+	path := filepath.Join(dir, "crush")
+	script := `#!/bin/sh
+set -eu
+if [ "$#" -eq 1 ] && [ "$1" = "--version" ]; then
+  printf 'crush version v0.79.1\n'
+  exit 0
+fi
+if [ "$#" -eq 2 ] && [ "$1" = "run" ] && [ "$2" = "--help" ]; then
+  printf 'Run a single prompt in non-interactive mode and exit.\n'
+  printf 'The prompt can be provided as arguments or piped from stdin.\n'
+  printf 'USAGE\n  crush run [prompt...] [--flags]\n'
+  exit 0
+fi
+if [ "$#" -gt 0 ] && [ "$1" = "run" ]; then
+  : "${CRUSH_STUB_DIR:?}"
+  printf '%s\n' "$@" >> "$CRUSH_STUB_DIR/run.args"
+  stdin=$(cat)
+  printf '%s\n---CALL---\n' "$stdin" >> "$CRUSH_STUB_DIR/run.stdin"
+  case "$stdin" in
+    *"Return JSON only"*) printf '{"pass":true,"severity":"low","notes":"ok"}\n' ;;
+    *) printf 'crush artifact\n' ;;
+  esac
+  exit 0
+fi
+exit 64
+`
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatalf("write crush stub: %v", err)
 	}
 }
 
