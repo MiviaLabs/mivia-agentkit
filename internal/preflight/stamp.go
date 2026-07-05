@@ -21,8 +21,13 @@ type Stamp struct {
 	MutationProofs     []string `json:"mutation_proofs"`
 	NotRun             []string `json:"not_run"`
 	PolicyDecisionRefs []string `json:"policy_decision_refs"`
+	PipelinePreflight  Metadata `json:"pipeline_preflight,omitempty"`
 	CreatedAt          string   `json:"created_at"`
 }
+
+// Metadata records extension metadata that hooks must preserve without owning
+// the producer-specific nested schema.
+type Metadata map[string]any
 
 // NewStamp returns a stamp with normalized slices and UTC creation time.
 func NewStamp(head, diff string, changed []string) Stamp {
@@ -62,6 +67,7 @@ func (s Stamp) Marshal() ([]byte, error) {
 		Head               string   `json:"head"`
 		MutationProofs     []string `json:"mutation_proofs"`
 		NotRun             []string `json:"not_run"`
+		PipelinePreflight  Metadata `json:"pipeline_preflight,omitempty"`
 		PolicyDecisionRefs []string `json:"policy_decision_refs"`
 	}
 	data, err := json.Marshal(orderedStamp{
@@ -74,6 +80,7 @@ func (s Stamp) Marshal() ([]byte, error) {
 		Head:               s.Head,
 		MutationProofs:     s.MutationProofs,
 		NotRun:             s.NotRun,
+		PipelinePreflight:  s.PipelinePreflight,
 		PolicyDecisionRefs: s.PolicyDecisionRefs,
 	})
 	if err != nil {

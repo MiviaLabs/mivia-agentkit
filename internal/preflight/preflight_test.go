@@ -97,6 +97,26 @@ func TestPreflightHandlesUnstagedUntrackedFile(t *testing.T) {
 	}
 }
 
+func TestPreflightWritesPipelinePreflightMetadata(t *testing.T) {
+	repo := newRepo(t)
+	writeFile(t, repo, "docs/readme.md", "hello\n")
+	runGit(t, repo, "add", "docs/readme.md")
+	stamp, err := Run(Context{Repo: repo, PipelinePreflight: true})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got := stamp.PipelinePreflight["passed"]; got != true {
+		t.Fatalf("PipelinePreflight[passed] got %v want true", got)
+	}
+	data, err := os.ReadFile(filepath.Join(repo, stampRelPath))
+	if err != nil {
+		t.Fatalf("ReadFile(stamp) error = %v", err)
+	}
+	if !strings.Contains(string(data), `"pipeline_preflight"`) {
+		t.Fatalf("stamp file missing pipeline_preflight: %s", data)
+	}
+}
+
 func TestPreflightStampWrittenUnderDotGit(t *testing.T) {
 	repo := newRepo(t)
 	writeFile(t, repo, "docs/readme.md", "hello\n")

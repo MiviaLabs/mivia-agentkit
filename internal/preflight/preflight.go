@@ -57,6 +57,12 @@ func Run(ctx Context) (Stamp, error) {
 	stamp.BroadVerifiers = sortedCopy(ctx.BroadVerifiers)
 	stamp.MutationProofs = sortedCopy(ctx.MutationProofs)
 	stamp.NotRun = sortedCopy(ctx.NotRun)
+	if ctx.PipelinePreflight {
+		stamp.PipelinePreflight = Metadata{
+			"created_at": stamp.CreatedAt,
+			"passed":     true,
+		}
+	}
 	data, err := stamp.Marshal()
 	if err != nil {
 		return Stamp{}, err
