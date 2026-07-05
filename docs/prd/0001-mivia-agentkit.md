@@ -187,7 +187,7 @@ Traceability column: **WS** = implementation workstream, **Ph** = release phase 
 - **US-1:** As an OSS maintainer, I run `mivia-agent init --profile standard --write` so that Codex + Claude + Copilot are all configured consistently from one place.
 - **US-2:** As a reviewer, I run `mivia-agent review --artifact src/auth.go --reviewers codex,claude --mode majority` so that two CLIs independently vet the change before I merge.
 - **US-3:** As a workflow author, I define a `bug-audit` loop (Codex audits → Claude + Codex consensus-review → iterate to fix) and run it in CI with a 5-iteration bound.
-- **US-4:** As a platform engineer, I add a new orchestrable adapter (one file) — e.g. Crush once it is verified headless — and immediately route research steps to it without touching policy. *(If the target CLI is not headless-capable, the adapter is accepted but excluded from `run` per FR-3.4.)*
+- **US-4:** As a platform engineer, I add a new orchestrable adapter (one file) — e.g. Crush after `crush run` verification — and immediately route research steps to it without touching policy. *(If the target CLI is not headless-capable, the adapter is accepted but excluded from `run` per FR-3.4.)*
 - **US-5:** As CI, I deny a `git push` because the stamp is stale and the latest policy decision is `denied`.
 
 ## 11. Command surface

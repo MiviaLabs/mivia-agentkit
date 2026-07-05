@@ -62,7 +62,7 @@ Current adapter behavior:
 - `claude`: orchestrable.
 - `antigravity`: orchestrable via the `agy` binary.
 - `copilot`: guidance-only template surface, not an orchestrated runtime adapter.
-- `crush`: detected as guidance-only and excluded from `run` and `review`.
+- `crush`: orchestrable when `crush run --help` confirms noninteractive `run` support.
 
 Some flags already exist on the CLI but are not fully wired yet:
 
@@ -119,6 +119,13 @@ Inspect adapter status:
 
 ```bash
 go run ./cmd/mivia-agent adapters --repo /path/to/repo --json
+```
+
+Preview a Crush/Qwen producer with Codex review:
+
+```bash
+go run ./cmd/mivia-agent run --repo /path/to/repo \
+  --workflow crush-research-loop --dry-run --json
 ```
 
 Preview a workflow plan without invoking adapters:
@@ -186,6 +193,8 @@ make help
 ## Docs
 
 - [User guide](docs/user-guide.md) - current command surface, flags, behavior notes, and examples
+- [Configuration examples](docs/config-examples.md) - working manifest and workflow examples, including Codex plus Crush/Qwen loops
+- [Loop authoring](docs/loop-authoring.md) - workflow shape, consensus, artifact paths, and practical checks
 - [Development environment](docs/setup/development-environment.md) - local prerequisites and Ubuntu setup
 - [Development hooks](docs/development-hooks.md) - hook behavior and policy shape
 - [Agent hooks](docs/agent-hooks.md) - agent hook surfaces, triggers, policies, and audit-loop behavior

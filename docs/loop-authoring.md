@@ -95,12 +95,52 @@ steps:
     on_fail: iterate
 ```
 
+## Crush/Qwen Research Example
+
+This example uses Crush as a local producer and Codex as the reviewer.
+
+```yaml
+version: 1
+name: crush-research-loop
+description: Local Crush/Qwen context research with Codex review.
+bound: iterations
+max_iterations: 1
+exit_when: review-pass
+on_exhausted: fail
+steps:
+  - id: research
+    producer: crush
+    artifact: go-mivia-context.md
+  - id: review
+    reviewers: [codex]
+    artifact: go-mivia-context.md
+    consensus:
+      mode: majority
+      min_reviewers: 1
+      tie_breaker: strict
+    on_fail: fail
+```
+
+The matching manifest must enable both adapters as orchestrable:
+
+```yaml
+adapters:
+  codex:
+    enabled: true
+    role: orchestrable
+  crush:
+    enabled: true
+    role: orchestrable
+    model: ollama/qwen3-coder:latest
+```
+
 ## Practical Checks
 
 - Prefer one producer step followed by one review step.
 - Keep reviewer count satisfiable by enabled headless adapters.
 - Use step-level `model` or `effort` only when you want to override the adapter default for that specific step.
 - Keep `effort` compatible with every adapter selected by the step. Codex supports `minimal`, `low`, `medium`, `high`, and `xhigh`; Claude supports `low`, `medium`, `high`, `xhigh`, and `max`.
+- Do not set `effort` on Crush steps until a tested effort mapping exists.
 - Do not set `model`, `effort`, or `params` on Antigravity workflow steps; `agy -p` has no documented mapping for those runtime knobs here.
 - Use stable artifact names so run traces stay stable.
 - Do not point loop artifacts at shared repo paths such as `notes/foo.md` or `.ai/runs/latest/...`; the runstore already places them under the per-run directory.

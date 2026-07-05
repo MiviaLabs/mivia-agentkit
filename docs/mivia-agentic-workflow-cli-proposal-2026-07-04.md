@@ -518,7 +518,7 @@ Adapter responsibilities:
 - Scrub secrets and never persist raw prompts or raw model output; only structured metadata and the declared artifact path are returned.
 - Map the CLI's exit codes to `Result.ExitCode` and a human-readable status.
 
-`mivia-agent adapters` lists each adapter's presence, headless capability, configured approval mode, and whether it is approved for `run`. Adapters that are present but not headless-capable (likely Crush, pending verification) are flagged and excluded from orchestration; they may still receive guidance/instruction files via `init`.
+`mivia-agent adapters` lists each adapter's presence, headless capability, configured approval mode, and whether it is approved for `run`. Adapters that are present but not headless-capable are flagged and excluded from orchestration; they may still receive guidance/instruction files via `init`. Crush is approved only when local detection confirms `crush run` noninteractive support.
 
 ## Governance Backbone (AGT)
 

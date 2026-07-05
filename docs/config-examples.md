@@ -47,11 +47,8 @@ adapters:
     role: orchestrable
   crush:
     enabled: true
-    role: guidance
-    model: openai/gpt-5.5
-    params:
-      provider: openai
-      base_url: https://api.openai.com/v1
+    role: orchestrable
+    model: ollama/qwen3-coder:latest
 
 routing:
   default_producer: codex
@@ -185,6 +182,76 @@ Run it with:
 go run ./cmd/mivia-agent run --repo /path/to/repo --workflow research --dry-run --json
 ```
 
+## Example `.ai/workflows/crush-research-loop.yaml`
+
+This mirrors the working go-mivia pattern: Crush/Qwen produces a local context artifact, then Codex reviews it.
+
+```yaml
+version: 1
+name: crush-research-loop
+description: Local Crush/Qwen context research with Codex review.
+bound: iterations
+max_iterations: 1
+steps:
+  - id: research
+    producer: crush
+    artifact: go-mivia-context.md
+  - id: review
+    reviewers:
+      - codex
+    artifact: go-mivia-context.md
+    consensus:
+      mode: majority
+      tie_breaker: strict
+      min_reviewers: 1
+    on_fail: fail
+exit_when: review-pass
+on_exhausted: fail
+```
+
+Preview:
+
+```bash
+go run ./cmd/mivia-agent run --repo /path/to/repo \
+  --workflow crush-research-loop --dry-run --json
+```
+
+Execute:
+
+```bash
+go run ./cmd/mivia-agent run --repo /path/to/repo \
+  --workflow crush-research-loop --json
+```
+
+## Example `.ai/workflows/codex-bug-audit-crush-review.yaml`
+
+Use this when Codex should produce an audit artifact and local Crush/Qwen should independently review artifact quality.
+
+```yaml
+version: 1
+name: codex-bug-audit-crush-review
+description: Codex bug audit artifact reviewed by local Crush/Qwen.
+bound: iterations
+max_iterations: 1
+steps:
+  - id: bug-audit
+    producer: codex
+    artifact: bug-audit.md
+  - id: crush-review
+    reviewers:
+      - crush
+    artifact: bug-audit.md
+    consensus:
+      mode: majority
+      tie_breaker: strict
+      min_reviewers: 1
+    on_fail: fail
+exit_when: review-pass
+on_exhausted: fail
+```
+
+For this pattern, keep the reviewer prompt clear that `pass=true` means the artifact is accepted as useful workflow output. It does not mean the repository is approved for merge or release.
+
 ## Example `~/.agents/mivia-agent.yaml`
 
 This is the optional global defaults layer. Project config still wins.
@@ -209,12 +276,13 @@ defaults:
 
 - Precedence is `step model/effort` -> `adapter default model/effort` -> CLI default.
 - Effort values are adapter-specific at runtime: Codex supports `minimal`, `low`, `medium`, `high`, and `xhigh`; Claude supports `low`, `medium`, `high`, `xhigh`, and `max`.
-- `params` are Crush guidance-only today. Antigravity has no documented runtime mapping for `model`, `effort`, or `params`, so those fields are rejected before `agy` runs.
+- Crush supports `model` and rejects unsupported `effort` until a tested effort mapping exists. Crush provider setup belongs in Crush/Ollama configuration, not in `adapters.crush.params`.
+- Antigravity has no documented runtime mapping for `model`, `effort`, or `params`, so those fields are rejected before `agy` runs.
 - `run --dry-run --json` reports a per-step `runtime` list so you can inspect the resolved adapter, model, and effort before execution.
 - Supported profiles are `starter`, `standard`, and `strict`.
 - Workflow `bound: budget` is not supported in MVP.
 - Separate `run` executions are isolated under unique `.ai/runs/<run-id>/` directories.
 - Retried steps within one run are stored under per-iteration subdirectories such as `iter-001` and `iter-002`.
 - Producer and reviewer adapters in loops must be enabled and `orchestrable`.
-- `copilot` and `crush` are guidance-only and cannot be workflow producers or reviewers, even when `crush` has `model` or `params` config.
+- `copilot` is guidance-only and cannot be a workflow producer or reviewer.
 - `init --with-loop`, `run --step`, `run --input-artifact`, and `run --var` are reserved surface today.

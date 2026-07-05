@@ -1,7 +1,7 @@
 # Model And Effort Config Implementation Plan
 
 Date: 2026-07-05
-Scope: add first-class model and intelligence-effort configuration to `mivia-agent` workflows and adapter config, with Codex and Claude runtime pass-through now, and Crush config support split from Crush orchestration support.
+Scope: add first-class model and intelligence-effort configuration to `mivia-agent` workflows and adapter config, with Codex and Claude runtime pass-through and Crush runtime support gated by detected `crush run` noninteractive support.
 
 ## Contract
 
@@ -14,7 +14,7 @@ Planned contract:
 - The orchestrator passes resolved settings into adapters through `adapter.Request`.
 - Adapters fail closed when a workflow asks for unsupported runtime knobs.
 - Codex and Claude get real runtime pass-through.
-- Crush gets project config/template support for provider/model and documented config fields, but remains excluded from orchestrated `run` until Crush has a documented headless run contract.
+- Crush gets runtime `model` pass-through and remains fail-closed for unsupported effort until a tested effort mapping exists.
 
 Proposed config shape:
 
@@ -32,11 +32,8 @@ adapters:
     effort: medium
   crush:
     enabled: true
-    role: guidance
-    model: openai/gpt-5.5
-    params:
-      provider: openai
-      base_url: https://api.openai.com/v1
+    role: orchestrable
+    model: ollama/qwen3-coder:latest
 
 loops:
   research:
@@ -64,24 +61,22 @@ Proposed runtime rule:
 
 Current repo state:
 
-- Manifest and loop schema do not currently expose `model` or `effort` fields in [internal/config/manifest.go](../internal/config/manifest.go) and [internal/config/loop.go](../internal/config/loop.go).
-- Orchestrator requests currently only pass `Prompt`, `Workdir`, `Approval`, `ArtifactOut`, `Timeout`, and `MaxTurns` in [internal/orchestrator/engine.go](../internal/orchestrator/engine.go).
-- Adapter request types do not yet carry model/effort in [internal/adapter/adapter.go](../internal/adapter/adapter.go).
-- Codex and Claude adapters currently parse returned model metadata but do not accept requested model settings in [internal/adapter/codex.go](../internal/adapter/codex.go) and [internal/adapter/claude.go](../internal/adapter/claude.go).
-- Crush is currently guidance-only and explicitly blocked from orchestrated `Run`/`Review` in [internal/adapter/crush.go](../internal/adapter/crush.go).
+- Manifest and loop schema expose `model` and `effort` fields in [internal/config/manifest.go](../internal/config/manifest.go) and [internal/config/loop.go](../internal/config/loop.go).
+- Orchestrator requests pass resolved runtime knobs through [internal/orchestrator/engine.go](../internal/orchestrator/engine.go).
+- Adapter request types carry model/effort in [internal/adapter/adapter.go](../internal/adapter/adapter.go).
+- Codex and Claude adapters accept requested model settings in [internal/adapter/codex.go](../internal/adapter/codex.go) and [internal/adapter/claude.go](../internal/adapter/claude.go).
+- Crush detects `crush run --help`, invokes `crush run --quiet --cwd <repo>`, and passes `--model` when configured in [internal/adapter/crush.go](../internal/adapter/crush.go).
 
 Current external docs:
 
 - Codex documents `--model` for CLI selection and config-level `model_reasoning_effort`, with one-off `-c/--config` overrides: [Models](https://developers.openai.com/codex/models), [Config basics](https://developers.openai.com/codex/config-basic), [Configuration reference](https://developers.openai.com/codex/config-reference), [Advanced config](https://developers.openai.com/codex/config-advanced).
 - Claude Code documents `--model`, `--effort`, `-p`, and model-capability handling for effort/thinking: [CLI reference](https://code.claude.com/docs/en/cli-reference), [Run Claude Code programmatically](https://code.claude.com/docs/en/headless), [Model configuration](https://code.claude.com/docs/en/model-config), [Commands](https://code.claude.com/docs/en/commands), [Environment variables](https://code.claude.com/docs/en/env-vars).
-- Crush documents provider/model configuration through `crush.json` and provider model lists, but this repo still lacks a documented non-TUI run surface for orchestrated execution: [Crush README](https://github.com/charmbracelet/crush), especially config and model/provider sections, plus the existing headless-gap issue already referenced in repo code: [issue #1862](https://github.com/charmbracelet/crush/issues/1862).
+- Crush v0.79.1 local help documents `crush run [prompt...]`, stdin input, `--cwd`, `--model`, `--quiet`, `--session`, and `--continue`; this repo gates orchestration on that detected support.
 
 Inference from those docs:
 
 - Codex and Claude implementation is a runtime pass-through problem.
-- Crush support should be split:
-  - config/template support now
-  - orchestrated runtime support later, after a stable headless contract exists
+- Crush support uses the detected `crush run` contract and rejects unsupported effort knobs until tested mappings exist.
 
 ## Workstreams
 
@@ -265,7 +260,7 @@ Happy path:
 Negative path:
 
 - Unknown effort value rejected by config parsing and request validation.
-- Guidance-only Crush cannot become a producer/reviewer just because it has `model` or `params`.
+- Crush cannot accept unsupported `effort` or untested `params` just because it is configured as orchestrable.
 - Empty model/effort values do not inject bogus flags.
 
 Stale/reused state path:
@@ -291,7 +286,7 @@ Conflict path:
 3. Thread resolved model/effort through orchestrator producer/review calls.
 4. Add Codex adapter pass-through with tests.
 5. Add Claude adapter pass-through with tests.
-6. Add Crush config/template guidance support without changing its guidance-only runtime role.
+6. Add Crush config/template support and orchestrated runtime support gated by `crush run --help`.
 7. Update `run --dry-run` output and docs/examples.
 
 ## Verification

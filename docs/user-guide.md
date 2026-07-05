@@ -220,7 +220,7 @@ Current adapter expectations:
 
 - `codex` and `claude` are orchestrable when installed and headless-capable.
 - `antigravity` is orchestrable through `agy`.
-- `crush` is guidance-only and never approved for `run`.
+- `crush` is orchestrable when installed and `crush run --help` confirms noninteractive `run` support.
 - `copilot` is guidance-only template surface, not a runtime adapter.
 
 ## Run A Workflow
@@ -251,11 +251,11 @@ Current `run` behavior:
 
 Current adapter runtime support:
 
-- Codex passes `--model` and a one-off `model_reasoning_effort` override when configured.
+- Codex runs noninteractively through `codex exec`, passes `--model`, writes clean producer artifacts with `--output-last-message`, and passes a one-off `model_reasoning_effort` config override when configured.
 - Claude passes `--model` and `--effort` when configured.
 - Runtime effort values fail closed if they are valid globally but unsupported by the selected adapter. Codex supports `minimal`, `low`, `medium`, `high`, and `xhigh`; Claude supports `low`, `medium`, `high`, `xhigh`, and `max`.
 - Antigravity runs through `agy -p` and rejects `model`, `effort`, and `params` because this repo has no documented Antigravity runtime mapping for those knobs.
-- Crush may carry repo-owned `model` and `params` config, but it remains guidance-only and is never invoked by `run`.
+- Crush runs through `crush run --quiet --cwd <repo>`, passes `--model` when configured, reads prompts from stdin, and rejects unsupported `effort` until a tested mapping exists.
 
 Loop authoring details live in [loop-authoring.md](./loop-authoring.md).
 
