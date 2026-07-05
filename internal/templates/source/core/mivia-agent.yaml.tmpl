@@ -8,6 +8,12 @@ adapters:
   {{ $name }}:
     enabled: {{ $enabled }}
     role: {{ if or (eq $name "copilot") (eq $name "crush") }}guidance{{ else }}orchestrable{{ end }}
+{{- if eq $name "crush" }}
+    # model: openai/gpt-5.5
+    # params:
+    #   provider: openai
+    #   base_url: https://api.openai.com/v1
+{{- end }}
 {{- end }}
 routing:
   default_producer: codex

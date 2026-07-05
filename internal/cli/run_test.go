@@ -5,6 +5,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -29,6 +30,38 @@ func TestRunDryRunPrintsPlanWithoutInvoking(t *testing.T) {
 	}
 	if !containsAll(out.String(), "research", "review", "adapters") {
 		t.Fatalf("dry-run output = %s, want execution plan", out.String())
+	}
+}
+
+func TestRunDryRunPrintsModelAndEffort(t *testing.T) {
+	repo := repoWithResearchLoop(t)
+	mustWrite(t, filepath.Join(repo, "mivia-agent.yaml"), "version: \"1\"\nadapters:\n  codex:\n    enabled: true\n    role: orchestrable\n    model: gpt-5.5\n    effort: minimal\n  claude:\n    enabled: true\n    role: orchestrable\n    model: sonnet\n    effort: high\nloops:\n  research:\n    bound: iterations\n    max_iterations: 2\n    steps:\n      - id: research\n        producer: codex\n        artifact: research.md\n      - id: review\n        reviewers: [codex, claude]\n        artifact: research.md\n        model: claude-opus\n        effort: low\n")
+	cmd := newRunCommand()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"--repo", repo, "--workflow", "research", "--dry-run", "--json"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("run dry-run error = %v", err)
+	}
+	var rows []struct {
+		Step    string `json:"step"`
+		Runtime []struct {
+			Adapter string `json:"adapter"`
+			Model   string `json:"model"`
+			Effort  string `json:"effort"`
+		} `json:"runtime"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &rows); err != nil {
+		t.Fatalf("Unmarshal() error = %v, output=%s", err, out.String())
+	}
+	if len(rows) != 2 {
+		t.Fatalf("rows len = %d, want 2", len(rows))
+	}
+	if got := rows[0].Runtime; len(got) != 1 || got[0].Adapter != "codex" || got[0].Model != "gpt-5.5" || got[0].Effort != "minimal" {
+		t.Fatalf("producer runtime = %#v, want codex defaults", got)
+	}
+	if got := rows[1].Runtime; len(got) != 2 || got[0].Model != "claude-opus" || got[0].Effort != "low" || got[1].Model != "claude-opus" || got[1].Effort != "low" {
+		t.Fatalf("review runtime = %#v, want step overrides for both reviewers", got)
 	}
 }
 

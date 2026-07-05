@@ -164,6 +164,24 @@ func TestCrushShimDoesNotDuplicateLongPolicy(t *testing.T) {
 	assertThinAdapterPointer(t, string(data))
 }
 
+func TestCrushTemplateIncludesModelConfigGuidance(t *testing.T) {
+	readme, err := fs.ReadFile(FS(), "adapters/crush/README.md.tmpl")
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if !strings.Contains(string(readme), "adapters.crush.model") || !strings.Contains(string(readme), "adapters.crush.params") || !strings.Contains(string(readme), "guidance-only") {
+		t.Fatalf("crush README = %q, want model/params guidance and guidance-only note", readme)
+	}
+
+	manifest, err := fs.ReadFile(FS(), "core/mivia-agent.yaml.tmpl")
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if !strings.Contains(string(manifest), "# model: openai/gpt-5.5") || !strings.Contains(string(manifest), "# params:") || !strings.Contains(string(manifest), "#   provider: openai") {
+		t.Fatalf("mivia-agent.yaml template = %q, want crush model/params example", manifest)
+	}
+}
+
 func TestCrushAdapterRendersGuidanceRole(t *testing.T) {
 	data, err := fs.ReadFile(FS(), "core/mivia-agent.yaml.tmpl")
 	if err != nil {

@@ -46,5 +46,7 @@ If `List` changes, update its tests and any generated-fixture expectations that 
 
 - Add the committed template under `templates/`.
 - Make sure the embedded path matches the committed source exactly.
+- If a template is mirrored under `internal/templates/source/`, update both copies in the same change.
 - Keep adapter shims thin; point back to `.ai/INDEX.md` instead of duplicating policy.
+- Guidance-only adapter shims may document config knobs, but they must not imply `mivia-agent run` support that does not exist.
 - Add or update idempotency coverage when a rendered file changes shape.

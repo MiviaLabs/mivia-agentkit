@@ -27,3 +27,25 @@ Dependencies:
 
 Mutation proof:
 - Re-run the prior node mutations; at least one named regression test per guard must fail before revert.
+
+## Verification
+
+```bash
+go test ./internal/config/... ./internal/adapter/... ./internal/orchestrator/... ./internal/cli/... ./internal/templates/... -count=1
+go vet ./internal/config/... ./internal/adapter/... ./internal/orchestrator/... ./internal/cli/... ./internal/templates/...
+```
+
+WS ws-f-audit-review is ☑ when:
+- [x] deep bug audit found no open in-scope gaps
+- [x] test coverage audit found no missing or shallow in-scope tests
+- [x] adversarial test review found no surviving regression path
+- [x] all named load-bearing mutations failed before revert
+- [x] full package verifier and `go vet` set passed
+
+## Completion — 2026-07-05
+
+- Tests: 170 passing.
+- Mutation proofs: config effort validation fail-then-revert ok; orchestrator step-override precedence fail-then-revert ok; Codex effort override fail-then-revert ok; Claude effort flag fail-then-revert ok; dry-run runtime surface fail-then-revert ok; Crush guidance removal fail-then-revert ok.
+- Files: 1 updated.
+- Residual risk: none.
+- Follow-ups: none.

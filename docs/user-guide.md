@@ -243,9 +243,17 @@ Current `run` behavior:
 
 - Reads the workflow from `mivia-agent.yaml` or `.ai/workflows/<name>.yaml`.
 - Rejects budget-bound loops.
+- Resolves runtime model and effort as `step override -> adapter default -> CLI default`.
+- `run --dry-run --json` includes a per-step `runtime` list with resolved `adapter`, `model`, and `effort` values.
 - Detects required orchestrable adapters.
 - Executes the loop through the orchestrator.
 - Writes run artifacts under `.ai/runs/`.
+
+Current adapter runtime support:
+
+- Codex passes `--model` and a one-off `model_reasoning_effort` override when configured.
+- Claude passes `--model` and `--effort` when configured.
+- Crush may carry repo-owned `model` and `params` config, but it remains guidance-only and is never invoked by `run`.
 
 Loop authoring details live in [loop-authoring.md](./loop-authoring.md).
 

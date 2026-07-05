@@ -40,3 +40,24 @@ Dependencies:
 
 Mutation proof:
 - Remove model/provider guidance from the template; `TestCrushTemplateIncludesModelConfigGuidance` must fail.
+
+## Verification
+
+```bash
+go test ./internal/config/... ./internal/templates/... -count=1
+go vet ./internal/config/... ./internal/templates/...
+```
+
+WS ws-d-crush-config-guidance is ☑ when:
+- [x] all listed tests pass
+- [x] all mutation proofs executed and reverted (results in completion report)
+- [x] `go vet` clean for this WS's packages
+- [x] no network calls added (grep for `http.`, `net.Dial`, `os/exec` outside adapter fakes)
+
+## Completion — 2026-07-05
+
+- Tests: 42 passing.
+- Mutation proofs: T1 Crush config guidance removal fail-then-revert ok; T2 Crush README guidance removal fail-then-revert ok.
+- Files: 7 updated.
+- Residual risk: none.
+- Follow-ups: none.

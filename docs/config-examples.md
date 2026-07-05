@@ -32,9 +32,13 @@ adapters:
   codex:
     enabled: true
     role: orchestrable
+    model: gpt-5.5
+    effort: high
   claude:
     enabled: true
     role: orchestrable
+    model: sonnet
+    effort: medium
   copilot:
     enabled: true
     role: guidance
@@ -42,8 +46,12 @@ adapters:
     enabled: false
     role: orchestrable
   crush:
-    enabled: false
+    enabled: true
     role: guidance
+    model: openai/gpt-5.5
+    params:
+      provider: openai
+      base_url: https://api.openai.com/v1
 
 routing:
   default_producer: codex
@@ -68,12 +76,16 @@ loops:
       - id: produce
         producer: codex
         artifact: research.md
+        model: gpt-5.5
+        effort: high
         max_turns: 4
       - id: review
         reviewers:
           - codex
           - claude
         artifact: research.md
+        model: sonnet
+        effort: low
         consensus:
           mode: majority
           min_reviewers: 2
@@ -195,10 +207,12 @@ defaults:
 
 ## Notes
 
+- Precedence is `step model/effort` -> `adapter default model/effort` -> CLI default.
+- `run --dry-run --json` reports a per-step `runtime` list so you can inspect the resolved adapter, model, and effort before execution.
 - Supported profiles are `starter`, `standard`, and `strict`.
 - Workflow `bound: budget` is not supported in MVP.
 - Separate `run` executions are isolated under unique `.ai/runs/<run-id>/` directories.
 - Retried steps within one run are stored under per-iteration subdirectories such as `iter-001` and `iter-002`.
 - Producer and reviewer adapters in loops must be enabled and `orchestrable`.
-- `copilot` and `crush` are guidance-only and cannot be workflow producers or reviewers.
+- `copilot` and `crush` are guidance-only and cannot be workflow producers or reviewers, even when `crush` has `model` or `params` config.
 - `init --with-loop`, `run --step`, `run --input-artifact`, and `run --var` are reserved surface today.

@@ -37,7 +37,7 @@ func newRunCommand() *cobra.Command {
 				return err
 			}
 			if dryRun {
-				return printRunPlan(cmd, loop, jsonOut)
+				return printRunPlan(cmd, manifest, loop, jsonOut)
 			}
 			reg, err := approvedRegistry(cmd.Context(), manifest, loopAdapterNames(loop)...)
 			if err != nil {
@@ -87,18 +87,24 @@ func newRunCommand() *cobra.Command {
 	return cmd
 }
 
-func printRunPlan(cmd *cobra.Command, loop config.Loop, jsonOut bool) error {
+func printRunPlan(cmd *cobra.Command, manifest config.Manifest, loop config.Loop, jsonOut bool) error {
 	nodes, err := orchestrator.Resolve(loop)
 	if err != nil {
 		return err
 	}
+	type runtimeRow struct {
+		Adapter string `json:"adapter"`
+		Model   string `json:"model"`
+		Effort  string `json:"effort"`
+	}
 	type row struct {
-		Step     string   `json:"step"`
-		Type     string   `json:"type"`
-		Adapters []string `json:"adapters"`
-		MaxTurns int      `json:"max_turns"`
-		Timeout  string   `json:"timeout"`
-		Artifact string   `json:"artifact"`
+		Step     string       `json:"step"`
+		Type     string       `json:"type"`
+		Adapters []string     `json:"adapters"`
+		Runtime  []runtimeRow `json:"runtime"`
+		MaxTurns int          `json:"max_turns"`
+		Timeout  string       `json:"timeout"`
+		Artifact string       `json:"artifact"`
 	}
 	var rows []row
 	for _, node := range nodes {
@@ -109,6 +115,17 @@ func printRunPlan(cmd *cobra.Command, loop config.Loop, jsonOut bool) error {
 		} else {
 			r.Type = "review"
 			r.Adapters = append([]string(nil), node.Step.Reviewers...)
+		}
+		for _, name := range r.Adapters {
+			model := manifest.Adapters[name].Model
+			if node.Step.Model != "" {
+				model = node.Step.Model
+			}
+			effort := manifest.Adapters[name].Effort
+			if node.Step.Effort != "" {
+				effort = node.Step.Effort
+			}
+			r.Runtime = append(r.Runtime, runtimeRow{Adapter: name, Model: model, Effort: effort})
 		}
 		rows = append(rows, r)
 	}

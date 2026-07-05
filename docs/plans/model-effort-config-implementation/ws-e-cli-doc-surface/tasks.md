@@ -39,3 +39,27 @@ Dependencies:
 
 Mutation proof:
 - Remove the documented override precedence; the dry-run behavior test remains the executable guard and docs must be updated to match it.
+
+## Verification
+
+```bash
+go test ./internal/cli/... -run 'TestRunDryRunPrintsModelAndEffort' -count=1
+go test ./internal/cli/... -count=1
+go vet ./internal/cli/...
+git diff --check
+```
+
+WS ws-e-cli-doc-surface is ☑ when:
+- [x] all listed tests pass
+- [x] all mutation proofs executed and reverted (results in completion report)
+- [x] `go vet` clean for this WS's packages
+- [x] `git diff --check` clean
+- [x] docs explain runtime precedence and supported adapter behavior
+
+## Completion — 2026-07-05
+
+- Tests: 42 passing.
+- Mutation proofs: T1 dry-run resolved model/effort omission fail-then-revert ok; T2 docs precedence drift guarded by `TestRunDryRunPrintsModelAndEffort`.
+- Files: 6 updated.
+- Residual risk: none.
+- Follow-ups: none.
