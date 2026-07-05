@@ -101,11 +101,15 @@ func checkHooksCallMiviaAgent(ctx *Context) []report.Finding {
 			continue
 		}
 		data, err := os.ReadFile(filepath.Join(ctx.Repo, filepath.FromSlash(rel)))
-		if err != nil || !bytes.Contains(data, []byte("mivia-agent hook")) {
+		if err != nil || !hookConfigInvokesMiviaAgent(data) {
 			findings = append(findings, finding(report.SeverityError, "hooks.missing_mivia_agent", rel, "hook config must invoke mivia-agent hook"))
 		}
 	}
 	return findings
+}
+
+func hookConfigInvokesMiviaAgent(data []byte) bool {
+	return bytes.Contains(data, []byte("mivia-agent hook")) || bytes.Contains(data, []byte("scripts/run_agent_hook_guard.sh"))
 }
 
 func checkSkillsFrontmatter(ctx *Context) []report.Finding {
@@ -133,6 +137,10 @@ func checkManagedMarkers(ctx *Context) []report.Finding {
 		if err != nil || d.IsDir() || strings.Contains(path, string(filepath.Separator)+".git"+string(filepath.Separator)) {
 			return nil
 		}
+		rel := relSlash(ctx.Repo, path)
+		if !isManagedMarkerPath(rel) {
+			return nil
+		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return nil
@@ -140,12 +148,19 @@ func checkManagedMarkers(ctx *Context) []report.Finding {
 		starts := bytes.Count(data, []byte("mivia-agent:managed:start"))
 		ends := bytes.Count(data, []byte("mivia-agent:managed:end"))
 		if starts != ends || (starts > 0 && !render.HasManaged(data)) {
-			rel := relSlash(ctx.Repo, path)
 			findings = append(findings, finding(report.SeverityError, "generated.markers_invalid", rel, "managed block markers must be balanced"))
 		}
 		return nil
 	})
 	return findings
+}
+
+func isManagedMarkerPath(rel string) bool {
+	rel = filepath.ToSlash(rel)
+	if isAgentControlPath(rel) {
+		return true
+	}
+	return strings.HasPrefix(rel, ".github/workflows/")
 }
 
 func checkCICallsDoctor(ctx *Context) []report.Finding {
@@ -154,10 +169,14 @@ func checkCICallsDoctor(ctx *Context) []report.Finding {
 	if os.IsNotExist(err) {
 		return []report.Finding{finding(report.SeverityWarn, "ci.missing_doctor_json", rel, "agent control workflow should run mivia-agent doctor --json")}
 	}
-	if err != nil || !bytes.Contains(data, []byte("mivia-agent doctor --json")) {
+	if err != nil || !ciCallsDoctorJSON(data) {
 		return []report.Finding{finding(report.SeverityWarn, "ci.missing_doctor_json", rel, "agent control workflow should run mivia-agent doctor --json")}
 	}
 	return nil
+}
+
+func ciCallsDoctorJSON(data []byte) bool {
+	return bytes.Contains(data, []byte("mivia-agent doctor")) && bytes.Contains(data, []byte("--json"))
 }
 
 func checkGeneratedArtifactsStaged(ctx *Context) []report.Finding {
@@ -287,6 +306,9 @@ func checkGlobalReadable(ctx *Context) []report.Finding {
 }
 
 func checkGlobalRuleConflict(ctx *Context) []report.Finding {
+	if !ctx.Strict {
+		return nil
+	}
 	globalRules := filepath.Join(ctx.GlobalDir, "rules")
 	projectRules := filepath.Join(ctx.Repo, ".ai", "rules")
 	entries, err := os.ReadDir(globalRules)

@@ -12,6 +12,7 @@ vendor/
 
 # Runtime artifacts
 .ai/runs/
+.ai/audit.jsonl
 .git/mivia-agent-quality-stamp.json
 
 # Local tool state

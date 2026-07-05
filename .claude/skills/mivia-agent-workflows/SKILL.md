@@ -22,3 +22,10 @@ Claude-specific behavior:
 - Translate user objectives into `mivia-agent run --repo . --workflow <name> --var objective="<free-text objective>" --json`.
 - Treat `.ai/runs/` as ignored runtime output and do not commit run artifacts.
 - Report workflow pass as artifact acceptance only, not ship approval.
+
+AgentKit repo workflows:
+
+- `research-loop`
+- `bug-audit-loop`
+- `roadmap-implementation-review-loop`
+- `desktop-workflow-docs-loop`

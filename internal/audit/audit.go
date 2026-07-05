@@ -62,10 +62,14 @@ func missingAI(ctx Context) []report.Finding {
 
 func missingCI(ctx Context) []report.Finding {
 	data, err := os.ReadFile(filepath.Join(ctx.Repo, ".github", "workflows", "agent-control.yml"))
-	if err != nil || !bytes.Contains(data, []byte("mivia-agent doctor --json")) {
+	if err != nil || !ciCallsDoctorJSON(data) {
 		return []report.Finding{warn("ci.missing_control_check", ".github/workflows/agent-control.yml", "strict profile should gate on doctor --json")}
 	}
 	return nil
+}
+
+func ciCallsDoctorJSON(data []byte) bool {
+	return bytes.Contains(data, []byte("mivia-agent doctor")) && bytes.Contains(data, []byte("--json"))
 }
 
 func missingContracts(ctx Context) []report.Finding {
@@ -209,7 +213,7 @@ func weakLoops(ctx Context) []report.Finding {
 }
 
 func globalRuleConflict(ctx Context) []report.Finding {
-	dctx := doctor.Context{Repo: ctx.Repo, GlobalDir: ctx.GlobalDir}
+	dctx := doctor.Context{Repo: ctx.Repo, GlobalDir: ctx.GlobalDir, Strict: ctx.Strict}
 	var findings []report.Finding
 	for _, check := range doctor.DefaultChecks() {
 		if check.ID != "global.no_rule_conflict" {

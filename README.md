@@ -40,6 +40,38 @@ Review advisory quality gaps:
 go run ./cmd/mivia-agent audit --repo /path/to/repo --json
 ```
 
+## Codex Desktop Flow
+
+In a Codex Desktop repo, `mivia-agent init` installs the repo skill, hook wiring, manifest, and workflow files. The desktop agent still starts from a normal user prompt, but the runtime boundary is the local `mivia-agent` binary.
+
+```mermaid
+flowchart TD
+  User["User in Codex Desktop"] --> Prompt["Use $mivia-agent-workflows with a free-text objective"]
+  Prompt --> Skill["Repo skill: .ai/skills/mivia-agent-workflows/SKILL.md"]
+  Prompt --> Hook["Fast Codex hooks: policy reminders and protected-action gates"]
+  Skill --> Check["mivia-agent adapters --repo . --json"]
+  Check --> DryRun["mivia-agent run --repo . --workflow <name> --dry-run --json"]
+  DryRun --> LiveRun["mivia-agent run --repo . --workflow <name> --var objective=... --json"]
+  LiveRun --> Adapter["Codex adapter: codex exec"]
+  Adapter --> Artifacts["Ignored artifacts: .ai/runs/<run-id>/<step>/iter-001/<artifact>"]
+  Artifacts --> Report["Desktop agent reports artifact path, verdict, and residual risk"]
+```
+
+Example desktop prompt:
+
+```text
+Use $mivia-agent-workflows. Check adapters, dry-run workflow research-loop, then run it for objective: audit auth timeout handling.
+```
+
+For a Codex-only runtime setup, configure Codex as the orchestrable adapter and keep desktop-only tools such as Antigravity guidance-only. The workflow files should resolve producer and reviewer steps to `codex` in the dry-run output before any live run.
+
+This repo includes Codex-only workflows for its own maintenance:
+
+- `research-loop`
+- `bug-audit-loop`
+- `roadmap-implementation-review-loop`
+- `desktop-workflow-docs-loop`
+
 ## Current Capabilities
 
 Implemented command surface:
@@ -182,7 +214,7 @@ printf '{"tool":"bash","command":"git push"}' | \
 
 `init` is idempotent for the same inputs. Existing user-owned files with different content are reported as conflicts and are not overwritten unless `--force` is passed. Files with `mivia-agent` managed-block markers are updated only inside the managed block.
 
-`doctor` is read-only. It checks the manifest, `.ai/` index, adapter files, hook wiring, skill frontmatter, managed-block markers, loop bounds, consensus satisfiability, governance provider, and global rule conflicts. `--strict` promotes warnings to failures.
+`doctor` is read-only. It checks the manifest, `.ai/` index, adapter files, hook wiring, skill frontmatter, managed-block markers in generated/control files, loop bounds, consensus satisfiability, and governance provider. In `--strict` mode it also reports project/global rule conflicts as warnings, and `--strict` promotes warnings to failures.
 
 `audit` is read-only and advisory by default. It flags duplicated policy, missing control checks, missing verifier or contract surfaces, unsafe MCP wildcard config, managed-file edits outside generated blocks, weak strict-profile consensus, protect-bound loops without review, and global rule conflicts.
 

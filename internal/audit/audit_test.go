@@ -47,6 +47,30 @@ func TestAuditReportsMissingCIForStrictProfile(t *testing.T) {
 	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents"), Strict: true}), "ci.missing_control_check")
 }
 
+func TestAuditReportsMissingContractMatrix(t *testing.T) {
+	repo, home := freshRepo(t)
+	removePath(t, repo, ".ai/quality/contracts/project-runtime.yaml")
+	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")}), "contracts.missing_matrix")
+}
+
+func TestAuditAcceptsContractMatrix(t *testing.T) {
+	repo, home := freshRepo(t)
+	writeFile(t, filepath.Join(repo, ".ai", "quality", "contracts", "project-runtime.yaml"), "version: 1\nproject: test\ncontracts:\n  - name: local-verification\n    required: true\n")
+	got := Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")})
+	if hasCode(got.Findings, "contracts.missing_matrix") {
+		t.Fatalf("Run() findings = %+v, want contract matrix accepted", got.Findings)
+	}
+}
+
+func TestAuditAcceptsGoRunDoctorJSONControlWorkflow(t *testing.T) {
+	repo, home := freshRepo(t)
+	writeFile(t, filepath.Join(repo, ".github", "workflows", "agent-control.yml"), "name: Agent Control\njobs:\n  doctor:\n    steps:\n      - run: go run ./cmd/mivia-agent doctor --repo . --json\n")
+	got := Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents"), Strict: true})
+	if hasCode(got.Findings, "ci.missing_control_check") {
+		t.Fatalf("Run() findings = %+v, want go run doctor --json accepted", got.Findings)
+	}
+}
+
 func TestAuditReportsNoReviewBeforeProtect(t *testing.T) {
 	repo, home := freshRepo(t)
 	writeFile(t, filepath.Join(repo, "mivia-agent.yaml"), strictProtectLoop("first-pass", false))
@@ -66,11 +90,21 @@ func TestAuditReportsEditedManagedFileOutsideBlocks(t *testing.T) {
 	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")}), "generated.edited_outside_managed_blocks")
 }
 
-func TestAuditReportsGlobalRuleConflictWithProject(t *testing.T) {
+func TestAuditIgnoresGlobalRuleConflictInNonStrictProjectWins(t *testing.T) {
 	repo, home := freshRepo(t)
 	writeFile(t, filepath.Join(home, ".agents", "rules", "20-agent-quality.md"), "global\n")
 	writeFile(t, filepath.Join(repo, ".ai", "rules", "20-agent-quality.md"), "project\n")
-	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")}), "global.rule_conflict_with_project")
+	got := Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")})
+	if hasCode(got.Findings, "global.rule_conflict_with_project") {
+		t.Fatalf("Run() findings = %+v, want project-wins global conflict ignored in non-strict audit", got.Findings)
+	}
+}
+
+func TestAuditReportsGlobalRuleConflictWithProjectInStrictMode(t *testing.T) {
+	repo, home := freshRepo(t)
+	writeFile(t, filepath.Join(home, ".agents", "rules", "20-agent-quality.md"), "global\n")
+	writeFile(t, filepath.Join(repo, ".ai", "rules", "20-agent-quality.md"), "project\n")
+	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents"), Strict: true}), "global.rule_conflict_with_project")
 }
 
 func strictProtectLoop(consensus string, withReview bool) string {

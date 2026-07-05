@@ -48,7 +48,6 @@ Flags that exist but are not fully wired yet:
 - `init --with-loop`
 - `run --step`
 - `run --input-artifact`
-- `run --var`
 - `preflight --pipeline-preflight`
 
 Treat those as reserved surface. They are accepted by the CLI but do not materially change behavior yet.
@@ -163,13 +162,13 @@ go run ./cmd/mivia-agent doctor --repo /path/to/repo --json
 - `.ai/INDEX.md` exists.
 - Root and tool adapter files point back to the canonical `.ai` surface.
 - Enabled adapter files exist, including `.codex/AGENTS.md` and `.codex/hooks.json` for Codex.
-- Hook configs invoke `mivia-agent hook`.
+- Hook configs invoke `mivia-agent hook` directly or delegate through the shared `scripts/run_agent_hook_guard.sh` runner.
 - Skill files have required frontmatter.
-- Managed-block markers are balanced.
+- Managed-block markers are balanced in generated/control files. Literal marker examples in source, tests, and docs are ignored.
 - Loop definitions are bounded and reference known orchestrable adapters.
 - Review steps have satisfiable `min_reviewers`.
 - Governance provider is known.
-- Global rule files that conflict with project rules are reported as warnings.
+- In `--strict` mode, global rule files that conflict with project rules are reported as warnings. In normal mode, project rules win without a finding.
 
 Exit codes:
 
@@ -205,7 +204,7 @@ go run ./cmd/mivia-agent audit --repo /path/to/repo --json
 - Strict-profile loops using weak consensus.
 - `min_reviewers` exceeding enabled orchestrable adapters.
 - `noop` governance under strict profile.
-- Global rule conflicts with project rules.
+- In `--strict` mode, global rule conflicts with project rules.
 
 By default, `audit` exits `0` even when it reports warnings. Use `--strict` to promote warning-only reports to exit code `2`.
 

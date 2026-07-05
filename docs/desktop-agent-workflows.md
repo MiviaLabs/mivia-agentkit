@@ -70,6 +70,23 @@ Use $mivia-agent-workflows. Run mivia-agent adapters, then run the workflow dry-
 
 Codex hooks are a lifecycle framework and skills are reusable instruction bundles; keep long workflow instructions in the skill, not in the hook.
 
+Codex repo skills are discovered from `.agents/skills` at the current working directory, parent directories, and the Git root. Keep reusable workflow instructions there, with `.ai/skills/` as the canonical source when the repo also supports generic agents.
+
+For this AgentKit repo, use the local ignored binary and Codex-only workflows:
+
+```bash
+./mivia-agent adapters --repo . --json
+./mivia-agent run --repo . --workflow research-loop --dry-run --json
+./mivia-agent run --repo . --workflow research-loop --var objective="<free-text objective>" --json
+```
+
+Available AgentKit maintenance workflows:
+
+- `research-loop`
+- `bug-audit-loop`
+- `roadmap-implementation-review-loop`
+- `desktop-workflow-docs-loop`
+
 Official docs:
 
 - [Codex hooks](https://developers.openai.com/codex/hooks)

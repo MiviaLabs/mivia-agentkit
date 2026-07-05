@@ -51,6 +51,23 @@ Use $mivia-agent-workflows. Inspect workflow outputs from the latest run and rep
 
 Translate free-text objectives into `--var objective="<free-text objective>"` when invoking `mivia-agent run`.
 
+## AgentKit Repo Workflows
+
+In this repo, `mivia-agent.yaml` configures Codex as the only orchestrable adapter. Antigravity and Copilot are guidance-only, and Crush/Claude are disabled unless a future scoped change enables them.
+
+- `research-loop`: Codex `low` producer, Codex `medium` review.
+- `bug-audit-loop`: Codex `high` producer, Codex `medium` review.
+- `roadmap-implementation-review-loop`: Codex `high` producer, Codex `xhigh` review.
+- `desktop-workflow-docs-loop`: Codex `medium` producer, Codex `high` review.
+
+For local AgentKit workflow requests, run:
+
+```bash
+./mivia-agent adapters --repo . --json
+./mivia-agent run --repo . --workflow <name> --dry-run --json
+./mivia-agent run --repo . --workflow <name> --var objective="<free-text objective>" --json
+```
+
 ## Required Report
 
 Always use `mivia-agent-report/v1` from `.ai/templates/agent-report-v1.md`. Keep the report strict and concise; do not add free-form sections unless the user asks for a long artifact.

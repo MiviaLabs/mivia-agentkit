@@ -45,6 +45,48 @@ func TestDoctorFailsHookNotCallingMiviaAgent(t *testing.T) {
 	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")}), "hooks.missing_mivia_agent")
 }
 
+func TestDoctorAcceptsSharedHookGuardRunner(t *testing.T) {
+	repo, home := freshRepo(t)
+	command := `sh -c 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); exec "$ROOT/scripts/run_agent_hook_guard.sh" codex pre-tool-use'`
+	writeFile(t, filepath.Join(repo, ".codex", "hooks.json"), `{"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"`+command+`"}]}]}}`)
+	writeFile(t, filepath.Join(repo, ".claude", "settings.json"), `{"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"`+command+`"}]}]}}`)
+	got := Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")})
+	if hasCode(got.Findings, "hooks.missing_mivia_agent") {
+		t.Fatalf("Run() findings = %+v, want shared hook guard runner accepted", got.Findings)
+	}
+}
+
+func TestDoctorIgnoresManagedMarkerExamplesOutsideGeneratedSurface(t *testing.T) {
+	repo, home := freshRepo(t)
+	markerStart := "mivia-agent:managed:" + "start"
+	markerEnd := "mivia-agent:managed:" + "end"
+	writeFile(t, filepath.Join(repo, "docs", "template-authoring.md"), "Example markers:\n"+markerStart+"\nmanaged\n"+markerEnd+"\n")
+	writeFile(t, filepath.Join(repo, "internal", "render", "managedblock_test.go"), `package render
+
+const markerExample = "`+markerStart+` without a real block"
+`)
+	got := Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")})
+	if hasCode(got.Findings, "generated.markers_invalid") {
+		t.Fatalf("Run() findings = %+v, want source and docs marker examples ignored", got.Findings)
+	}
+}
+
+func TestDoctorFlagsUnbalancedManagedMarkerInGeneratedFile(t *testing.T) {
+	repo, home := freshRepo(t)
+	markerStart := "<!-- mivia-agent:managed:" + "start -->"
+	writeFile(t, filepath.Join(repo, ".ai", "INDEX.md"), "intro\n"+markerStart+"\nmanaged\n")
+	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")}), "generated.markers_invalid")
+}
+
+func TestDoctorPassesAgentControlWorkflowCallingDoctorJSON(t *testing.T) {
+	repo, home := freshRepo(t)
+	writeFile(t, filepath.Join(repo, ".github", "workflows", "agent-control.yml"), "name: Agent Control\njobs:\n  doctor:\n    steps:\n      - run: go run ./cmd/mivia-agent doctor --repo . --json\n")
+	got := Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")})
+	if hasCode(got.Findings, "ci.missing_doctor_json") {
+		t.Fatalf("Run() findings = %+v, want agent-control workflow accepted", got.Findings)
+	}
+}
+
 func TestDoctorFailsLoopWithNoBound(t *testing.T) {
 	repo, home := freshRepo(t)
 	writeFile(t, filepath.Join(repo, "mivia-agent.yaml"), manifestWithLoop("bound: \"\"\n    max_iterations: 1"))
@@ -70,14 +112,24 @@ func TestDoctorFailsUnknownGovernanceProvider(t *testing.T) {
 	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")}), "governance.provider_unknown")
 }
 
-func TestDoctorWarnsGlobalRuleConflict(t *testing.T) {
+func TestDoctorIgnoresGlobalRuleConflictInNonStrictProjectWins(t *testing.T) {
 	repo, home := freshRepo(t)
 	writeFile(t, filepath.Join(home, ".agents", "rules", "00-operating-doctrine.md"), "global\n")
 	writeFile(t, filepath.Join(repo, ".ai", "rules", "00-operating-doctrine.md"), "project\n")
 	got := Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")})
+	if hasCode(got.Findings, "global.rule_conflict") {
+		t.Fatalf("Run() findings = %+v, want project-wins global conflict ignored in non-strict mode", got.Findings)
+	}
+}
+
+func TestDoctorWarnsGlobalRuleConflictInStrictMode(t *testing.T) {
+	repo, home := freshRepo(t)
+	writeFile(t, filepath.Join(home, ".agents", "rules", "00-operating-doctrine.md"), "global\n")
+	writeFile(t, filepath.Join(repo, ".ai", "rules", "00-operating-doctrine.md"), "project\n")
+	got := Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents"), Strict: true})
 	assertCode(t, got, "global.rule_conflict")
-	if got.ExitCode != 0 {
-		t.Fatalf("ExitCode = %d, want 0 for non-strict warning", got.ExitCode)
+	if got.ExitCode == 0 {
+		t.Fatalf("ExitCode = 0, want strict warning to fail")
 	}
 }
 

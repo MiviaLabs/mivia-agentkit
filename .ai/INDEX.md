@@ -54,12 +54,31 @@ Committed machine-readable implementation plans live under `.ai/plans/`. `.ai/ru
 
 The AgentKit implementation roadmap is under `docs/plans/agentkit-implementation-roadmap/`. Treat that directory and `.ai/plans/agentkit-implementation-roadmap.plan.json` as the durable planning source of truth.
 
+## Workflows
+
+Codex-only AgentKit workflows live under `.ai/workflows/`:
+
+- `research-loop` - inspect source, docs, and plans for a free-text objective.
+- `bug-audit-loop` - produce and review an implementation risk audit.
+- `roadmap-implementation-review-loop` - check roadmap/workstream implementation plans against repo conventions.
+- `desktop-workflow-docs-loop` - check desktop workflow docs, skills, and hook guidance for consistency.
+
+Always dry-run before live execution:
+
+```bash
+./mivia-agent run --repo . --workflow <name> --dry-run --json
+```
+
 ## Policy
 
 - `.ai/policy/commit-message.json` - allowed commit message types, scopes, and subject length for the repo `commit-msg` hook.
 - `.ai/policy/agent-hook-bypass.json` - blocked verification-bypass terms and the corrective instruction used by agent hooks.
 - `.ai/policy/audit-loop.json` - strict audit loop policy for structured audit/review Stop hooks.
 - `.ai/policy/agent-plan.json` - strict planning and plan-implementation hook policy.
+
+## Quality
+
+- `.ai/quality/contracts/project-runtime.yaml` - repo contract matrix for agent-control, workflow runtime, and doctor/audit quality gates.
 
 ## Templates
 
