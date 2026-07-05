@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
 	"github.com/MiviaLabs/mivia-agentkit/internal/config"
@@ -24,14 +25,20 @@ func newRunCommand() *cobra.Command {
 	var repo, workflow string
 	var maxIterations int
 	var dryRun, jsonOut, strict bool
+	var vars []string
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run a bounded agent workflow",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			templateVars, err := parseTemplateVars(vars)
+			if err != nil {
+				return err
+			}
 			manifest, err := loadManifest(repo)
 			if err != nil {
 				return err
 			}
+			templateVars["project"] = manifest.Project.Name
 			loop, err := loadLoop(absRepoPath(repo), manifest, workflow)
 			if err != nil {
 				return err
@@ -47,7 +54,7 @@ func newRunCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			builder := PromptBuilder{Repo: absRepoPath(repo), Vars: map[string]string{"project": manifest.Project.Name}}
+			builder := PromptBuilder{Repo: absRepoPath(repo), Vars: templateVars}
 			engine := orchestrator.Engine{Adapters: reg, Policy: prov, Store: runstore.New(absRepoPath(repo)), AdapterDefaults: manifest.Adapters, Repo: absRepoPath(repo), MaxIterations: maxIterations, Stamp: func(repo string) (string, error) {
 				stamp, err := preflight.CheckStamp(repo)
 				return stamp.Head, err
@@ -83,8 +90,39 @@ func newRunCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&strict, "strict", false, "fail warn-only outcomes")
 	cmd.Flags().String("step", "", "specific step")
 	cmd.Flags().String("input-artifact", "", "input artifact")
-	cmd.Flags().StringArray("var", nil, "template variable")
+	cmd.Flags().StringArrayVar(&vars, "var", nil, "template variable as key=value")
 	return cmd
+}
+
+func parseTemplateVars(values []string) (map[string]string, error) {
+	vars := map[string]string{}
+	for _, value := range values {
+		key, val, ok := strings.Cut(value, "=")
+		if !ok || strings.TrimSpace(key) == "" {
+			return nil, fmt.Errorf("invalid --var %q: expected key=value", value)
+		}
+		key = strings.TrimSpace(key)
+		if !validTemplateVarName(key) {
+			return nil, fmt.Errorf("invalid --var %q: key must match [A-Za-z_][A-Za-z0-9_]*", value)
+		}
+		vars[key] = val
+	}
+	return vars, nil
+}
+
+func validTemplateVarName(key string) bool {
+	for i, r := range key {
+		if i == 0 {
+			if r != '_' && !unicode.IsLetter(r) {
+				return false
+			}
+			continue
+		}
+		if r != '_' && !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			return false
+		}
+	}
+	return key != ""
 }
 
 func printRunPlan(cmd *cobra.Command, manifest config.Manifest, loop config.Loop, jsonOut bool) error {

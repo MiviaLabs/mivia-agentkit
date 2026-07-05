@@ -111,12 +111,32 @@ Use the skill when asking an agent to run or inspect a workflow:
 Use $mivia-agent-workflows. Check adapters, dry-run the workflow, then run it only if the dry-run resolves the expected producer and reviewer.
 ```
 
+Short prompts to paste into desktop apps:
+
+```text
+Use $mivia-agent-workflows. Run workflow research-loop for objective: audit auth timeout handling.
+```
+
+```text
+Use $mivia-agent-workflows. Dry-run workflow crush-research-loop, verify Crush/Qwen and Codex are resolved, then run it for objective: collect repo context for the billing refactor.
+```
+
+```text
+Use $mivia-agent-workflows. Inspect workflow outputs from the latest run and report the artifact path and review consensus.
+```
+
 The skill tells agents to prove the CLI boundary with:
 
 ```bash
 mivia-agent adapters --repo . --json
 mivia-agent run --repo . --workflow <name> --dry-run --json
 mivia-agent run --repo . --workflow <name> --json
+```
+
+For free-text objectives, have the desktop agent pass a workflow variable:
+
+```bash
+mivia-agent run --repo . --workflow <name> --var objective="<free-text objective>" --json
 ```
 
 Use hooks as fast reminders and policy gates only. Keep long operational instructions in the skill. A passing workflow accepts the artifact, not the repository for merge or release.
@@ -265,13 +285,15 @@ go run ./cmd/mivia-agent run --repo /path/to/repo --workflow research --dry-run 
 Execute it:
 
 ```bash
-go run ./cmd/mivia-agent run --repo /path/to/repo --workflow research
+go run ./cmd/mivia-agent run --repo /path/to/repo --workflow research \
+  --var objective="audit auth timeout handling"
 ```
 
 Current `run` behavior:
 
 - Reads the workflow from `mivia-agent.yaml` or `.ai/workflows/<name>.yaml`.
 - Rejects budget-bound loops.
+- Passes `--var key=value` values into prompt templates as `.Vars.<key>`; keys must match `[A-Za-z_][A-Za-z0-9_]*`, and the default producer and reviewer prompts use `.Vars.objective` when provided.
 - Resolves runtime model and effort as `step override -> adapter default -> CLI default`.
 - `run --dry-run --json` includes a per-step `runtime` list with resolved `adapter`, `model`, and `effort` values.
 - Detects required orchestrable adapters.

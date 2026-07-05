@@ -19,5 +19,6 @@ Codex-specific behavior:
 
 - Use the real CLI boundary for workflow proof.
 - Run `mivia-agent run --repo . --workflow <name> --dry-run --json` before live workflow execution.
+- Translate user objectives into `mivia-agent run --repo . --workflow <name> --var objective="<free-text objective>" --json`.
 - Treat `.ai/runs/` as ignored runtime output and do not commit run artifacts.
 - Report workflow pass as artifact acceptance only, not ship approval.

@@ -17,6 +17,22 @@ func TestTemplatesDirExists(t *testing.T) {
 	}
 }
 
+func TestReadmeLinksUserWorkflowDocsAndSkill(t *testing.T) {
+	data, err := os.ReadFile(repoPath(t, "README.md"))
+	if err != nil {
+		t.Fatalf("ReadFile(README.md) error = %v", err)
+	}
+	for _, want := range []string{
+		"[User guide](docs/user-guide.md)",
+		"[Desktop agent workflows](docs/desktop-agent-workflows.md)",
+		"[Mivia workflow skill](.ai/skills/mivia-agent-workflows/SKILL.md)",
+	} {
+		if !strings.Contains(string(data), want) {
+			t.Fatalf("README.md missing %q", want)
+		}
+	}
+}
+
 func TestTemplatesSubdirsExist(t *testing.T) {
 	for _, dir := range []string{
 		"templates/core/rules",
@@ -296,6 +312,14 @@ func TestMiviaAgentWorkflowSkillTemplates(t *testing.T) {
 	}
 	if string(agents) != string(canonical) {
 		t.Fatalf(".agents mivia-agent-workflows skill differs from .ai canonical")
+	}
+	for _, want := range []string{
+		`--var objective="<free-text objective>"`,
+		"Use $mivia-agent-workflows. Run workflow research-loop for objective:",
+	} {
+		if !strings.Contains(string(canonical), want) {
+			t.Fatalf("canonical workflow skill = %q, want %q", canonical, want)
+		}
 	}
 	claude, err := fs.ReadFile(FS(), "adapters/claude/skills/mivia-agent-workflows/SKILL.md.tmpl")
 	if err != nil {

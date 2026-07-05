@@ -126,12 +126,21 @@ Preview a Crush/Qwen producer with Codex review:
 ```bash
 go run ./cmd/mivia-agent run --repo /path/to/repo \
   --workflow crush-research-loop --dry-run --json
+go run ./cmd/mivia-agent run --repo /path/to/repo \
+  --workflow crush-research-loop \
+  --var objective="collect repo context for the billing refactor" --json
 ```
 
 Preview a workflow plan without invoking adapters:
 
 ```bash
 go run ./cmd/mivia-agent run --repo /path/to/repo --workflow research --dry-run --json
+```
+
+In desktop apps, ask the agent to use the generated workflow skill:
+
+```text
+Use $mivia-agent-workflows. Run workflow research-loop for objective: audit auth timeout handling.
 ```
 
 Run a one-off review:
@@ -196,6 +205,7 @@ make help
 - [Configuration examples](docs/config-examples.md) - working manifest and workflow examples, including Codex plus Crush/Qwen loops
 - [Loop authoring](docs/loop-authoring.md) - workflow shape, consensus, artifact paths, and practical checks
 - [Desktop agent workflows](docs/desktop-agent-workflows.md) - how Codex, Claude, and generic agent desktops should use skills and hooks to invoke `mivia-agent`
+- [Mivia workflow skill](.ai/skills/mivia-agent-workflows/SKILL.md) - repo skill with copy-paste desktop prompts and runtime proof rules
 - [Development environment](docs/setup/development-environment.md) - local prerequisites and Ubuntu setup
 - [Development hooks](docs/development-hooks.md) - hook behavior and policy shape
 - [Agent hooks](docs/agent-hooks.md) - agent hook surfaces, triggers, policies, and audit-loop behavior

@@ -180,6 +180,8 @@ Run it with:
 
 ```bash
 go run ./cmd/mivia-agent run --repo /path/to/repo --workflow research --dry-run --json
+go run ./cmd/mivia-agent run --repo /path/to/repo --workflow research \
+  --var objective="summarize the auth timeout risk and proposed fixes" --json
 ```
 
 ## Example `.ai/workflows/crush-research-loop.yaml`
@@ -220,7 +222,8 @@ Execute:
 
 ```bash
 go run ./cmd/mivia-agent run --repo /path/to/repo \
-  --workflow crush-research-loop --json
+  --workflow crush-research-loop \
+  --var objective="collect local repo context for the billing refactor" --json
 ```
 
 ## Example `.ai/workflows/codex-bug-audit-crush-review.yaml`

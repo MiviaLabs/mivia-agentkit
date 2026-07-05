@@ -39,6 +39,27 @@ To ask a desktop agent to use the generated skill:
 Use $mivia-agent-workflows. Check adapters, run the workflow dry-run, then run the workflow only if the dry-run resolves the expected producer, reviewer, model, and effort.
 ```
 
+Short desktop prompts:
+
+```text
+Use $mivia-agent-workflows. Run workflow research-loop for objective: audit auth timeout handling.
+```
+
+```text
+Use $mivia-agent-workflows. Dry-run workflow crush-research-loop, verify Crush/Qwen and Codex are resolved, then run it for objective: collect repo context for the billing refactor.
+```
+
+```text
+Use $mivia-agent-workflows. Inspect workflow outputs from the latest run and report the artifact path and review consensus.
+```
+
+Free-text objectives are passed as workflow variables. The desktop agent should translate the first two prompts into:
+
+```bash
+mivia-agent run --repo . --workflow <name> --dry-run --json
+mivia-agent run --repo . --workflow <name> --var objective="<free-text objective>" --json
+```
+
 ## Codex
 
 Codex should read `AGENTS.md`, then the repo skill. Project prompt hooks can inject a short reminder such as:

@@ -33,6 +33,24 @@ Use this skill when changing, testing, or explaining `mivia-agent` workflows and
 5. Prove generated target repos through `init --write`, not only template helper tests.
 6. Do not persist raw prompts, raw model output, provider payloads, secrets, credentials, or `.env` content.
 
+## Desktop Prompts
+
+Expected user prompts:
+
+```text
+Use $mivia-agent-workflows. Run workflow research-loop for objective: audit auth timeout handling.
+```
+
+```text
+Use $mivia-agent-workflows. Dry-run workflow crush-research-loop, verify Crush/Qwen and Codex are resolved, then run it for objective: collect repo context for the billing refactor.
+```
+
+```text
+Use $mivia-agent-workflows. Inspect workflow outputs from the latest run and report the artifact path and review consensus.
+```
+
+Translate free-text objectives into `--var objective="<free-text objective>"` when invoking `mivia-agent run`.
+
 ## Required Report
 
 Always use `mivia-agent-report/v1` from `.ai/templates/agent-report-v1.md`. Keep the report strict and concise; do not add free-form sections unless the user asks for a long artifact.

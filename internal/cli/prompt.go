@@ -80,9 +80,9 @@ func (b PromptBuilder) readPrompt(name string) ([]byte, error) {
 	}
 	switch name {
 	case "producer.tmpl":
-		return []byte("Produce artifact {{.Step.Artifact}} for {{.Vars.project}}."), nil
+		return []byte("Objective: {{with index .Vars \"objective\"}}{{.}}{{else}}use the workflow step and repo context{{end}}\nProduce artifact {{.Step.Artifact}} for {{.Vars.project}}."), nil
 	case "reviewer.tmpl":
-		return []byte("Review {{.Step.Artifact}} for {{.Vars.project}}."), nil
+		return []byte("{{with index .Vars \"objective\"}}Objective: {{.}}\n{{end}}Review {{.Step.Artifact}} for {{.Vars.project}}."), nil
 	default:
 		return nil, fmt.Errorf("prompt template %q not found", name)
 	}

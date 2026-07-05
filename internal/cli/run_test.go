@@ -137,6 +137,44 @@ func TestRunReviewStepUsesConcreteArtifactPath(t *testing.T) {
 	}
 }
 
+func TestRunPassesTemplateVariablesToPrompt(t *testing.T) {
+	var prompts []string
+	repo := repoWithResearchLoop(t)
+	withRuntimeAdapters(t,
+		fakeCLIAdapter{name: "codex", headless: true, run: adapter.Result{Stdout: []byte("artifact")}, verdict: adapter.Verdict{Pass: true, Severity: "low", Notes: "ok"}, prompts: &prompts},
+		fakeCLIAdapter{name: "claude", headless: true, verdict: adapter.Verdict{Pass: true, Severity: "low", Notes: "ok"}, prompts: &prompts},
+	)
+	cmd := newRunCommand()
+	cmd.SetArgs([]string{"--repo", repo, "--workflow", "research", "--var", "objective=Audit auth timeout behavior", "--json"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("run error = %v", err)
+	}
+	if len(prompts) == 0 || !strings.Contains(prompts[0], "Objective: Audit auth timeout behavior") ||
+		!strings.Contains(prompts[0], "Produce artifact research.md") {
+		t.Fatalf("prompts = %#v, want objective variable passed to producer prompt", prompts)
+	}
+}
+
+func TestRunRejectsMalformedTemplateVariable(t *testing.T) {
+	tests := []struct {
+		name string
+		arg  string
+	}{
+		{name: "missing_equals", arg: "objective"},
+		{name: "invalid_template_key", arg: "bad key=value"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := repoWithResearchLoop(t)
+			cmd := newRunCommand()
+			cmd.SetArgs([]string{"--repo", repo, "--workflow", "research", "--var", tt.arg})
+			if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "invalid --var") {
+				t.Fatalf("run error = %v, want malformed --var rejection", err)
+			}
+		})
+	}
+}
+
 func TestRunPassesManifestAdapterDefaultsToRuntime(t *testing.T) {
 	var runReqs []adapter.Request
 	var reviewReqs []adapter.Request

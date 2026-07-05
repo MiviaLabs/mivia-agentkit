@@ -48,6 +48,7 @@ func TestInitBinaryWritesMiviaAgentWorkflowSkills(t *testing.T) {
 		"name: mivia-agent-workflows",
 		"triggers:",
 		"./mivia-agent run --repo . --workflow <name> --dry-run --json",
+		`--var objective="<free-text objective>"`,
 		".ai/runs/<run-id>/<step-id>/iter-<nnn>/<artifact>",
 	} {
 		if !strings.Contains(canonical, want) {
