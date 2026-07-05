@@ -79,6 +79,6 @@ func TestReviewProducesConsensusReport(t *testing.T) {
 	if !strings.Contains(result.Stdout, `"pass":true`) || !strings.Contains(result.Stdout, `"adapter":"codex"`) || !strings.Contains(result.Stdout, `"adapter":"claude"`) {
 		t.Fatalf("review stdout = %s, want structured consensus report", result.Stdout)
 	}
-	readLogContains(t, codexLog, "--ask-for-approval never")
+	readLogContains(t, codexLog, `--config approval_policy="never"`)
 	readLogContains(t, claudeLog, "--permission-mode never")
 }

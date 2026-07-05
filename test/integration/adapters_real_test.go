@@ -49,7 +49,7 @@ func TestCodexAdapterRealSubprocessContract(t *testing.T) {
 	if result.ProviderMeta["model_id"] != "gpt-5" {
 		t.Fatalf("ProviderMeta = %#v, want model_id", result.ProviderMeta)
 	}
-	readLogContains(t, logPath, "exec", "--sandbox workspace-write", "--ask-for-approval never", "--json")
+	readLogContains(t, logPath, "exec", "--sandbox workspace-write", `--config approval_policy="never"`, "--json")
 
 	verdict, err := a.Review(context.Background(), adapter.Request{Prompt: "review", Approval: "never", Workdir: toolsDir})
 	if err != nil {

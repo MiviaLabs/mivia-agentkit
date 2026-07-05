@@ -1,12 +1,13 @@
 // Package adapter defines the Codex CLI adapter.
 // Plan: WS-C. PRD: FR-3.1, FR-3.2, FR-7.4.
 //
-// Codex docs verified 2026-07-05:
+// Codex docs and local CLI verified 2026-07-05:
 // https://developers.openai.com/codex/noninteractive documents `codex exec`
 // with `--output-last-message`; https://developers.openai.com/codex/cli/reference
-// documents pairing `--json` with `--output-last-message`; and
+// documents pairing `--json` with `--output-last-message`;
 // https://developers.openai.com/codex/agent-approvals-security documents
-// non-interactive `--sandbox workspace-write` with approval modes.
+// non-interactive `--sandbox workspace-write` with approval modes; and local
+// codex-cli 0.143.0-alpha.21 accepts approval through `-c approval_policy=...`.
 package adapter
 
 import (
@@ -95,7 +96,7 @@ func (c Codex) runRaw(ctx context.Context, req Request) (RunResult, error) {
 	if err := c.ValidateRequest(req); err != nil {
 		return RunResult{}, err
 	}
-	args := []string{"codex", "exec", "--sandbox", "workspace-write", "--ask-for-approval", req.Approval, "--json"}
+	args := []string{"codex", "exec", "--sandbox", "workspace-write", "--config", `approval_policy="` + req.Approval + `"`, "--json"}
 	if req.Model != "" {
 		args = append(args, "--model", req.Model)
 	}

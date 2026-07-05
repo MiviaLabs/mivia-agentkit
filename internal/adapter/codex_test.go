@@ -28,7 +28,7 @@ func TestCodexRunEnforcesNonInteractiveApproval(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 	args := strings.Join(r.Calls[0].Args, " ")
-	if !strings.Contains(args, "exec") || !strings.Contains(args, "--ask-for-approval never") || !strings.Contains(args, "--sandbox workspace-write") {
+	if !strings.Contains(args, "exec") || !strings.Contains(args, `--config approval_policy="never"`) || !strings.Contains(args, "--sandbox workspace-write") {
 		t.Fatalf("args = %q, want non-interactive approval and sandbox flags", args)
 	}
 }
