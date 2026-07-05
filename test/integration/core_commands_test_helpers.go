@@ -75,6 +75,7 @@ func tempGitRepo(t *testing.T) string {
 	runGit(t, repo, "init", "-q")
 	runGit(t, repo, "config", "user.email", "test@example.invalid")
 	runGit(t, repo, "config", "user.name", "Test User")
+	runGit(t, repo, "config", "commit.gpgsign", "false")
 	runGit(t, repo, "commit", "-q", "--allow-empty", "-m", "init")
 	return repo
 }

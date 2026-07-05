@@ -90,6 +90,20 @@ func TestGeneratedFixtureDryRunPlanNonEmpty(t *testing.T) {
 	}
 }
 
+func TestFixtureTempGitRepoDisablesGlobalSigning(t *testing.T) {
+	global := filepath.Join(t.TempDir(), "gitconfig")
+	if err := os.WriteFile(global, []byte("[commit]\n\tgpgsign = true\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile(global config) error = %v", err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", global)
+	repo := tempGitRepo(t)
+	if err := os.WriteFile(filepath.Join(repo, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(README.md) error = %v", err)
+	}
+	runGit(t, repo, "add", "README.md")
+	runGit(t, repo, "commit", "-q", "-m", "docs")
+}
+
 type fixtureEnv struct {
 	binary        string
 	repo          string
@@ -186,6 +200,7 @@ func tempGitRepo(t *testing.T) string {
 	runGit(t, repo, "init", "-q")
 	runGit(t, repo, "config", "user.email", "test@example.invalid")
 	runGit(t, repo, "config", "user.name", "Test User")
+	runGit(t, repo, "config", "commit.gpgsign", "false")
 	runGit(t, repo, "commit", "-q", "--allow-empty", "-m", "init")
 	return repo
 }

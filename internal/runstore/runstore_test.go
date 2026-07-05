@@ -78,6 +78,37 @@ func TestAppendTraceStableKeyOrder(t *testing.T) {
 	}
 }
 
+func TestAppendTraceRejectsRunIDTraversal(t *testing.T) {
+	repo := t.TempDir()
+	s := New(repo)
+	if err := s.AppendTrace(RunID("../escape"), TraceEvent{TS: "2026-07-05T00:00:00Z", Kind: "k"}); err == nil {
+		t.Fatalf("AppendTrace traversal error = nil, want error")
+	}
+	if _, err := os.Stat(filepath.Join(repo, ".ai", "escape", "trace.jsonl")); !os.IsNotExist(err) {
+		t.Fatalf("trace escaped runs or stat failed err=%v", err)
+	}
+	absolute := filepath.Join(t.TempDir(), "escape")
+	if err := s.AppendTrace(RunID(absolute), TraceEvent{TS: "2026-07-05T00:00:00Z", Kind: "k"}); err == nil {
+		t.Fatalf("AppendTrace absolute run id error = nil, want error")
+	}
+	if _, err := os.Stat(filepath.Join(absolute, "trace.jsonl")); !os.IsNotExist(err) {
+		t.Fatalf("trace escaped to absolute run id or stat failed err=%v", err)
+	}
+}
+
+func TestAppendTraceStaysUnderRuns(t *testing.T) {
+	repo := t.TempDir()
+	s := New(repo)
+	id := s.NewRun()
+	if err := s.AppendTrace(id, TraceEvent{TS: "2026-07-05T00:00:00Z", Kind: "k"}); err != nil {
+		t.Fatalf("AppendTrace error = %v", err)
+	}
+	path := filepath.Join(s.Dir(id), "trace.jsonl")
+	if !strings.HasPrefix(path, filepath.Join(repo, ".ai", "runs")+string(filepath.Separator)) {
+		t.Fatalf("trace path = %q, want under .ai/runs", path)
+	}
+}
+
 func TestReadArtifactRoundTrip(t *testing.T) {
 	s := New(t.TempDir())
 	id := s.NewRun()

@@ -93,20 +93,24 @@ func (s Store) ReadArtifact(id RunID, step string, iteration int, name string) (
 
 // AppendTrace appends one deterministic JSON trace line.
 func (s Store) AppendTrace(id RunID, event TraceEvent) error {
+	runDir, err := s.checkedRunDir(id)
+	if err != nil {
+		return err
+	}
 	if event.TS == "" {
 		event.TS = time.Now().UTC().Format(time.RFC3339)
 	}
 	if event.Payload == nil {
 		event.Payload = map[string]any{}
 	}
-	if err := os.MkdirAll(s.Dir(id), 0o755); err != nil {
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		return fmt.Errorf("create run dir: %w", err)
 	}
 	line, err := marshalTrace(event)
 	if err != nil {
 		return err
 	}
-	f, err := os.OpenFile(filepath.Join(s.Dir(id), "trace.jsonl"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(filepath.Join(runDir, "trace.jsonl"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("open trace: %w", err)
 	}
@@ -117,15 +121,37 @@ func (s Store) AppendTrace(id RunID, event TraceEvent) error {
 	return nil
 }
 
+func (s Store) checkedRunDir(id RunID) (string, error) {
+	if id == "" {
+		return "", fmt.Errorf("run id is required")
+	}
+	if filepath.IsAbs(string(id)) {
+		return "", fmt.Errorf("run path must be relative")
+	}
+	if hasTraversal(string(id)) {
+		return "", fmt.Errorf("run path traverses outside runs")
+	}
+	runs, err := filepath.Abs(filepath.Join(s.repoRoot(), ".ai", "runs"))
+	if err != nil {
+		return "", err
+	}
+	checked, err := filepath.Abs(filepath.Join(runs, string(id)))
+	if err != nil {
+		return "", err
+	}
+	if checked != runs && !strings.HasPrefix(checked, runs+string(filepath.Separator)) {
+		return "", fmt.Errorf("run path escapes runs")
+	}
+	return checked, nil
+}
+
 func (s Store) checkedArtifactPath(id RunID, step string, iteration int, name string) (string, string, error) {
 	if id == "" || step == "" || iteration <= 0 || name == "" {
 		return "", "", fmt.Errorf("run id, step, iteration, and name are required")
 	}
 	for _, raw := range []string{string(id), step, name} {
-		for _, part := range strings.FieldsFunc(raw, func(r rune) bool { return r == '/' || r == '\\' }) {
-			if part == ".." {
-				return "", "", fmt.Errorf("artifact path traverses outside runs")
-			}
+		if hasTraversal(raw) {
+			return "", "", fmt.Errorf("artifact path traverses outside runs")
 		}
 	}
 	rel := filepath.Join(".ai", "runs", string(id), step, fmt.Sprintf("iter-%03d", iteration), name)
@@ -142,6 +168,15 @@ func (s Store) checkedArtifactPath(id RunID, step string, iteration int, name st
 		return "", "", fmt.Errorf("artifact path escapes runs")
 	}
 	return rel, checked, nil
+}
+
+func hasTraversal(raw string) bool {
+	for _, part := range strings.FieldsFunc(raw, func(r rune) bool { return r == '/' || r == '\\' }) {
+		if part == ".." {
+			return true
+		}
+	}
+	return false
 }
 
 func (s Store) root() string {

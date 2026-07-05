@@ -112,12 +112,25 @@ func TestPreflightStampWrittenUnderDotGit(t *testing.T) {
 	}
 }
 
+func TestNewRepoDisablesGlobalSigning(t *testing.T) {
+	global := filepath.Join(t.TempDir(), "gitconfig")
+	if err := os.WriteFile(global, []byte("[commit]\n\tgpgsign = true\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile(global config) error = %v", err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", global)
+	repo := newRepo(t)
+	writeFile(t, repo, "docs/readme.md", "hello\n")
+	runGit(t, repo, "add", "docs/readme.md")
+	runGit(t, repo, "commit", "-q", "-m", "docs")
+}
+
 func newRepo(t *testing.T) string {
 	t.Helper()
 	repo := t.TempDir()
 	runGit(t, repo, "init", "-q")
 	runGit(t, repo, "config", "user.email", "test@example.invalid")
 	runGit(t, repo, "config", "user.name", "Test User")
+	runGit(t, repo, "config", "commit.gpgsign", "false")
 	runGit(t, repo, "commit", "-q", "--allow-empty", "-m", "init")
 	return repo
 }

@@ -52,12 +52,25 @@ func TestHeadErrorsOnRepoWithNoCommits(t *testing.T) {
 	}
 }
 
+func TestInitRepoDisablesGlobalSigning(t *testing.T) {
+	global := filepath.Join(t.TempDir(), "gitconfig")
+	if err := os.WriteFile(global, []byte("[commit]\n\tgpgsign = true\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile(global config) error = %v", err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", global)
+	repo := initRepo(t)
+	writeFile(t, repo, "README.md", "hello\n")
+	git(t, repo, "add", "README.md")
+	git(t, repo, "commit", "-m", "initial")
+}
+
 func initRepo(t *testing.T) string {
 	t.Helper()
 	repo := t.TempDir()
 	git(t, repo, "init")
 	git(t, repo, "config", "user.email", "test@example.invalid")
 	git(t, repo, "config", "user.name", "Test User")
+	git(t, repo, "config", "commit.gpgsign", "false")
 	return repo
 }
 

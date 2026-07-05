@@ -40,33 +40,39 @@ EXPECTED_RULES = {
     "mivia.go.tests-no-time-sleep",
 }
 
+SEMGREP_TIMEOUT_SECONDS = 60
+
 
 def write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(textwrap.dedent(content).lstrip(), encoding="utf-8")
 
 
-def run_semgrep(target: Path) -> tuple[int, set[str], str]:
+def run_semgrep(target: Path, runner=subprocess.run) -> tuple[int, set[str], str]:
     files = sorted(str(path.relative_to(target)) for path in target.rglob("*") if path.is_file())
-    proc = subprocess.run(
-        [
-            "semgrep",
-            "--json",
-            "--config",
-            str(CONFIG),
-            "--error",
-            "--skip-unknown-extensions",
-            "--metrics",
-            "off",
-            "--disable-nosem",
-            *files,
-        ],
-        cwd=target,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
+    try:
+        proc = runner(
+            [
+                "semgrep",
+                "--json",
+                "--config",
+                str(CONFIG),
+                "--error",
+                "--skip-unknown-extensions",
+                "--metrics",
+                "off",
+                "--disable-nosem",
+                *files,
+            ],
+            cwd=target,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=SEMGREP_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return 124, set(), f"Semgrep timed out after {SEMGREP_TIMEOUT_SECONDS}s\n{exc.stderr or ''}"
     try:
         payload = json.loads(proc.stdout or "{}")
     except json.JSONDecodeError as exc:
@@ -78,6 +84,36 @@ def run_semgrep(target: Path) -> tuple[int, set[str], str]:
             check_id = check_id.split(".semgrep.", 1)[1]
         rule_ids.add(check_id)
     return proc.returncode, rule_ids, proc.stderr
+
+
+def test_run_semgrep_reports_invalid_json_stderr() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write(root / "bad.go", "package bad\n")
+
+        def runner(*args, **kwargs):
+            return subprocess.CompletedProcess(args[0], 2, stdout="not-json", stderr="settings error")
+
+        code, rules, stderr = run_semgrep(root, runner=runner)
+        if code != 2 or rules:
+            raise AssertionError(f"run_semgrep returned code={code} rules={rules}")
+        if "invalid Semgrep JSON" not in stderr or "settings error" not in stderr:
+            raise AssertionError(f"stderr did not preserve startup detail: {stderr!r}")
+
+
+def test_run_semgrep_reports_timeout() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        write(root / "bad.go", "package bad\n")
+
+        def runner(*args, **kwargs):
+            raise subprocess.TimeoutExpired(args[0], kwargs.get("timeout"), stderr="partial stderr")
+
+        code, rules, stderr = run_semgrep(root, runner=runner)
+        if code != 124 or rules:
+            raise AssertionError(f"run_semgrep timeout returned code={code} rules={rules}")
+        if "timed out" not in stderr or "partial stderr" not in stderr:
+            raise AssertionError(f"timeout stderr missing detail: {stderr!r}")
 
 
 def create_bad_fixture(root: Path) -> None:
@@ -295,6 +331,9 @@ def create_good_fixture(root: Path) -> None:
 
 
 def main() -> int:
+    test_run_semgrep_reports_invalid_json_stderr()
+    test_run_semgrep_reports_timeout()
+
     with tempfile.TemporaryDirectory() as tmp:
         bad_root = Path(tmp) / "bad"
         create_bad_fixture(bad_root)
@@ -307,6 +346,8 @@ def main() -> int:
         if missing:
             print(f"FAIL: bad fixture missed rules: {sorted(missing)}", file=sys.stderr)
             print(f"found: {sorted(bad_rules)}", file=sys.stderr)
+            if bad_stderr:
+                print(bad_stderr, file=sys.stderr)
             return 1
 
         good_root = Path(tmp) / "good"

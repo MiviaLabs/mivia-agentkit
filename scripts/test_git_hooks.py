@@ -28,6 +28,7 @@ def init_repo(root: Path) -> None:
     run(["git", "init"], root)
     run(["git", "config", "user.email", "hook-test@example.invalid"], root)
     run(["git", "config", "user.name", "Hook Test"], root)
+    run(["git", "config", "commit.gpgsign", "false"], root)
     (root / "file.txt").write_text("content\n", encoding="utf-8")
     policy_path = root / ".ai" / "policy" / "commit-message.json"
     policy_path.parent.mkdir(parents=True, exist_ok=True)

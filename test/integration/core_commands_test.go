@@ -156,3 +156,15 @@ func TestVersionCommandOutputsStructuredBuildInfo(t *testing.T) {
 		t.Fatalf("build info = %#v, want exact ldflags-backed version, commit, and date", buildInfo)
 	}
 }
+
+func TestTempGitRepoDisablesGlobalSigning(t *testing.T) {
+	global := filepath.Join(t.TempDir(), "gitconfig")
+	if err := os.WriteFile(global, []byte("[commit]\n\tgpgsign = true\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile(global config) error = %v", err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", global)
+	repo := tempGitRepo(t)
+	mustWriteFile(t, filepath.Join(repo, "README.md"), "hello\n")
+	runGit(t, repo, "add", "README.md")
+	runGit(t, repo, "commit", "-q", "-m", "docs")
+}
