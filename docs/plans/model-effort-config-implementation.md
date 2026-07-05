@@ -58,6 +58,7 @@ Proposed runtime rule:
 - Step-level `model` / `effort` win over adapter defaults.
 - Adapter defaults win over external CLI defaults.
 - Empty value means "use the CLI's default."
+- Adapter-specific support is enforced before execution; unsupported runtime knobs fail before any subprocess starts.
 
 ## Discovery Evidence
 

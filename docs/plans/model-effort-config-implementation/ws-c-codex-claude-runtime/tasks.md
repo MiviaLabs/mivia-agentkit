@@ -9,11 +9,14 @@ Create:
 Spec:
 - `Run` passes `--model <id>` when model is set.
 - `Run` passes the documented effort override through Codex's config override surface.
+- `Run` rejects globally valid effort values that Codex does not support before invoking the runner.
 - Existing approval, timeout, and scrubbed metadata behavior stays intact.
 
 Tests that must pass:
 - `TestCodexRunPassesModelFlag`
 - `TestCodexRunPassesReasoningEffortOverride`
+- `TestCodexRunRejectsUnsupportedEffort`
+- `TestCodexReviewRejectsUnsupportedEffort`
 
 Dependencies:
 - `internal/adapter`
@@ -30,11 +33,14 @@ Create:
 Spec:
 - `Run` passes `--model <id>` when model is set.
 - `Run` passes `--effort <level>` when effort is set.
+- `Run` rejects globally valid effort values that Claude does not support before invoking the runner.
 - Existing permission-mode, JSON, and review behavior stays intact.
 
 Tests that must pass:
 - `TestClaudeRunPassesModelFlag`
 - `TestClaudeRunPassesEffortFlag`
+- `TestClaudeRunRejectsUnsupportedEffort`
+- `TestClaudeReviewRejectsUnsupportedEffort`
 
 Dependencies:
 - `internal/adapter`
@@ -62,3 +68,20 @@ WS ws-c-codex-claude-runtime is ☑ when:
 - Files: 5 updated.
 - Residual risk: none.
 - Follow-ups: continue to the next scoped node for downstream runtime consumers and doc surface.
+
+## Audit Fix — 2026-07-05
+
+- Tests: `TestCodexRunRejectsUnsupportedEffort`, `TestCodexReviewRejectsUnsupportedEffort`, `TestClaudeRunRejectsUnsupportedEffort`, and `TestClaudeReviewRejectsUnsupportedEffort` added.
+- Mutation proofs: remove adapter-specific effort validation; the matching unsupported-effort test must fail.
+- Files: 5 updated.
+- Residual risk: none.
+- Follow-ups: none.
+
+## Audit Hardening — 2026-07-05
+
+- Tests: added Codex and Claude `Run`/`Review` rejection coverage for unsupported `params`.
+- Runtime guard: Codex and Claude now validate adapter-specific request support before subprocess execution for both producer and review paths.
+- Mutation proofs: remove `params` rejection; the matching unsupported-params test must fail before any runner call.
+- Files: 5 updated.
+- Residual risk: none.
+- Follow-ups: none.

@@ -253,6 +253,8 @@ Current adapter runtime support:
 
 - Codex passes `--model` and a one-off `model_reasoning_effort` override when configured.
 - Claude passes `--model` and `--effort` when configured.
+- Runtime effort values fail closed if they are valid globally but unsupported by the selected adapter. Codex supports `minimal`, `low`, `medium`, `high`, and `xhigh`; Claude supports `low`, `medium`, `high`, `xhigh`, and `max`.
+- Antigravity runs through `agy -p` and rejects `model`, `effort`, and `params` because this repo has no documented Antigravity runtime mapping for those knobs.
 - Crush may carry repo-owned `model` and `params` config, but it remains guidance-only and is never invoked by `run`.
 
 Loop authoring details live in [loop-authoring.md](./loop-authoring.md).

@@ -100,6 +100,8 @@ steps:
 - Prefer one producer step followed by one review step.
 - Keep reviewer count satisfiable by enabled headless adapters.
 - Use step-level `model` or `effort` only when you want to override the adapter default for that specific step.
+- Keep `effort` compatible with every adapter selected by the step. Codex supports `minimal`, `low`, `medium`, `high`, and `xhigh`; Claude supports `low`, `medium`, `high`, `xhigh`, and `max`.
+- Do not set `model`, `effort`, or `params` on Antigravity workflow steps; `agy -p` has no documented mapping for those runtime knobs here.
 - Use stable artifact names so run traces stay stable.
 - Do not point loop artifacts at shared repo paths such as `notes/foo.md` or `.ai/runs/latest/...`; the runstore already places them under the per-run directory.
 - Test new loops with `mivia-agent run --workflow <name> --dry-run --json` before real execution, and inspect the `runtime` entries for the resolved adapter/model/effort combination.

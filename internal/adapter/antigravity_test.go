@@ -54,6 +54,54 @@ func TestAntigravityRunScrubsSecretsFromStdout(t *testing.T) {
 	}
 }
 
+func TestAntigravityRunRejectsUnsupportedRuntimeKnobs(t *testing.T) {
+	tests := []struct {
+		name string
+		req  Request
+		want string
+	}{
+		{name: "model", req: Request{Prompt: "x", Approval: "yolo", Model: "gemini-pro"}, want: "antigravity unsupported model"},
+		{name: "effort", req: Request{Prompt: "x", Approval: "yolo", Effort: "high"}, want: "antigravity unsupported effort"},
+		{name: "params", req: Request{Prompt: "x", Approval: "yolo", Params: map[string]string{"provider": "google"}}, want: "antigravity unsupported params"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := antigravityRunner([]byte("{}"), nil)
+			_, err := (Antigravity{Runner: r}).Run(context.Background(), tt.req)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("Run() error = %v, want %q", err, tt.want)
+			}
+			if len(r.Calls) != 0 {
+				t.Fatalf("runner calls = %d, want 0 before unsupported knob reaches CLI", len(r.Calls))
+			}
+		})
+	}
+}
+
+func TestAntigravityReviewRejectsUnsupportedRuntimeKnobs(t *testing.T) {
+	tests := []struct {
+		name string
+		req  Request
+		want string
+	}{
+		{name: "model", req: Request{Prompt: "x", Approval: "yolo", Model: "gemini-pro"}, want: "antigravity unsupported model"},
+		{name: "effort", req: Request{Prompt: "x", Approval: "yolo", Effort: "high"}, want: "antigravity unsupported effort"},
+		{name: "params", req: Request{Prompt: "x", Approval: "yolo", Params: map[string]string{"provider": "google"}}, want: "antigravity unsupported params"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := antigravityRunner([]byte(`{"pass":true,"severity":"low","notes":"ok"}`), nil)
+			_, err := (Antigravity{Runner: r}).Review(context.Background(), tt.req)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("Review() error = %v, want %q", err, tt.want)
+			}
+			if len(r.Calls) != 0 {
+				t.Fatalf("runner calls = %d, want 0 before unsupported knob reaches CLI", len(r.Calls))
+			}
+		})
+	}
+}
+
 func TestAntigravityReviewParsesVerdict(t *testing.T) {
 	out := []byte(`{"pass":true,"severity":"low","notes":"ok"}`)
 	v, err := (Antigravity{Runner: antigravityRunner(out, nil)}).Review(context.Background(), Request{Prompt: "x", Approval: "yolo"})

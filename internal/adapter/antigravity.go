@@ -11,6 +11,7 @@ package adapter
 
 import (
 	"context"
+	"fmt"
 	"strings"
 )
 
@@ -33,7 +34,7 @@ func (g Antigravity) Detect(ctx context.Context) (Detection, error) {
 
 // Run invokes Antigravity CLI with a one-shot prompt.
 func (g Antigravity) Run(ctx context.Context, req Request) (Result, error) {
-	if err := req.Validate(); err != nil {
+	if err := g.ValidateRequest(req); err != nil {
 		return Result{}, err
 	}
 	runCtx := ctx
@@ -54,7 +55,7 @@ func (g Antigravity) Run(ctx context.Context, req Request) (Result, error) {
 // Review runs a structured Antigravity review prompt.
 func (g Antigravity) Review(ctx context.Context, req Request) (Verdict, error) {
 	req.Prompt = req.Prompt + "\nReturn JSON only: {\"pass\":bool,\"severity\":\"low|medium|high|critical|error\",\"notes\":\"short\"}."
-	if err := req.Validate(); err != nil {
+	if err := g.ValidateRequest(req); err != nil {
 		return Verdict{}, err
 	}
 	runCtx := ctx
@@ -68,6 +69,20 @@ func (g Antigravity) Review(ctx context.Context, req Request) (Verdict, error) {
 		return Verdict{}, err
 	}
 	return parseProviderVerdict(res.Stdout), nil
+}
+
+// ValidateRequest rejects Antigravity request fields without a documented CLI mapping.
+func (g Antigravity) ValidateRequest(req Request) error {
+	if err := req.Validate(); err != nil {
+		return err
+	}
+	if req.Model != "" {
+		return fmt.Errorf("%s unsupported model %q", g.Name(), req.Model)
+	}
+	if req.Effort != "" {
+		return fmt.Errorf("%s unsupported effort %q", g.Name(), req.Effort)
+	}
+	return validateNoParams(g.Name(), req.Params)
 }
 
 func (g Antigravity) runner() Runner {

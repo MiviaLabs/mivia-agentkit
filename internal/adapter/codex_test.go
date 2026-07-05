@@ -96,6 +96,28 @@ func TestCodexRunPassesReasoningEffortOverride(t *testing.T) {
 	}
 }
 
+func TestCodexRunRejectsUnsupportedEffort(t *testing.T) {
+	r := codexRunner([]byte("{}"), nil)
+	_, err := (Codex{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: "never", Effort: "max"})
+	if err == nil || !strings.Contains(err.Error(), "codex unsupported effort") {
+		t.Fatalf("Run() error = %v, want codex unsupported effort", err)
+	}
+	if len(r.Calls) != 0 {
+		t.Fatalf("runner calls = %d, want 0 before unsupported effort reaches CLI", len(r.Calls))
+	}
+}
+
+func TestCodexRunRejectsUnsupportedParams(t *testing.T) {
+	r := codexRunner([]byte("{}"), nil)
+	_, err := (Codex{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: "never", Params: map[string]string{"provider": "openai"}})
+	if err == nil || !strings.Contains(err.Error(), "codex unsupported params") {
+		t.Fatalf("Run() error = %v, want codex unsupported params", err)
+	}
+	if len(r.Calls) != 0 {
+		t.Fatalf("runner calls = %d, want 0 before unsupported params reach CLI", len(r.Calls))
+	}
+}
+
 func TestCodexRunDropsPromptAndCompletionFromMeta(t *testing.T) {
 	out := []byte(`{"model_id":"m","total_tokens":12,"prompt":"raw","completion":"raw"}`)
 	got, err := (Codex{Runner: codexRunner(out, nil)}).Run(context.Background(), Request{Prompt: "x", Approval: "never"})
@@ -147,6 +169,28 @@ func TestCodexReviewParsesVerdictFromJSONLMessageText(t *testing.T) {
 	}
 	if !v.Pass || v.Severity != "low" {
 		t.Fatalf("Verdict = %#v, want parsed wrapper verdict", v)
+	}
+}
+
+func TestCodexReviewRejectsUnsupportedEffort(t *testing.T) {
+	r := codexRunner([]byte(`{"pass":true,"severity":"low","notes":"ok"}`), nil)
+	_, err := (Codex{Runner: r}).Review(context.Background(), Request{Prompt: "x", Approval: "never", Effort: "max"})
+	if err == nil || !strings.Contains(err.Error(), "codex unsupported effort") {
+		t.Fatalf("Review() error = %v, want codex unsupported effort", err)
+	}
+	if len(r.Calls) != 0 {
+		t.Fatalf("runner calls = %d, want 0 before unsupported effort reaches CLI", len(r.Calls))
+	}
+}
+
+func TestCodexReviewRejectsUnsupportedParams(t *testing.T) {
+	r := codexRunner([]byte(`{"pass":true,"severity":"low","notes":"ok"}`), nil)
+	_, err := (Codex{Runner: r}).Review(context.Background(), Request{Prompt: "x", Approval: "never", Params: map[string]string{"provider": "openai"}})
+	if err == nil || !strings.Contains(err.Error(), "codex unsupported params") {
+		t.Fatalf("Review() error = %v, want codex unsupported params", err)
+	}
+	if len(r.Calls) != 0 {
+		t.Fatalf("runner calls = %d, want 0 before unsupported params reach CLI", len(r.Calls))
 	}
 }
 

@@ -49,3 +49,30 @@ WS ws-f-audit-review is ☑ when:
 - Files: 1 updated.
 - Residual risk: none.
 - Follow-ups: none.
+
+## Audit Loop Fix — 2026-07-05
+
+- Tests: expanded `TestAntigravityReviewRejectsUnsupportedRuntimeKnobs`; added `TestExecuteProducerStepValidatesGenericRequestBeforeRun` and `TestExecuteReviewStepValidatesGenericRequestBeforeReview`.
+- Coverage gap fixed: Antigravity review now proves every unsupported runtime knob is rejected before `agy`; orchestrator fallback validation now covers adapters without `RequestValidator`.
+- Mutation proofs: remove Antigravity effort/params rejection or bypass generic request validation; the matching focused tests must fail before revert.
+- Files: 3 updated.
+- Residual risk: none.
+- Follow-ups: none.
+
+## Audit Fix — 2026-07-05
+
+- Tests: added adapter-specific unsupported-effort regressions for Codex and Claude `Run` and `Review`.
+- Mutation proofs: remove Codex/Claude adapter-specific effort validation; the matching test must fail.
+- Files: 9 updated.
+- Residual risk: none.
+- Follow-ups: none.
+
+## Audit Hardening — 2026-07-05
+
+- Tests: added `TestExecuteReviewStepValidatesRequestsBeforeFanout`, `TestExecuteProducerStepValidatesRequestBeforeRun`, Codex/Claude unsupported-params tests, and Antigravity unsupported runtime-knob tests.
+- Runtime guard: added adapter request preflight so every producer request and every reviewer request validates before any adapter subprocess or fan-out starts.
+- Adapter guard: Antigravity now rejects `model`, `effort`, and `params` because the current `agy -p` contract has no documented mapping for those fields.
+- Mutation proofs: remove producer/reviewer preflight, allow unsupported params, or allow Antigravity model; the matching focused tests must fail before revert.
+- Files: 14 updated.
+- Residual risk: none.
+- Follow-ups: none.

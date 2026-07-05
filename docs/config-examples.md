@@ -208,6 +208,8 @@ defaults:
 ## Notes
 
 - Precedence is `step model/effort` -> `adapter default model/effort` -> CLI default.
+- Effort values are adapter-specific at runtime: Codex supports `minimal`, `low`, `medium`, `high`, and `xhigh`; Claude supports `low`, `medium`, `high`, `xhigh`, and `max`.
+- `params` are Crush guidance-only today. Antigravity has no documented runtime mapping for `model`, `effort`, or `params`, so those fields are rejected before `agy` runs.
 - `run --dry-run --json` reports a per-step `runtime` list so you can inspect the resolved adapter, model, and effort before execution.
 - Supported profiles are `starter`, `standard`, and `strict`.
 - Workflow `bound: budget` is not supported in MVP.

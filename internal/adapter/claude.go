@@ -10,6 +10,7 @@ package adapter
 
 import (
 	"context"
+	"fmt"
 	"strings"
 )
 
@@ -32,7 +33,7 @@ func (c Claude) Detect(ctx context.Context) (Detection, error) {
 
 // Run invokes Claude Code in print mode.
 func (c Claude) Run(ctx context.Context, req Request) (Result, error) {
-	if err := req.Validate(); err != nil {
+	if err := c.ValidateRequest(req); err != nil {
 		return Result{}, err
 	}
 	runCtx := ctx
@@ -53,7 +54,7 @@ func (c Claude) Run(ctx context.Context, req Request) (Result, error) {
 // Review runs a structured Claude review prompt.
 func (c Claude) Review(ctx context.Context, req Request) (Verdict, error) {
 	req.Prompt = req.Prompt + "\nReturn JSON only: {\"pass\":bool,\"severity\":\"low|medium|high|critical|error\",\"notes\":\"short\"}."
-	if err := req.Validate(); err != nil {
+	if err := c.ValidateRequest(req); err != nil {
 		return Verdict{}, err
 	}
 	runCtx := ctx
@@ -69,6 +70,17 @@ func (c Claude) Review(ctx context.Context, req Request) (Verdict, error) {
 	return parseProviderVerdict(res.Stdout), nil
 }
 
+// ValidateRequest rejects Claude request fields that cannot be passed to Claude Code.
+func (c Claude) ValidateRequest(req Request) error {
+	if err := req.Validate(); err != nil {
+		return err
+	}
+	if err := validateClaudeEffort(req.Effort); err != nil {
+		return err
+	}
+	return validateNoParams(c.Name(), req.Params)
+}
+
 func (c Claude) runner() Runner {
 	if c.Runner != nil {
 		return c.Runner
@@ -77,6 +89,9 @@ func (c Claude) runner() Runner {
 }
 
 func (c Claude) runRaw(ctx context.Context, req Request) (RunResult, error) {
+	if err := c.ValidateRequest(req); err != nil {
+		return RunResult{}, err
+	}
 	args := []string{"claude", "-p", "--output-format", "json", "--permission-mode", req.Approval}
 	if req.Model != "" {
 		args = append(args, "--model", req.Model)
@@ -89,4 +104,13 @@ func (c Claude) runRaw(ctx context.Context, req Request) (RunResult, error) {
 	}
 	args = append(args, req.Prompt)
 	return c.runner().Run(ctx, args, nil, req.Workdir)
+}
+
+func validateClaudeEffort(effort string) error {
+	switch effort {
+	case "", "low", "medium", "high", "xhigh", "max":
+		return nil
+	default:
+		return fmt.Errorf("claude unsupported effort %q", effort)
+	}
 }

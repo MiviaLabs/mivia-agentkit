@@ -65,6 +65,28 @@ func TestClaudeRunPassesEffortFlag(t *testing.T) {
 	}
 }
 
+func TestClaudeRunRejectsUnsupportedEffort(t *testing.T) {
+	r := claudeRunner([]byte("{}"), nil)
+	_, err := (Claude{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: "plan", Effort: "minimal"})
+	if err == nil || !strings.Contains(err.Error(), "claude unsupported effort") {
+		t.Fatalf("Run() error = %v, want claude unsupported effort", err)
+	}
+	if len(r.Calls) != 0 {
+		t.Fatalf("runner calls = %d, want 0 before unsupported effort reaches CLI", len(r.Calls))
+	}
+}
+
+func TestClaudeRunRejectsUnsupportedParams(t *testing.T) {
+	r := claudeRunner([]byte("{}"), nil)
+	_, err := (Claude{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: "plan", Params: map[string]string{"provider": "anthropic"}})
+	if err == nil || !strings.Contains(err.Error(), "claude unsupported params") {
+		t.Fatalf("Run() error = %v, want claude unsupported params", err)
+	}
+	if len(r.Calls) != 0 {
+		t.Fatalf("runner calls = %d, want 0 before unsupported params reach CLI", len(r.Calls))
+	}
+}
+
 func TestClaudeRunScrubsSecretsFromStdout(t *testing.T) {
 	token := "Bearer " + strings.Repeat("a", 16)
 	got, err := (Claude{Runner: claudeRunner([]byte(token), nil)}).Run(context.Background(), Request{Prompt: "x", Approval: "plan"})
@@ -126,6 +148,28 @@ func TestClaudeReviewParsesVerdictFromJSONResult(t *testing.T) {
 	}
 	if !v.Pass || v.Severity != "medium" {
 		t.Fatalf("Verdict = %#v, want parsed wrapper verdict", v)
+	}
+}
+
+func TestClaudeReviewRejectsUnsupportedEffort(t *testing.T) {
+	r := claudeRunner([]byte(`{"pass":true,"severity":"medium","notes":"ok"}`), nil)
+	_, err := (Claude{Runner: r}).Review(context.Background(), Request{Prompt: "x", Approval: "plan", Effort: "minimal"})
+	if err == nil || !strings.Contains(err.Error(), "claude unsupported effort") {
+		t.Fatalf("Review() error = %v, want claude unsupported effort", err)
+	}
+	if len(r.Calls) != 0 {
+		t.Fatalf("runner calls = %d, want 0 before unsupported effort reaches CLI", len(r.Calls))
+	}
+}
+
+func TestClaudeReviewRejectsUnsupportedParams(t *testing.T) {
+	r := claudeRunner([]byte(`{"pass":true,"severity":"medium","notes":"ok"}`), nil)
+	_, err := (Claude{Runner: r}).Review(context.Background(), Request{Prompt: "x", Approval: "plan", Params: map[string]string{"provider": "anthropic"}})
+	if err == nil || !strings.Contains(err.Error(), "claude unsupported params") {
+		t.Fatalf("Review() error = %v, want claude unsupported params", err)
+	}
+	if len(r.Calls) != 0 {
+		t.Fatalf("runner calls = %d, want 0 before unsupported params reach CLI", len(r.Calls))
 	}
 }
 

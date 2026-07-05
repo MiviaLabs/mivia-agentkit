@@ -13,6 +13,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 )
 
@@ -35,7 +36,7 @@ func (c Codex) Detect(ctx context.Context) (Detection, error) {
 
 // Run invokes Codex non-interactively.
 func (c Codex) Run(ctx context.Context, req Request) (Result, error) {
-	if err := req.Validate(); err != nil {
+	if err := c.ValidateRequest(req); err != nil {
 		return Result{}, err
 	}
 	runCtx := ctx
@@ -56,7 +57,7 @@ func (c Codex) Run(ctx context.Context, req Request) (Result, error) {
 // Review runs a structured Codex review prompt.
 func (c Codex) Review(ctx context.Context, req Request) (Verdict, error) {
 	req.Prompt = req.Prompt + "\nReturn JSON only: {\"pass\":bool,\"severity\":\"low|medium|high|critical|error\",\"notes\":\"short\"}."
-	if err := req.Validate(); err != nil {
+	if err := c.ValidateRequest(req); err != nil {
 		return Verdict{}, err
 	}
 	runCtx := ctx
@@ -72,6 +73,17 @@ func (c Codex) Review(ctx context.Context, req Request) (Verdict, error) {
 	return parseProviderVerdict(res.Stdout), nil
 }
 
+// ValidateRequest rejects Codex request fields that cannot be passed to Codex CLI.
+func (c Codex) ValidateRequest(req Request) error {
+	if err := req.Validate(); err != nil {
+		return err
+	}
+	if err := validateCodexEffort(req.Effort); err != nil {
+		return err
+	}
+	return validateNoParams(c.Name(), req.Params)
+}
+
 func (c Codex) runner() Runner {
 	if c.Runner != nil {
 		return c.Runner
@@ -80,6 +92,9 @@ func (c Codex) runner() Runner {
 }
 
 func (c Codex) runRaw(ctx context.Context, req Request) (RunResult, error) {
+	if err := c.ValidateRequest(req); err != nil {
+		return RunResult{}, err
+	}
 	args := []string{"codex", "exec", "--sandbox", "workspace-write", "--ask-for-approval", req.Approval, "--json"}
 	if req.Model != "" {
 		args = append(args, "--model", req.Model)
@@ -92,6 +107,22 @@ func (c Codex) runRaw(ctx context.Context, req Request) (RunResult, error) {
 	}
 	args = append(args, req.Prompt)
 	return c.runner().Run(ctx, args, nil, req.Workdir)
+}
+
+func validateNoParams(adapterName string, params map[string]string) error {
+	if len(params) > 0 {
+		return fmt.Errorf("%s unsupported params", adapterName)
+	}
+	return nil
+}
+
+func validateCodexEffort(effort string) error {
+	switch effort {
+	case "", "minimal", "low", "medium", "high", "xhigh":
+		return nil
+	default:
+		return fmt.Errorf("codex unsupported effort %q", effort)
+	}
 }
 
 func sanitizedMeta(stdout []byte) map[string]string {

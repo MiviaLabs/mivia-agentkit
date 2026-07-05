@@ -77,7 +77,11 @@ func (e Engine) executeProducer(ctx context.Context, runID runstore.RunID, node 
 	}
 	ctx, cancel := context.WithTimeout(ctx, stepTimeout(node.Step))
 	defer cancel()
-	result, err := a.Run(ctx, e.requestFor(node.Step.Producer, node.Step, prompt, true))
+	req := e.requestFor(node.Step.Producer, node.Step, prompt, true)
+	if err := validateAdapterRequest(a, req); err != nil {
+		return StepResult{}, err
+	}
+	result, err := a.Run(ctx, req)
 	if err != nil {
 		return StepResult{}, err
 	}
@@ -101,24 +105,36 @@ func (e Engine) executeReview(ctx context.Context, runID runstore.RunID, node No
 		err      error
 	}
 	results := make(chan item, len(node.Step.Reviewers))
-	var wg sync.WaitGroup
+	type reviewCall struct {
+		i        int
+		reviewer string
+		adapter  adapter.Adapter
+		request  adapter.Request
+	}
+	calls := make([]reviewCall, 0, len(node.Step.Reviewers))
 	for i, reviewer := range node.Step.Reviewers {
-		i, reviewer := i, reviewer
+		a, ok := e.Adapters.Lookup(reviewer)
+		if !ok {
+			return StepResult{}, fmt.Errorf("adapter %q not found", reviewer)
+		}
+		prompt, err := e.prompt(node.Step, iteration, e.CurrentArtifact)
+		if err != nil {
+			return StepResult{}, err
+		}
+		req := e.requestFor(reviewer, node.Step, prompt, false)
+		if err := validateAdapterRequest(a, req); err != nil {
+			return StepResult{}, err
+		}
+		calls = append(calls, reviewCall{i: i, reviewer: reviewer, adapter: a, request: req})
+	}
+	var wg sync.WaitGroup
+	for _, call := range calls {
+		call := call
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			a, ok := e.Adapters.Lookup(reviewer)
-			if !ok {
-				results <- item{i: i, reviewer: reviewer, err: fmt.Errorf("adapter %q not found", reviewer)}
-				return
-			}
-			prompt, err := e.prompt(node.Step, iteration, e.CurrentArtifact)
-			if err != nil {
-				results <- item{i: i, reviewer: reviewer, err: err}
-				return
-			}
-			v, err := a.Review(ctx, e.requestFor(reviewer, node.Step, prompt, false))
-			results <- item{i: i, reviewer: reviewer, verdict: v, err: err}
+			v, err := call.adapter.Review(ctx, call.request)
+			results <- item{i: call.i, reviewer: call.reviewer, verdict: v, err: err}
 		}()
 	}
 	wg.Wait()
@@ -139,6 +155,13 @@ func (e Engine) executeReview(ctx context.Context, runID runstore.RunID, node No
 		return StepResult{}, err
 	}
 	return StepResult{Verdicts: verdicts, Consensus: pass}, nil
+}
+
+func validateAdapterRequest(a adapter.Adapter, req adapter.Request) error {
+	if validator, ok := a.(adapter.RequestValidator); ok {
+		return validator.ValidateRequest(req)
+	}
+	return req.Validate()
 }
 
 func (e Engine) decide(ctx context.Context, runID runstore.RunID, step config.Step, stamp string) ([]string, []policy.Decision, error) {

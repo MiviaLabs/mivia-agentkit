@@ -4,6 +4,7 @@ package orchestrator
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -88,6 +89,63 @@ func TestExecuteReviewStepSendsReviewPrompt(t *testing.T) {
 	}
 	if a.prompt != "review /tmp/run/produce/iter-001/artifact.md" {
 		t.Fatalf("review prompt = %q, want concrete artifact path", a.prompt)
+	}
+}
+
+func TestExecuteReviewStepValidatesRequestsBeforeFanout(t *testing.T) {
+	var reviewCalls int
+	started := &validatingReviewAdapter{name: "started", verdict: adapter.Verdict{Pass: true}, reviewCalls: &reviewCalls}
+	blocked := &validatingReviewAdapter{name: "blocked", validateErr: errors.New("blocked invalid request")}
+	e := testEngine(t, started, blocked)
+
+	_, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "review", Reviewers: []string{"started", "blocked"}}}, 1)
+	if err == nil || !strings.Contains(err.Error(), "blocked invalid request") {
+		t.Fatalf("ExecuteStep error = %v, want blocked invalid request", err)
+	}
+	if reviewCalls != 0 {
+		t.Fatalf("review calls = %d, want 0 before all reviewer requests validate", reviewCalls)
+	}
+}
+
+func TestExecuteProducerStepValidatesRequestBeforeRun(t *testing.T) {
+	var runCalls int
+	producer := &validatingReviewAdapter{name: "codex", validateErr: errors.New("producer invalid request"), runCalls: &runCalls}
+	e := testEngine(t, producer)
+
+	_, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "produce", Producer: "codex"}}, 1)
+	if err == nil || !strings.Contains(err.Error(), "producer invalid request") {
+		t.Fatalf("ExecuteStep error = %v, want producer invalid request", err)
+	}
+	if runCalls != 0 {
+		t.Fatalf("run calls = %d, want 0 before producer request validates", runCalls)
+	}
+}
+
+func TestExecuteProducerStepValidatesGenericRequestBeforeRun(t *testing.T) {
+	var runCalls int
+	producer := scriptedAdapter{name: "codex", runCalls: &runCalls}
+	e := testEngine(t, producer)
+
+	_, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "produce", Producer: "codex", MaxTurns: -1}}, 1)
+	if err == nil || !strings.Contains(err.Error(), "max turns cannot be negative") {
+		t.Fatalf("ExecuteStep error = %v, want max turns validation error", err)
+	}
+	if runCalls != 0 {
+		t.Fatalf("run calls = %d, want 0 before generic request validates", runCalls)
+	}
+}
+
+func TestExecuteReviewStepValidatesGenericRequestBeforeReview(t *testing.T) {
+	var reviewCalls int
+	reviewer := scriptedAdapter{name: "reviewer", reviewCalls: &reviewCalls}
+	e := testEngine(t, reviewer)
+
+	_, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "review", Reviewers: []string{"reviewer"}, MaxTurns: -1}}, 1)
+	if err == nil || !strings.Contains(err.Error(), "max turns cannot be negative") {
+		t.Fatalf("ExecuteStep error = %v, want max turns validation error", err)
+	}
+	if reviewCalls != 0 {
+		t.Fatalf("review calls = %d, want 0 before generic request validates", reviewCalls)
 	}
 }
 
@@ -180,10 +238,12 @@ func testEngine(t *testing.T, adapters ...adapter.Adapter) Engine {
 }
 
 type scriptedAdapter struct {
-	name    string
-	run     adapter.Result
-	verdict adapter.Verdict
-	delay   time.Duration
+	name        string
+	run         adapter.Result
+	verdict     adapter.Verdict
+	delay       time.Duration
+	runCalls    *int
+	reviewCalls *int
 }
 
 func (s scriptedAdapter) Name() string       { return s.name }
@@ -192,12 +252,18 @@ func (s scriptedAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: s.name, HeadlessCapable: true}, nil
 }
 func (s scriptedAdapter) Run(ctx context.Context, req adapter.Request) (adapter.Result, error) {
+	if s.runCalls != nil {
+		(*s.runCalls)++
+	}
 	if err := sleepContext(ctx, s.delay); err != nil {
 		return adapter.Result{}, err
 	}
 	return s.run, nil
 }
 func (s scriptedAdapter) Review(ctx context.Context, req adapter.Request) (adapter.Verdict, error) {
+	if s.reviewCalls != nil {
+		(*s.reviewCalls)++
+	}
 	if err := sleepContext(ctx, s.delay); err != nil {
 		return adapter.Verdict{}, err
 	}
@@ -243,6 +309,35 @@ func (r *requestRecorderAdapter) Run(_ context.Context, req adapter.Request) (ad
 func (r *requestRecorderAdapter) Review(_ context.Context, req adapter.Request) (adapter.Verdict, error) {
 	r.reviewReq = req
 	return r.verdict, nil
+}
+
+type validatingReviewAdapter struct {
+	name        string
+	verdict     adapter.Verdict
+	validateErr error
+	runCalls    *int
+	reviewCalls *int
+}
+
+func (v *validatingReviewAdapter) Name() string       { return v.name }
+func (v *validatingReviewAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (v *validatingReviewAdapter) Detect(context.Context) (adapter.Detection, error) {
+	return adapter.Detection{Name: v.name, HeadlessCapable: true}, nil
+}
+func (v *validatingReviewAdapter) ValidateRequest(adapter.Request) error {
+	return v.validateErr
+}
+func (v *validatingReviewAdapter) Run(context.Context, adapter.Request) (adapter.Result, error) {
+	if v.runCalls != nil {
+		(*v.runCalls)++
+	}
+	return adapter.Result{}, nil
+}
+func (v *validatingReviewAdapter) Review(context.Context, adapter.Request) (adapter.Verdict, error) {
+	if v.reviewCalls != nil {
+		(*v.reviewCalls)++
+	}
+	return v.verdict, nil
 }
 
 type recordingPolicy struct{ calls int }

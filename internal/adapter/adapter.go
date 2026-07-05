@@ -80,6 +80,11 @@ type Adapter interface {
 	Review(context.Context, Request) (Verdict, error)
 }
 
+// RequestValidator validates adapter-specific request fields before execution.
+type RequestValidator interface {
+	ValidateRequest(Request) error
+}
+
 // Registry stores adapters by name.
 type Registry struct {
 	adapters map[string]Adapter
