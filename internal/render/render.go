@@ -37,6 +37,13 @@ type SkillEntry struct {
 	Source string
 }
 
+// RoutingVars describes rendered default routing for selected runtime adapters.
+type RoutingVars struct {
+	DefaultProducer  string
+	DefaultReviewers []string
+	MinReviewers     int
+}
+
 // Renderer renders embedded templates.
 type Renderer struct {
 	fsys fs.FS
@@ -83,6 +90,7 @@ func templateData(vars Vars) map[string]any {
 		"Binary":   vars.Binary,
 		"Version":  vars.Version,
 		"Skills":   vars.Skills,
+		"Routing":  routingVars(vars.Adapters),
 	}
 }
 
@@ -136,6 +144,23 @@ func skillEntries(globalSkills, projectSkills map[string]string) []SkillEntry {
 	out := make([]SkillEntry, 0, len(names))
 	for _, name := range names {
 		out = append(out, merged[name])
+	}
+	return out
+}
+
+func routingVars(adapters map[string]bool) RoutingVars {
+	var runtime []string
+	for _, name := range []string{"codex", "claude", "antigravity"} {
+		if adapters[name] {
+			runtime = append(runtime, name)
+		}
+	}
+	out := RoutingVars{DefaultReviewers: runtime, MinReviewers: len(runtime)}
+	if len(runtime) > 0 {
+		out.DefaultProducer = runtime[0]
+		if out.MinReviewers > 2 {
+			out.MinReviewers = 2
+		}
 	}
 	return out
 }

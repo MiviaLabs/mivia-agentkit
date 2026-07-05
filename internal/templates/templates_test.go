@@ -193,7 +193,7 @@ func TestCrushAdapterRendersGuidanceRole(t *testing.T) {
 }
 
 func TestListIncludesWorkflowTemplatesForStandard(t *testing.T) {
-	got, err := List("standard", []string{"codex"})
+	got, err := List("standard", []string{"codex", "claude"})
 	if err != nil {
 		t.Fatalf("List() error = %v, want nil", err)
 	}
@@ -205,6 +205,30 @@ func TestListIncludesWorkflowTemplatesForStandard(t *testing.T) {
 		if !found[want] {
 			t.Fatalf("List() missing %q: %#v", want, got)
 		}
+	}
+}
+
+func TestListOmitsCodexClaudeWorkflowTemplatesWithoutBothRuntimeAdapters(t *testing.T) {
+	tests := []struct {
+		name     string
+		adapters []string
+	}{
+		{name: "codex only", adapters: []string{"codex"}},
+		{name: "claude only", adapters: []string{"claude"}},
+		{name: "other adapter", adapters: []string{"antigravity"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := List("standard", tt.adapters)
+			if err != nil {
+				t.Fatalf("List() error = %v, want nil", err)
+			}
+			for _, path := range got {
+				if path == ".ai/workflows/research-loop.yaml" || path == ".ai/workflows/bug-audit-loop.yaml" {
+					t.Fatalf("List() includes %q without codex+claude enabled: %#v", path, got)
+				}
+			}
+		})
 	}
 }
 

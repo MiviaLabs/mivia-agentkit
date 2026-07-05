@@ -48,7 +48,7 @@ func List(profile string, adapters []string) ([]string, error) {
 	}
 
 	var out []string
-	for _, path := range coreOutputs(profile) {
+	for _, path := range coreOutputs(profile, enabled) {
 		out = append(out, path)
 	}
 	if enabled["codex"] {
@@ -77,7 +77,7 @@ func TemplateForOutput(outPath string) (string, bool) {
 	return tpl, ok
 }
 
-func coreOutputs(profile string) []string {
+func coreOutputs(profile string, enabled map[string]bool) []string {
 	out := []string{
 		"AGENTS.md",
 		"mivia-agent.yaml",
@@ -93,11 +93,9 @@ func coreOutputs(profile string) []string {
 		".ai/skills/adversarial-test-review/SKILL.md",
 		".ai/quality/contracts/project-runtime.yaml",
 		".ai/quality/review-policies/default.yaml",
-		".ai/workflows/research-loop.yaml",
-		".ai/workflows/bug-audit-loop.yaml",
 	}
-	if profile == "starter" {
-		return out[:len(out)-2]
+	if profile != "starter" && enabled["codex"] && enabled["claude"] {
+		out = append(out, ".ai/workflows/research-loop.yaml", ".ai/workflows/bug-audit-loop.yaml")
 	}
 	return out
 }

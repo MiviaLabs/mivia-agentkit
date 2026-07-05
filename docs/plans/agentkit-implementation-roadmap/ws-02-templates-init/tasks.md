@@ -148,3 +148,12 @@ WS2 is ☑ when:
 - Files: template embedding, renderer, init command, managed-block handling, and template source files created.
 - Residual risk: none.
 - Follow-ups: WS3 should wire post-write doctor validation; smoke used isolated HOME because this checkout's user-level `~/.agents/mivia.yaml` is outside the WS2 fixture contract.
+
+## Audit Fix — 2026-07-05
+
+- Tests: added `TestListOmitsCodexClaudeWorkflowTemplatesWithoutBothRuntimeAdapters`, `TestInitOmitsCodexClaudeWorkflowsWithoutBothAdapters`, `TestInitRendersRoutingDefaultsFromSelectedRuntimeAdapters`, and `TestReviewUsesRenderedAdapterScopedDefaults`.
+- Bugs fixed: `List(profile, adapters)` no longer returns Codex+Claude workflow templates unless both required runtime adapters are selected; rendered `routing.default_*` values now follow the selected runtime adapters instead of hard-coding Codex+Claude.
+- Mutation proof: remove the workflow adapter gate or hard-code rendered routing to Codex+Claude; the new template-list, init integration, and CLI review tests must fail.
+- Files: 8 updated.
+- Residual risk: none.
+- Follow-ups: none.

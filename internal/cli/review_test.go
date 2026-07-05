@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
+	"github.com/MiviaLabs/mivia-agentkit/internal/render"
 )
 
 func TestReviewOneOffConsensus(t *testing.T) {
@@ -80,6 +81,24 @@ func TestReviewPassesManifestAdapterDefaultsToRuntime(t *testing.T) {
 	}
 	if len(reviewReqs) != 1 || reviewReqs[0].Model != "gpt-5.5" || reviewReqs[0].Effort != "minimal" {
 		t.Fatalf("review requests = %#v, want manifest defaults", reviewReqs)
+	}
+}
+
+func TestReviewUsesRenderedAdapterScopedDefaults(t *testing.T) {
+	var reviewReqs []adapter.Request
+	t.Setenv("HOME", t.TempDir())
+	repo, artifactPath := reviewRepo(t)
+	if _, err := render.WriteInit(render.InitConfig{Repo: repo, Profile: "standard", Adapters: []string{"codex"}}); err != nil {
+		t.Fatalf("WriteInit() error = %v, want nil", err)
+	}
+	withRuntimeAdapters(t, fakeCLIAdapter{name: "codex", headless: true, verdict: adapter.Verdict{Pass: true, Severity: "low", Notes: "ok"}, reviews: &reviewReqs})
+	cmd := newReviewCommand()
+	cmd.SetArgs([]string{"--repo", repo, "--artifact", artifactPath})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("review error = %v, want codex-only rendered defaults to pass", err)
+	}
+	if len(reviewReqs) != 1 {
+		t.Fatalf("review requests = %#v, want one default codex reviewer", reviewReqs)
 	}
 }
 

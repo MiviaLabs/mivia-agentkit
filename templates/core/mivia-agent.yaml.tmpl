@@ -16,14 +16,15 @@ adapters:
 {{- end }}
 {{- end }}
 routing:
-  default_producer: codex
+  default_producer: {{ .Routing.DefaultProducer }}
   default_reviewers:
-    - codex
-    - claude
+{{- range .Routing.DefaultReviewers }}
+    - {{ . }}
+{{- end }}
   consensus:
     mode: majority
     tie_breaker: strict
-    min_reviewers: 2
+    min_reviewers: {{ .Routing.MinReviewers }}
   on_review_fail: iterate
   max_iterations: 3
 governance:

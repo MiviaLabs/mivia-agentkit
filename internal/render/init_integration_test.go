@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/MiviaLabs/mivia-agentkit/internal/config"
 )
 
 func TestInitDryRunWritesNothing(t *testing.T) {
@@ -37,6 +39,57 @@ func TestInitWriteCreatesExpectedFiles(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(repo, filepath.FromSlash(rel))); err != nil {
 			t.Fatalf("Stat(%q) error = %v, want nil", rel, err)
 		}
+	}
+}
+
+func TestInitOmitsCodexClaudeWorkflowsWithoutBothAdapters(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	repo := tempGitRepo(t)
+	if _, err := WriteInit(InitConfig{Repo: repo, Profile: "standard", Adapters: []string{"codex"}}); err != nil {
+		t.Fatalf("WriteInit() error = %v, want nil", err)
+	}
+	for _, rel := range []string{".ai/workflows/research-loop.yaml", ".ai/workflows/bug-audit-loop.yaml"} {
+		if _, err := os.Stat(filepath.Join(repo, filepath.FromSlash(rel))); err == nil {
+			t.Fatalf("Stat(%q) error = nil, want workflow omitted without codex+claude", rel)
+		} else if !os.IsNotExist(err) {
+			t.Fatalf("Stat(%q) error = %v, want not exists", rel, err)
+		}
+	}
+}
+
+func TestInitRendersRoutingDefaultsFromSelectedRuntimeAdapters(t *testing.T) {
+	tests := []struct {
+		name       string
+		adapters   []string
+		producer   string
+		reviewers  []string
+		minReviews int
+	}{
+		{name: "codex only", adapters: []string{"codex"}, producer: "codex", reviewers: []string{"codex"}, minReviews: 1},
+		{name: "antigravity only", adapters: []string{"antigravity"}, producer: "antigravity", reviewers: []string{"antigravity"}, minReviews: 1},
+		{name: "codex claude", adapters: []string{"codex", "claude"}, producer: "codex", reviewers: []string{"codex", "claude"}, minReviews: 2},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("HOME", t.TempDir())
+			repo := tempGitRepo(t)
+			if _, err := WriteInit(InitConfig{Repo: repo, Profile: "standard", Adapters: tt.adapters}); err != nil {
+				t.Fatalf("WriteInit() error = %v, want nil", err)
+			}
+			manifest, err := config.Parse([]byte(readFile(t, filepath.Join(repo, "mivia-agent.yaml"))))
+			if err != nil {
+				t.Fatalf("Parse(rendered manifest) error = %v", err)
+			}
+			if manifest.Routing.DefaultProducer != tt.producer {
+				t.Fatalf("default producer = %q, want %q", manifest.Routing.DefaultProducer, tt.producer)
+			}
+			if strings.Join(manifest.Routing.DefaultReviewers, ",") != strings.Join(tt.reviewers, ",") {
+				t.Fatalf("default reviewers = %#v, want %#v", manifest.Routing.DefaultReviewers, tt.reviewers)
+			}
+			if manifest.Routing.Consensus.MinReviewers != tt.minReviews {
+				t.Fatalf("min reviewers = %d, want %d", manifest.Routing.Consensus.MinReviewers, tt.minReviews)
+			}
+		})
 	}
 }
 
