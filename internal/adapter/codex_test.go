@@ -184,6 +184,18 @@ func TestCodexReviewParsesVerdictFromJSONLMessageText(t *testing.T) {
 	}
 }
 
+func TestCodexReviewParsesEmbeddedJSONVerdict(t *testing.T) {
+	out := []byte(`The artifact is grounded and actionable.
+{"pass":true,"severity":"high","notes":"accepted artifact with blocking findings"}`)
+	v, err := (Codex{Runner: codexRunner(out, nil)}).Review(context.Background(), Request{Prompt: "x", Approval: "never"})
+	if err != nil {
+		t.Fatalf("Review() error = %v", err)
+	}
+	if !v.Pass || v.Severity != "high" {
+		t.Fatalf("Verdict = %#v, want parsed embedded verdict", v)
+	}
+}
+
 func TestCodexReviewRejectsUnsupportedEffort(t *testing.T) {
 	r := codexRunner([]byte(`{"pass":true,"severity":"low","notes":"ok"}`), nil)
 	_, err := (Codex{Runner: r}).Review(context.Background(), Request{Prompt: "x", Approval: "never", Effort: "max"})

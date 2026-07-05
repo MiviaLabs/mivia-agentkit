@@ -159,14 +159,64 @@ func parseProviderVerdict(b []byte) Verdict {
 	if verdict := parseVerdict(b); verdict.Severity != "error" {
 		return verdict
 	}
+	if verdict := parseEmbeddedVerdict(b); verdict.Severity != "error" {
+		return verdict
+	}
 	for _, payload := range decodeProviderPayloads(b) {
 		for _, candidate := range rawTextCandidates(payload) {
 			if verdict := parseVerdict([]byte(candidate)); verdict.Severity != "error" {
 				return verdict
 			}
+			if verdict := parseEmbeddedVerdict([]byte(candidate)); verdict.Severity != "error" {
+				return verdict
+			}
 		}
 	}
 	return Verdict{Pass: false, Severity: "error", Notes: "unparseable review output"}
+}
+
+func parseEmbeddedVerdict(b []byte) Verdict {
+	text := string(b)
+	for start := 0; start < len(text); start++ {
+		if text[start] != '{' {
+			continue
+		}
+		depth := 0
+		inString := false
+		escaped := false
+		for end := start; end < len(text); end++ {
+			ch := text[end]
+			if inString {
+				if escaped {
+					escaped = false
+					continue
+				}
+				if ch == '\\' {
+					escaped = true
+					continue
+				}
+				if ch == '"' {
+					inString = false
+				}
+				continue
+			}
+			switch ch {
+			case '"':
+				inString = true
+			case '{':
+				depth++
+			case '}':
+				depth--
+				if depth == 0 {
+					if verdict := parseVerdict([]byte(text[start : end+1])); verdict.Severity != "error" {
+						return verdict
+					}
+					start = end
+				}
+			}
+		}
+	}
+	return Verdict{Severity: "error"}
 }
 
 func truncate(b []byte) []byte {
