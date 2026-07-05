@@ -4,13 +4,18 @@ bound: iterations
 max_iterations: 3
 steps:
   - id: research
-    producer: codex
+    producer: {{ .Routing.DefaultProducer }}
     artifact: research.md
   - id: review
     reviewers:
-      - codex
-      - claude
+{{- range .Routing.DefaultReviewers }}
+      - {{ . }}
+{{- end }}
     artifact: research.md
+    consensus:
+      mode: majority
+      tie_breaker: strict
+      min_reviewers: {{ .Routing.MinReviewers }}
     on_fail: iterate
 exit_when: review-pass
 on_exhausted: warn

@@ -90,6 +90,32 @@ func TestDoctorPassesWithNoGlobalConfig(t *testing.T) {
 	}
 }
 
+func TestDoctorIgnoresGitIgnoredSecretLikeLocalFiles(t *testing.T) {
+	repo, home := freshRepo(t)
+	writeFile(t, filepath.Join(repo, ".gitignore"), ".env\nnode_modules/\n")
+	writeFile(t, filepath.Join(repo, ".env"), "local=true\n")
+	writeFile(t, filepath.Join(repo, "node_modules", "package", "private-key.js"), "ignored\n")
+	got := Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")})
+	if hasCode(got.Findings, "paths.secret_generated") {
+		t.Fatalf("Run() findings = %+v, want ignored local secret-like files skipped", got.Findings)
+	}
+}
+
+func TestDoctorFlagsUnignoredSecretPath(t *testing.T) {
+	repo, home := freshRepo(t)
+	writeFile(t, filepath.Join(repo, ".ai", "private-key-note.md"), "not ignored\n")
+	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")}), "paths.secret_generated")
+}
+
+func TestDoctorDoesNotScanUnrelatedApplicationSecretPaths(t *testing.T) {
+	repo, home := freshRepo(t)
+	writeFile(t, filepath.Join(repo, "secrets", "atlassian-credentials.json.example"), "{}\n")
+	got := Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")})
+	if hasCode(got.Findings, "paths.secret_generated") {
+		t.Fatalf("Run() findings = %+v, want unrelated application path skipped", got.Findings)
+	}
+}
+
 func freshRepo(t *testing.T) (string, string) {
 	t.Helper()
 	home := t.TempDir()

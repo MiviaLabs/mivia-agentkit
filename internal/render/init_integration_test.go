@@ -42,18 +42,18 @@ func TestInitWriteCreatesExpectedFiles(t *testing.T) {
 	}
 }
 
-func TestInitOmitsCodexClaudeWorkflowsWithoutBothAdapters(t *testing.T) {
+func TestInitRendersWorkflowsForSingleRuntimeAdapter(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	repo := tempGitRepo(t)
-	if _, err := WriteInit(InitConfig{Repo: repo, Profile: "standard", Adapters: []string{"codex"}}); err != nil {
+	if _, err := WriteInit(InitConfig{Repo: repo, Profile: "standard", Adapters: []string{"codex", "crush"}}); err != nil {
 		t.Fatalf("WriteInit() error = %v, want nil", err)
 	}
-	for _, rel := range []string{".ai/workflows/research-loop.yaml", ".ai/workflows/bug-audit-loop.yaml"} {
-		if _, err := os.Stat(filepath.Join(repo, filepath.FromSlash(rel))); err == nil {
-			t.Fatalf("Stat(%q) error = nil, want workflow omitted without codex+claude", rel)
-		} else if !os.IsNotExist(err) {
-			t.Fatalf("Stat(%q) error = %v, want not exists", rel, err)
-		}
+	workflow := readFile(t, filepath.Join(repo, ".ai/workflows/research-loop.yaml"))
+	if !strings.Contains(workflow, "producer: codex") || !strings.Contains(workflow, "min_reviewers: 1") {
+		t.Fatalf("research workflow = %q, want codex routing with min reviewer 1", workflow)
+	}
+	if strings.Contains(workflow, "claude") || strings.Contains(workflow, "crush") {
+		t.Fatalf("research workflow = %q, want no unavailable/guidance reviewers", workflow)
 	}
 }
 
@@ -142,6 +142,27 @@ func TestInitRefusesToOverwriteUserOwnedFile(t *testing.T) {
 	}
 	if got := readFile(t, path); got != "user-owned\n" {
 		t.Fatalf("AGENTS.md = %q, want unchanged", got)
+	}
+}
+
+func TestInitWritesSafeFilesWhenUserOwnedFilesConflict(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	repo := tempGitRepo(t)
+	writeFile(t, filepath.Join(repo, "AGENTS.md"), "user-owned\n")
+	report, err := WriteInit(InitConfig{Repo: repo, Profile: "standard", Adapters: []string{"codex", "crush"}})
+	if err == nil || !strings.Contains(err.Error(), "init conflicts") {
+		t.Fatalf("WriteInit() error = %v, want conflict", err)
+	}
+	if len(report.Conflicts) != 1 || report.Conflicts[0] != "AGENTS.md" {
+		t.Fatalf("Conflicts = %#v, want AGENTS.md only", report.Conflicts)
+	}
+	if got := readFile(t, filepath.Join(repo, "AGENTS.md")); got != "user-owned\n" {
+		t.Fatalf("AGENTS.md = %q, want unchanged", got)
+	}
+	for _, rel := range []string{"mivia-agent.yaml", ".codex/AGENTS.md", ".crush/README.md"} {
+		if _, statErr := os.Stat(filepath.Join(repo, filepath.FromSlash(rel))); statErr != nil {
+			t.Fatalf("Stat(%q) error = %v, want safe file written", rel, statErr)
+		}
 	}
 }
 

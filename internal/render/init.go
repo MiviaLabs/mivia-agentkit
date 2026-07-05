@@ -127,10 +127,10 @@ func WriteInit(cfg InitConfig) (InitReport, error) {
 	if err != nil {
 		return InitReport{}, err
 	}
-	if len(report.Conflicts) > 0 {
-		return report, fmt.Errorf("init conflicts: %v", report.Conflicts)
-	}
 	for _, item := range plan {
+		if isConflict(report, item.OutPath) {
+			continue
+		}
 		path := filepath.Join(repo, filepath.FromSlash(item.OutPath))
 		data := rendered[item.OutPath]
 		if old, err := os.ReadFile(path); err == nil && HasManaged(old) {
@@ -147,6 +147,9 @@ func WriteInit(cfg InitConfig) (InitReport, error) {
 		if err := os.WriteFile(path, data, 0o644); err != nil {
 			return InitReport{}, err
 		}
+	}
+	if len(report.Conflicts) > 0 {
+		return report, fmt.Errorf("init conflicts: %v", report.Conflicts)
 	}
 	return report, nil
 }
@@ -179,6 +182,15 @@ func classifyWrite(repo string, plan RenderPlan, rendered map[string][]byte, for
 	sort.Strings(report.FilesSkipped)
 	sort.Strings(report.Conflicts)
 	return report, nil
+}
+
+func isConflict(report InitReport, outPath string) bool {
+	for _, conflict := range report.Conflicts {
+		if conflict == outPath {
+			return true
+		}
+	}
+	return false
 }
 
 // JSON returns the report encoded as deterministic JSON.

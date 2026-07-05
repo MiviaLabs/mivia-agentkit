@@ -23,13 +23,64 @@ func TestGlobalConfigReadAbsentReturnsZeroNoError(t *testing.T) {
 
 func TestGlobalConfigReadParsesMiviaYaml(t *testing.T) {
 	home := setupHome(t)
-	writeHomeFile(t, home, ".agents/mivia.yaml", "defaults:\n  profile: starter\n  governance:\n    provider: noop\n")
+	writeHomeFile(t, home, ".agents/mivia-agent.yaml", "defaults:\n  profile: starter\n  governance:\n    provider: noop\n")
 	got, err := Read()
 	if err != nil {
 		t.Fatalf("Read() error = %v, want nil", err)
 	}
 	if got.Defaults.Profile != "starter" {
 		t.Fatalf("Defaults.Profile = %q, want starter", got.Defaults.Profile)
+	}
+}
+
+func TestGlobalConfigReadPrefersMiviaAgentYamlOverLegacyName(t *testing.T) {
+	home := setupHome(t)
+	writeHomeFile(t, home, ".agents/mivia.yaml", "defaults:\n  profile: starter\n")
+	writeHomeFile(t, home, ".agents/mivia-agent.yaml", "defaults:\n  profile: strict\n")
+	got, err := Read()
+	if err != nil {
+		t.Fatalf("Read() error = %v, want nil", err)
+	}
+	if got.Defaults.Profile != "strict" {
+		t.Fatalf("Defaults.Profile = %q, want strict from mivia-agent.yaml", got.Defaults.Profile)
+	}
+}
+
+func TestGlobalConfigReadParsesLegacyGroupedAdapters(t *testing.T) {
+	home := setupHome(t)
+	writeHomeFile(t, home, ".agents/mivia-agent.yaml", `
+version: 1
+defaults:
+  profile: standard
+  adapters:
+    orchestrable:
+      - codex
+      - claude
+    guidance:
+      - copilot
+  verification:
+    require_tests_before_commit: true
+    require_mutation_proofs_for_guards: true
+  privacy:
+    persist_raw_prompts: false
+hooks:
+  protected_actions:
+    - commit
+    - push
+  default_policy_provider: noop
+`)
+	got, err := Read()
+	if err != nil {
+		t.Fatalf("Read() error = %v, want nil", err)
+	}
+	if got.Defaults.Adapters["codex"].Role != config.AdapterRoleOrchestrable {
+		t.Fatalf("codex adapter = %+v, want orchestrable", got.Defaults.Adapters["codex"])
+	}
+	if got.Defaults.Adapters["copilot"].Role != config.AdapterRoleGuidance {
+		t.Fatalf("copilot adapter = %+v, want guidance", got.Defaults.Adapters["copilot"])
+	}
+	if got.Defaults.Governance.Provider != "noop" {
+		t.Fatalf("governance provider = %q, want noop", got.Defaults.Governance.Provider)
 	}
 }
 
@@ -109,7 +160,7 @@ func TestGlobalConfigRejectsSymlinkEscape(t *testing.T) {
 
 func TestGlobalConfigRejectsUnknownYAMLField(t *testing.T) {
 	home := setupHome(t)
-	writeHomeFile(t, home, ".agents/mivia.yaml", "defaults:\n  profile: starter\nmystery: true\n")
+	writeHomeFile(t, home, ".agents/mivia-agent.yaml", "defaults:\n  profile: starter\nmystery: true\n")
 	if _, err := Read(); err == nil || !strings.Contains(err.Error(), "field mystery not found") {
 		t.Fatalf("Read() error = %v, want unknown field", err)
 	}

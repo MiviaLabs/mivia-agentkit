@@ -94,10 +94,19 @@ func coreOutputs(profile string, enabled map[string]bool) []string {
 		".ai/quality/contracts/project-runtime.yaml",
 		".ai/quality/review-policies/default.yaml",
 	}
-	if profile != "starter" && enabled["codex"] && enabled["claude"] {
+	if profile != "starter" && hasRuntimeAdapter(enabled) {
 		out = append(out, ".ai/workflows/research-loop.yaml", ".ai/workflows/bug-audit-loop.yaml")
 	}
 	return out
+}
+
+func hasRuntimeAdapter(enabled map[string]bool) bool {
+	for _, name := range []string{"codex", "claude", "antigravity"} {
+		if enabled[name] {
+			return true
+		}
+	}
+	return false
 }
 
 var outputTemplates = map[string]string{

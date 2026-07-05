@@ -38,7 +38,7 @@ A single distributable binary that:
 ### Goals
 
 - One command (`init`) installs the full control surface for any adapter mix.
-- Global user config (`~/.agents/rules/`, `~/.agents/skills/`, `~/.agents/mivia.yaml`) is layered under project config — project wins on conflict; absence is silently ignored.
+- Global user config (`~/.agents/rules/`, `~/.agents/skills/`, `~/.agents/mivia-agent.yaml`) is layered under project config — project wins on conflict; absence is silently ignored.
 - One command (`run`) executes named loops by orchestrating adapters headlessly, with bounded iterations and consensus review.
 - One command (`review`) runs a one-off cross-CLI consensus review.
 - Deterministic gates (quality stamp + policy decisions) block protected actions: commit, push, PR, deploy, release, live-smoke.
@@ -77,7 +77,7 @@ A single distributable binary that:
 ## 7. Key concepts
 
 - **`.ai/`** — canonical agent-control surface (rules, skills, workflows, quality contracts, review policies). Root/vendor files are thin adapters pointing here.
-- **`~/.agents/`** — global user-level agent config directory (the emerging universal standard; see [dot-agents.com](https://dot-agents.com/)). `mivia-agent` reads `~/.agents/rules/`, `~/.agents/skills/`, and `~/.agents/mivia.yaml` if present, layering them under the project-level `.ai/` surface. It never writes to `~/.agents/`. Absence is silently ignored — no errors, no warnings.
+- **`~/.agents/`** — global user-level agent config directory (the emerging universal standard; see [dot-agents.com](https://dot-agents.com/)). `mivia-agent` reads `~/.agents/rules/`, `~/.agents/skills/`, and `~/.agents/mivia-agent.yaml` if present, layering them under the project-level `.ai/` surface. It never writes to `~/.agents/`. Absence is silently ignored — no errors, no warnings.
 - **Config hierarchy** — two layers: global (`~/.agents/`, per-user, lowest priority) and project (`.ai/` + root adapters, per-repo, highest priority). Project values always win on conflict; global provides defaults for unset values.
 - **Adapter** — swappable interface (`Detect`/`Run`/`Review`) wrapping one CLI. `orchestrable` adapters can be invoked headlessly by `run`; `guidance` adapters (Copilot) only receive instruction files.
 - **Loop** — named, bounded workflow of steps. `bound: iterations` (MVP) or `bound: budget` (post-MVP). Has `exit_when` gate and `on_exhausted` policy.
@@ -166,7 +166,7 @@ Traceability column: **WS** = implementation workstream, **Ph** = release phase 
 | ID | Requirement | WS | Ph |
 |---|---|---|---|
 | FR-10.1 | `mivia-agent` reads `~/.agents/rules/` and `~/.agents/skills/` if present and layers them under `.ai/rules/` and `.ai/skills/`. Project rules/skills of the same name override global ones. | WS1 | 1 |
-| FR-10.2 | `mivia-agent` reads `~/.agents/mivia.yaml` if present and merges its `defaults` (profile, adapter set) under the project manifest. Explicit project values always win. | WS1 | 1 |
+| FR-10.2 | `mivia-agent` reads `~/.agents/mivia-agent.yaml` if present, falling back to deprecated `~/.agents/mivia.yaml` for compatibility and merges its `defaults` (profile, adapter set) under the project manifest. Explicit project values always win. | WS1 | 1 |
 | FR-10.3 | Absence of `~/.agents/` is silently ignored — no error, no warning. | WS1 | 1 |
 | FR-10.4 | `mivia-agent` never writes to `~/.agents/`. | all | — |
 | FR-10.5 | `doctor` reports warnings when a global rule conflicts with a project rule of the same name (same file name, divergent content). | WS3 | 1 |

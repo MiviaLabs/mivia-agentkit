@@ -171,13 +171,32 @@ func checkGeneratedArtifactsStaged(ctx *Context) []report.Finding {
 
 func checkSecretPaths(ctx *Context) []report.Finding {
 	policy := pathpolicy.NewDefault()
+	ignored := gitIgnored(ctx.Repo)
 	var findings []report.Finding
 	_ = filepath.WalkDir(ctx.Repo, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+		if err != nil {
 			return nil
 		}
 		rel := relSlash(ctx.Repo, path)
 		if strings.HasPrefix(rel, ".git/") {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if isIgnoredPath(ignored, rel) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !isAgentControlPath(rel) {
+			if d.IsDir() && isKnownLargeAppDir(rel) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
 			return nil
 		}
 		if err := policy.Check(ctx.Repo, rel); err != nil {
@@ -186,6 +205,63 @@ func checkSecretPaths(ctx *Context) []report.Finding {
 		return nil
 	})
 	return findings
+}
+
+func isAgentControlPath(rel string) bool {
+	rel = filepath.ToSlash(rel)
+	switch rel {
+	case "mivia-agent.yaml", "AGENTS.md", "CLAUDE.md", "GEMINI.md":
+		return true
+	}
+	for _, prefix := range []string{".ai/", ".agents/", ".codex/", ".claude/", ".crush/", ".github/copilot-instructions.md", ".github/instructions/"} {
+		if strings.HasPrefix(rel, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func isKnownLargeAppDir(rel string) bool {
+	switch filepath.Base(filepath.ToSlash(rel)) {
+	case "node_modules", "vendor":
+		return true
+	default:
+		return false
+	}
+}
+
+func gitIgnored(repo string) map[string]struct{} {
+	cmd := exec.Command("git", "-C", repo, "status", "--ignored", "--porcelain=v1", "-z")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+	ignored := map[string]struct{}{}
+	for _, item := range bytes.Split(out, []byte{0}) {
+		if len(item) < 4 || !bytes.HasPrefix(item, []byte("!! ")) {
+			continue
+		}
+		rel := filepath.ToSlash(string(item[3:]))
+		ignored[rel] = struct{}{}
+	}
+	return ignored
+}
+
+func isIgnoredPath(ignored map[string]struct{}, rel string) bool {
+	if len(ignored) == 0 {
+		return false
+	}
+	rel = filepath.ToSlash(rel)
+	if _, ok := ignored[rel]; ok {
+		return true
+	}
+	prefix := strings.TrimSuffix(rel, "/") + "/"
+	for ignoredPath := range ignored {
+		if strings.HasPrefix(ignoredPath, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func checkGlobalReadable(ctx *Context) []report.Finding {
@@ -197,10 +273,14 @@ func checkGlobalReadable(ctx *Context) []report.Finding {
 	} else if err != nil {
 		return []report.Finding{finding(report.SeverityWarn, "global.unreadable", ctx.GlobalDir, err.Error())}
 	}
-	if data, err := os.ReadFile(filepath.Join(ctx.GlobalDir, "mivia.yaml")); err == nil {
+	path := filepath.Join(ctx.GlobalDir, "mivia-agent.yaml")
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		path = filepath.Join(ctx.GlobalDir, "mivia.yaml")
+	}
+	if data, err := os.ReadFile(path); err == nil {
 		var parsed map[string]any
 		if err := yaml.Unmarshal(data, &parsed); err != nil {
-			return []report.Finding{finding(report.SeverityWarn, "global.parse_error", filepath.Join(ctx.GlobalDir, "mivia.yaml"), err.Error())}
+			return []report.Finding{finding(report.SeverityWarn, "global.parse_error", path, err.Error())}
 		}
 	}
 	return nil

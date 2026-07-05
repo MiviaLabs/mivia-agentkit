@@ -185,7 +185,7 @@ Run it with:
 go run ./cmd/mivia-agent run --repo /path/to/repo --workflow research --dry-run --json
 ```
 
-## Example `~/.agents/mivia.yaml`
+## Example `~/.agents/mivia-agent.yaml`
 
 This is the optional global defaults layer. Project config still wins.
 

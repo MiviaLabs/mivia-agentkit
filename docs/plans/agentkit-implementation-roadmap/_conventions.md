@@ -80,7 +80,7 @@ When a WS is done, append to its `tasks.md`:
 ## Glossary used in tasks
 
 - **Manifest** — `mivia-agent.yaml` at the repo root.
-- **Global manifest** — `~/.agents/mivia.yaml` (optional, user-managed, layered under project manifest).
+- **Global manifest** — `~/.agents/mivia-agent.yaml` (optional, user-managed, layered under project manifest).
 - **Global rules/skills** — `~/.agents/rules/` and `~/.agents/skills/` (optional, layered under `.ai/` equivalents).
 - **Config hierarchy** — two-layer: global (`~/.agents/`, per-user, lowest priority) → project (`.ai/`, per-repo, highest priority).
 - **Stamp** — `.git/mivia-agent-quality-stamp.json`.

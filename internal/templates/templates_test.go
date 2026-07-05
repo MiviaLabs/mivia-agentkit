@@ -208,7 +208,7 @@ func TestListIncludesWorkflowTemplatesForStandard(t *testing.T) {
 	}
 }
 
-func TestListOmitsCodexClaudeWorkflowTemplatesWithoutBothRuntimeAdapters(t *testing.T) {
+func TestListIncludesWorkflowTemplatesWithAnyRuntimeAdapter(t *testing.T) {
 	tests := []struct {
 		name     string
 		adapters []string
@@ -223,9 +223,37 @@ func TestListOmitsCodexClaudeWorkflowTemplatesWithoutBothRuntimeAdapters(t *test
 			if err != nil {
 				t.Fatalf("List() error = %v, want nil", err)
 			}
-			for _, path := range got {
-				if path == ".ai/workflows/research-loop.yaml" || path == ".ai/workflows/bug-audit-loop.yaml" {
-					t.Fatalf("List() includes %q without codex+claude enabled: %#v", path, got)
+			for _, want := range []string{".ai/workflows/research-loop.yaml", ".ai/workflows/bug-audit-loop.yaml"} {
+				if !containsTemplatePath(got, want) {
+					t.Fatalf("List() missing %q with runtime adapter enabled: %#v", want, got)
+				}
+			}
+		})
+	}
+}
+
+func TestListOmitsWorkflowTemplatesWithoutRuntimeAdapter(t *testing.T) {
+	got, err := List("standard", []string{"crush"})
+	if err != nil {
+		t.Fatalf("List() error = %v, want nil", err)
+	}
+	for _, path := range got {
+		if path == ".ai/workflows/research-loop.yaml" || path == ".ai/workflows/bug-audit-loop.yaml" {
+			t.Fatalf("List() includes %q without an orchestrable adapter: %#v", path, got)
+		}
+	}
+}
+
+func TestWorkflowTemplatesUseRoutingVars(t *testing.T) {
+	for _, tpl := range []string{"workflows/research-loop.yaml.tmpl", "workflows/bug-audit-loop.yaml.tmpl"} {
+		t.Run(tpl, func(t *testing.T) {
+			data, err := fs.ReadFile(FS(), tpl)
+			if err != nil {
+				t.Fatalf("ReadFile() error = %v", err)
+			}
+			for _, forbidden := range []string{"producer: codex", "- claude"} {
+				if strings.Contains(string(data), forbidden) {
+					t.Fatalf("%s = %q, want routing vars instead of hard-coded %q", tpl, data, forbidden)
 				}
 			}
 		})

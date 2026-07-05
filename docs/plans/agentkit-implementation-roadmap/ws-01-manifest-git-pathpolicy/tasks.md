@@ -132,7 +132,7 @@ Create:
 Spec:
 - `Read()` checks for `~/.agents/` directory existence. If absent, returns a zero `GlobalConfig` with no error (FR-10.3).
 - If present, reads:
-  - `~/.agents/mivia.yaml` — parse into `GlobalConfig.Defaults` (profile, adapter defaults). Unknown fields → error (fail closed).
+  - `~/.agents/mivia-agent.yaml` — parse into `GlobalConfig.Defaults` (profile, adapter defaults). Unknown fields → error (fail closed).
   - `~/.agents/rules/` — list `*.md` files, read each into a map of `filename → content`.
   - `~/.agents/skills/` — list `*/SKILL.md` files, read each into a map of `name → content`.
 - `Layer()` merges `global` defaults under `project` manifest: for each field in `GlobalConfig.Defaults`, if the project manifest's corresponding field is at its zero/empty value, fill it from global. Explicit project values always win.

@@ -38,6 +38,32 @@ type globalYAML struct {
 	Defaults config.Manifest `yaml:"defaults"`
 }
 
+type legacyGlobalYAML struct {
+	Version  int                  `yaml:"version"`
+	Defaults legacyGlobalDefaults `yaml:"defaults"`
+	Hooks    legacyHooks          `yaml:"hooks"`
+}
+
+type legacyGlobalDefaults struct {
+	Profile         string            `yaml:"profile"`
+	TemplateVersion string            `yaml:"template_version"`
+	Adapters        legacyAdapters    `yaml:"adapters"`
+	Governance      config.Governance `yaml:"governance"`
+	Verification    map[string]bool   `yaml:"verification"`
+	Privacy         map[string]bool   `yaml:"privacy"`
+}
+
+type legacyAdapters struct {
+	ByName       map[string]config.AdapterConfig
+	Orchestrable []string `yaml:"orchestrable"`
+	Guidance     []string `yaml:"guidance"`
+}
+
+type legacyHooks struct {
+	ProtectedActions      []string `yaml:"protected_actions"`
+	DefaultPolicyProvider string   `yaml:"default_policy_provider"`
+}
+
 // Read loads ~/.agents if present. Absence is not an error.
 func Read() (GlobalConfig, error) {
 	home, err := os.UserHomeDir()
@@ -94,24 +120,94 @@ func Layer(global GlobalConfig, project config.Manifest, projectContent ...Proje
 }
 
 func readDefaults(root string, policy pathpolicy.Policy, cfg *GlobalConfig) error {
-	path := filepath.Join(root, "mivia.yaml")
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	path, rel, ok, err := defaultConfigPath(root)
+	if err != nil {
+		return err
+	}
+	if !ok {
 		return nil
 	}
-	if err := policy.Check(filepath.Dir(root), filepath.Join(".agents", "mivia.yaml")); err != nil {
+	if err := policy.Check(filepath.Dir(root), rel); err != nil {
 		return err
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("read mivia.yaml: %w", err)
+		return fmt.Errorf("read %s: %w", filepath.Base(path), err)
 	}
 	var parsed globalYAML
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(&parsed); err != nil {
-		return fmt.Errorf("parse mivia.yaml: %w", err)
+		legacy, legacyErr := parseLegacyDefaults(data)
+		if legacyErr != nil {
+			return fmt.Errorf("parse %s: %w", filepath.Base(path), err)
+		}
+		cfg.Defaults = legacy
+		return nil
 	}
 	cfg.Defaults = parsed.Defaults
+	return nil
+}
+
+func defaultConfigPath(root string) (string, string, bool, error) {
+	for _, name := range []string{"mivia-agent.yaml", "mivia.yaml"} {
+		path := filepath.Join(root, name)
+		_, err := os.Stat(path)
+		if err == nil {
+			return path, filepath.Join(".agents", name), true, nil
+		}
+		if !os.IsNotExist(err) {
+			return "", "", false, fmt.Errorf("stat %s: %w", path, err)
+		}
+	}
+	return "", "", false, nil
+}
+
+func parseLegacyDefaults(data []byte) (config.Manifest, error) {
+	var parsed legacyGlobalYAML
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	if err := dec.Decode(&parsed); err != nil {
+		return config.Manifest{}, err
+	}
+	out := config.Manifest{
+		Version:         "1",
+		Profile:         parsed.Defaults.Profile,
+		TemplateVersion: parsed.Defaults.TemplateVersion,
+		Adapters:        parsed.Defaults.Adapters.ByName,
+		Governance:      parsed.Defaults.Governance,
+	}
+	if out.Governance.Provider == "" {
+		out.Governance.Provider = parsed.Hooks.DefaultPolicyProvider
+	}
+	if out.Governance.AuditLog == "" {
+		out.Governance.AuditLog = ".ai/audit.jsonl"
+	}
+	return out, nil
+}
+
+func (a *legacyAdapters) UnmarshalYAML(value *yaml.Node) error {
+	var byName map[string]config.AdapterConfig
+	if err := value.Decode(&byName); err == nil {
+		a.ByName = byName
+		return nil
+	}
+	var grouped struct {
+		Orchestrable []string `yaml:"orchestrable"`
+		Guidance     []string `yaml:"guidance"`
+	}
+	if err := value.Decode(&grouped); err != nil {
+		return err
+	}
+	a.ByName = map[string]config.AdapterConfig{}
+	for _, name := range grouped.Orchestrable {
+		a.ByName[name] = config.AdapterConfig{Enabled: true, Role: config.AdapterRoleOrchestrable}
+	}
+	for _, name := range grouped.Guidance {
+		a.ByName[name] = config.AdapterConfig{Enabled: true, Role: config.AdapterRoleGuidance}
+	}
+	a.Orchestrable = grouped.Orchestrable
+	a.Guidance = grouped.Guidance
 	return nil
 }
 

@@ -147,7 +147,7 @@ WS2 is ☑ when:
 - Mutation proofs: embedded core file removal fail-then-revert ok; undefined template variable guard fail-then-revert ok; dry-run write mutation fail-then-revert ok; dry-run generated-file skip mutation fail-then-revert ok; global skill source/path mutation fail-then-revert ok; committed/embedded template drift mutation fail-then-revert ok; overwrite guard removal fail-then-revert ok; managed-block preservation mutation fail-then-revert ok.
 - Files: template embedding, renderer, init command, managed-block handling, and template source files created.
 - Residual risk: none.
-- Follow-ups: WS3 should wire post-write doctor validation; smoke used isolated HOME because this checkout's user-level `~/.agents/mivia.yaml` is outside the WS2 fixture contract.
+- Follow-ups: WS3 should wire post-write doctor validation; smoke used isolated HOME because this checkout's user-level `~/.agents/mivia-agent.yaml` is outside the WS2 fixture contract.
 
 ## Audit Fix — 2026-07-05
 
