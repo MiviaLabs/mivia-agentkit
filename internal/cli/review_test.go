@@ -68,6 +68,21 @@ func TestReviewResolvesArtifactRelativeToRepo(t *testing.T) {
 	}
 }
 
+func TestReviewPassesManifestAdapterDefaultsToRuntime(t *testing.T) {
+	var reviewReqs []adapter.Request
+	repo, artifactPath := reviewRepo(t)
+	mustWrite(t, filepath.Join(repo, "mivia-agent.yaml"), "version: \"1\"\nadapters:\n  codex:\n    enabled: true\n    role: orchestrable\n    model: gpt-5.5\n    effort: minimal\n")
+	withRuntimeAdapters(t, fakeCLIAdapter{name: "codex", headless: true, verdict: adapter.Verdict{Pass: true, Severity: "low", Notes: "ok"}, reviews: &reviewReqs})
+	cmd := newReviewCommand()
+	cmd.SetArgs([]string{"--repo", repo, "--artifact", artifactPath, "--reviewers", "codex", "--min-reviewers", "1"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("review error = %v", err)
+	}
+	if len(reviewReqs) != 1 || reviewReqs[0].Model != "gpt-5.5" || reviewReqs[0].Effort != "minimal" {
+		t.Fatalf("review requests = %#v, want manifest defaults", reviewReqs)
+	}
+}
+
 func TestReviewRejectsMinReviewersUnsatisfied(t *testing.T) {
 	repo, artifactPath := reviewRepo(t)
 	withRuntimeAdapters(t, fakeCLIAdapter{name: "codex", headless: true, verdict: adapter.Verdict{Pass: true, Severity: "low", Notes: "ok"}})

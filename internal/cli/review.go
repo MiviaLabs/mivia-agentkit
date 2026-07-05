@@ -51,7 +51,15 @@ func newReviewCommand() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				v, err := a.Review(cmd.Context(), adapter.Request{Prompt: prompt, Workdir: absRepoPath(repo), Approval: "never"})
+				cfg := manifest.Adapters[name]
+				v, err := a.Review(cmd.Context(), adapter.Request{
+					Prompt:   prompt,
+					Workdir:  absRepoPath(repo),
+					Approval: "never",
+					Model:    cfg.Model,
+					Effort:   cfg.Effort,
+					Params:   cfg.Params,
+				})
 				if err != nil {
 					return err
 				}
