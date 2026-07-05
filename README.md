@@ -195,6 +195,7 @@ make help
 - [User guide](docs/user-guide.md) - current command surface, flags, behavior notes, and examples
 - [Configuration examples](docs/config-examples.md) - working manifest and workflow examples, including Codex plus Crush/Qwen loops
 - [Loop authoring](docs/loop-authoring.md) - workflow shape, consensus, artifact paths, and practical checks
+- [Desktop agent workflows](docs/desktop-agent-workflows.md) - how Codex, Claude, and generic agent desktops should use skills and hooks to invoke `mivia-agent`
 - [Development environment](docs/setup/development-environment.md) - local prerequisites and Ubuntu setup
 - [Development hooks](docs/development-hooks.md) - hook behavior and policy shape
 - [Agent hooks](docs/agent-hooks.md) - agent hook surfaces, triggers, policies, and audit-loop behavior

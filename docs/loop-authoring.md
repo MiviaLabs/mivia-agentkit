@@ -25,6 +25,16 @@ For `run` workflows, `artifact` is a run-local artifact name. The engine writes 
 ```
 
 Separate runs therefore do not overwrite each other across terminals, and repeated iterations within one run also keep separate artifact files.
+The artifact name is the handoff contract between producer and reviewer; it should not include a shared repo path.
+
+Future config should expose the run store base directory only, for example:
+
+```yaml
+run_store:
+  base_dir: .ai/runs
+```
+
+That base directory must remain repo-relative, ignored, and guarded against absolute paths, `..`, `.git`, `.env`, secrets, and raw provider payload dumps.
 
 Model/effort precedence is:
 

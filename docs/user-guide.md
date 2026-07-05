@@ -247,7 +247,9 @@ Current `run` behavior:
 - `run --dry-run --json` includes a per-step `runtime` list with resolved `adapter`, `model`, and `effort` values.
 - Detects required orchestrable adapters.
 - Executes the loop through the orchestrator.
-- Writes run artifacts under `.ai/runs/`.
+- Writes logical workflow artifacts under `.ai/runs/<run-id>/<step-id>/iter-<nnn>/`.
+
+The workflow `artifact` field should be a stable artifact name such as `bug-audit.md`, not a hardcoded repo output path. The runtime chooses the ignored per-run directory. A future manifest option should expose only `run_store.base_dir`, defaulting to `.ai/runs`.
 
 Current adapter runtime support:
 
@@ -305,6 +307,8 @@ Current hook behavior:
 - Reads event payload from stdin.
 - Denies protected actions when stamp or policy requirements are missing.
 - Fails closed for malformed protected payloads.
+
+For desktop agents, use hooks only as fast policy and context gates. Put long workflow instructions in repo skills, then let hooks remind the agent to use that skill and to run `mivia-agent run --dry-run --json` before live workflow execution. See [desktop-agent-workflows.md](./desktop-agent-workflows.md).
 
 ## Import An Existing Setup
 
