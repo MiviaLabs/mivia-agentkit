@@ -29,6 +29,21 @@ func TestInitDryRunWritesNothing(t *testing.T) {
 	}
 }
 
+func TestInitDryRunReportsGitignoreWithoutWriting(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	repo := tempGitRepo(t)
+	report, err := PreviewInit(InitConfig{Repo: repo, Profile: "standard", Adapters: []string{"codex"}})
+	if err != nil {
+		t.Fatalf("PreviewInit() error = %v, want nil", err)
+	}
+	if !containsString(report.FilesCreated, ".gitignore") {
+		t.Fatalf("FilesCreated = %#v, want .gitignore", report.FilesCreated)
+	}
+	if _, err := os.Stat(filepath.Join(repo, ".gitignore")); !os.IsNotExist(err) {
+		t.Fatalf("Stat(.gitignore) error = %v, want not exist after dry-run", err)
+	}
+}
+
 func TestInitWriteCreatesExpectedFiles(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	repo := tempGitRepo(t)
@@ -39,6 +54,56 @@ func TestInitWriteCreatesExpectedFiles(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(repo, filepath.FromSlash(rel))); err != nil {
 			t.Fatalf("Stat(%q) error = %v, want nil", rel, err)
 		}
+	}
+}
+
+func TestInitWriteCreatesGitignoreWithAIRuns(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	repo := tempGitRepo(t)
+	report, err := WriteInit(InitConfig{Repo: repo, Profile: "standard", Adapters: []string{"codex"}})
+	if err != nil {
+		t.Fatalf("WriteInit() error = %v, want nil", err)
+	}
+	got := readFile(t, filepath.Join(repo, ".gitignore"))
+	if got != ".ai/runs/\n" {
+		t.Fatalf(".gitignore = %q, want .ai/runs entry", got)
+	}
+	if !containsString(report.FilesCreated, ".gitignore") {
+		t.Fatalf("FilesCreated = %#v, want .gitignore", report.FilesCreated)
+	}
+}
+
+func TestInitWriteAppendsAIRunsToExistingGitignore(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	repo := tempGitRepo(t)
+	writeFile(t, filepath.Join(repo, ".gitignore"), "dist/\n")
+	report, err := WriteInit(InitConfig{Repo: repo, Profile: "standard", Adapters: []string{"codex"}})
+	if err != nil {
+		t.Fatalf("WriteInit() error = %v, want nil", err)
+	}
+	got := readFile(t, filepath.Join(repo, ".gitignore"))
+	if got != "dist/\n.ai/runs/\n" {
+		t.Fatalf(".gitignore = %q, want existing content plus .ai/runs entry", got)
+	}
+	if !containsString(report.FilesSkipped, ".gitignore") {
+		t.Fatalf("FilesSkipped = %#v, want .gitignore update recorded", report.FilesSkipped)
+	}
+}
+
+func TestInitWriteDoesNotDuplicateAIRunsGitignoreEntry(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	repo := tempGitRepo(t)
+	writeFile(t, filepath.Join(repo, ".gitignore"), "dist/\n.ai/runs/\n")
+	cfg := InitConfig{Repo: repo, Profile: "standard", Adapters: []string{"codex"}}
+	if _, err := WriteInit(cfg); err != nil {
+		t.Fatalf("first WriteInit() error = %v, want nil", err)
+	}
+	if _, err := WriteInit(cfg); err != nil {
+		t.Fatalf("second WriteInit() error = %v, want nil", err)
+	}
+	got := readFile(t, filepath.Join(repo, ".gitignore"))
+	if strings.Count(got, ".ai/runs/") != 1 {
+		t.Fatalf(".gitignore = %q, want exactly one .ai/runs entry", got)
 	}
 }
 
@@ -302,4 +367,13 @@ func readFile(t *testing.T, path string) string {
 		t.Fatalf("ReadFile() error = %v", err)
 	}
 	return string(data)
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

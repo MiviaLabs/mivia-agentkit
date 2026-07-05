@@ -3,6 +3,7 @@
 package render
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -148,10 +149,60 @@ func WriteInit(cfg InitConfig) (InitReport, error) {
 			return InitReport{}, err
 		}
 	}
+	if err := ensureAIRunsIgnored(repo, &report); err != nil {
+		return InitReport{}, err
+	}
 	if len(report.Conflicts) > 0 {
 		return report, fmt.Errorf("init conflicts: %v", report.Conflicts)
 	}
 	return report, nil
+}
+
+func ensureAIRunsIgnored(repo string, report *InitReport) error {
+	const entry = ".ai/runs/"
+	path := filepath.Join(repo, ".gitignore")
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		if err := os.WriteFile(path, []byte(entry+"\n"), 0o644); err != nil {
+			return err
+		}
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if gitignoreHasEntry(data, entry) {
+		return nil
+	}
+	next := append([]byte(nil), data...)
+	if len(next) > 0 && !bytes.HasSuffix(next, []byte("\n")) {
+		next = append(next, '\n')
+	}
+	next = append(next, []byte(entry+"\n")...)
+	if err := os.WriteFile(path, next, 0o644); err != nil {
+		return err
+	}
+	return nil
+}
+
+func gitignoreHasEntry(data []byte, entry string) bool {
+	for _, line := range bytes.Split(data, []byte("\n")) {
+		if string(bytes.TrimSpace(line)) == entry {
+			return true
+		}
+	}
+	return false
+}
+
+func appendUniqueSorted(values []string, value string) []string {
+	for _, existing := range values {
+		if existing == value {
+			return values
+		}
+	}
+	values = append(values, value)
+	sort.Strings(values)
+	return values
 }
 
 func classifyWrite(repo string, plan RenderPlan, rendered map[string][]byte, force bool) (InitReport, error) {
@@ -178,10 +229,35 @@ func classifyWrite(repo string, plan RenderPlan, rendered map[string][]byte, for
 		}
 		report.Actions = append(report.Actions, FileAction{Path: item.OutPath, Action: action})
 	}
+	if err := classifyAIRunsIgnore(repo, &report); err != nil {
+		return InitReport{}, err
+	}
 	sort.Strings(report.FilesCreated)
 	sort.Strings(report.FilesSkipped)
 	sort.Strings(report.Conflicts)
 	return report, nil
+}
+
+func classifyAIRunsIgnore(repo string, report *InitReport) error {
+	const rel = ".gitignore"
+	const entry = ".ai/runs/"
+	data, err := os.ReadFile(filepath.Join(repo, rel))
+	if os.IsNotExist(err) {
+		report.FilesCreated = appendUniqueSorted(report.FilesCreated, rel)
+		report.Actions = append(report.Actions, FileAction{Path: rel, Action: "would-create"})
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if gitignoreHasEntry(data, entry) {
+		report.FilesSkipped = appendUniqueSorted(report.FilesSkipped, rel)
+		report.Actions = append(report.Actions, FileAction{Path: rel, Action: "would-skip"})
+		return nil
+	}
+	report.FilesSkipped = appendUniqueSorted(report.FilesSkipped, rel)
+	report.Actions = append(report.Actions, FileAction{Path: rel, Action: "would-update"})
+	return nil
 }
 
 func isConflict(report InitReport, outPath string) bool {
