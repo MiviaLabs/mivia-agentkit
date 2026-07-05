@@ -42,35 +42,57 @@ go run ./cmd/mivia-agent audit --repo /path/to/repo --json
 
 ## Codex Desktop Flow
 
-In a Codex Desktop repo, `mivia-agent init` installs the repo skill, hook wiring, manifest, and workflow files. The desktop agent still starts from a normal user prompt, but the runtime boundary is the local `mivia-agent` binary.
+In a Codex Desktop repo, `mivia-agent init` installs the repo skill, hook wiring, manifest, and workflow files. The desktop agent still starts from a normal user prompt, but the runtime boundary is the local `mivia-agent` binary. A workflow is not just a prompt: it is a bounded produce-review loop with adapter detection, configured effort levels, run-local artifacts, consensus, and explicit pass/fail/iterate behavior.
 
 ```mermaid
 flowchart TD
-  User["User in Codex Desktop"] --> Prompt["Use $mivia-agent-workflows with a free-text objective"]
-  Prompt --> Skill["Repo skill: .ai/skills/mivia-agent-workflows/SKILL.md"]
-  Prompt --> Hook["Fast Codex hooks: policy reminders and protected-action gates"]
-  Skill --> Check["mivia-agent adapters --repo . --json"]
-  Check --> DryRun["mivia-agent run --repo . --workflow <name> --dry-run --json"]
-  DryRun --> LiveRun["mivia-agent run --repo . --workflow <name> --var objective=... --json"]
-  LiveRun --> Adapter["Codex adapter: codex exec"]
-  Adapter --> Artifacts["Ignored artifacts: .ai/runs/<run-id>/<step>/iter-001/<artifact>"]
-  Artifacts --> Report["Desktop agent reports artifact path, verdict, and residual risk"]
+  User["Executive or engineer asks Codex Desktop:<br/>Use $mivia-agent-workflows.<br/>Run bug-audit-loop for objective ..."]
+  Skill["Repo workflow skill<br/>.agents/skills/mivia-agent-workflows/SKILL.md<br/>routes the request to mivia-agent"]
+  Hooks["Fast hooks<br/>policy reminders and protected-action gates<br/>no long workflow work here"]
+  Adapters["Adapter check<br/>./mivia-agent adapters --repo . --json<br/>only approved runtimes can execute"]
+  DryRun["Dry run<br/>./mivia-agent run --workflow bug-audit-loop --dry-run --json<br/>shows Codex high producer and Codex medium reviewer"]
+
+  User --> Skill
+  User --> Hooks
+  Skill --> Adapters --> DryRun
+
+  subgraph Loop["Bounded workflow loop: bug-audit-loop, max_iterations: 2"]
+    Produce["Producer step: audit<br/>adapter: codex<br/>effort: high<br/>writes logical artifact bug-audit.md"]
+    Store["Run store<br/>.ai/runs/run-id/audit/iter-001/bug-audit.md<br/>ignored, per-run, no shared output path"]
+    Review["Reviewer step: review<br/>adapter: codex<br/>effort: medium<br/>reads the run artifact and returns strict JSON verdict"]
+    Consensus["Consensus gate<br/>mode: majority<br/>min_reviewers: 1<br/>tie_breaker: strict"]
+    Iterate["Fail verdict<br/>review notes feed the next iteration"]
+    Pass["Pass verdict<br/>workflow exits pass<br/>artifact is accepted as workflow output"]
+    Exhausted["Iteration cap reached<br/>on_exhausted: fail"]
+
+    Produce --> Store --> Review --> Consensus
+    Consensus -->|pass| Pass
+    Consensus -->|fail and iterations remain| Iterate --> Produce
+    Consensus -->|fail and cap reached| Exhausted
+  end
+
+  DryRun --> LiveRun["Live run<br/>./mivia-agent run --workflow bug-audit-loop --var objective=... --json"]
+  LiveRun --> Produce
+  Pass --> Report["Desktop agent reports<br/>trace id, artifact path, verdict, findings, residual risk"]
+  Exhausted --> Report
 ```
 
 Example desktop prompt:
 
 ```text
-Use $mivia-agent-workflows. Check adapters, dry-run workflow research-loop, then run it for objective: audit auth timeout handling.
+Use $mivia-agent-workflows. Check adapters, dry-run workflow bug-audit-loop, then run it for objective: find correctness and reliability bugs in the adapter runtime.
 ```
 
 For a Codex-only runtime setup, configure Codex as the orchestrable adapter and keep desktop-only tools such as Antigravity guidance-only. The workflow files should resolve producer and reviewer steps to `codex` in the dry-run output before any live run.
 
 This repo includes Codex-only workflows for its own maintenance:
 
-- `research-loop`
-- `bug-audit-loop`
-- `roadmap-implementation-review-loop`
-- `desktop-workflow-docs-loop`
+| Workflow | Producer | Reviewer | Output |
+| --- | --- | --- | --- |
+| `research-loop` | Codex `low` | Codex `medium` | `research.md` |
+| `bug-audit-loop` | Codex `high` | Codex `medium` | `bug-audit.md` |
+| `roadmap-implementation-review-loop` | Codex `high` | Codex `xhigh` | `roadmap-review.md` |
+| `desktop-workflow-docs-loop` | Codex `medium` | Codex `high` | `desktop-workflow-docs.md` |
 
 ## Current Capabilities
 
@@ -101,7 +123,6 @@ Some flags already exist on the CLI but are not fully wired yet:
 - `init --with-loop`
 - `run --step`
 - `run --input-artifact`
-- `run --var`
 - `preflight --pipeline-preflight`
 
 Treat those as reserved surface for now.
