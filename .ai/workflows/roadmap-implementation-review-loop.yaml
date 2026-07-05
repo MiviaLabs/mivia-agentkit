@@ -1,0 +1,22 @@
+version: 1
+name: roadmap-implementation-review-loop
+description: Codex checks a roadmap/workstream implementation plan against AgentKit conventions.
+bound: iterations
+max_iterations: 2
+steps:
+  - id: roadmap-review
+    producer: codex
+    artifact: roadmap-review.md
+    effort: high
+  - id: codex-review
+    reviewers:
+      - codex
+    artifact: roadmap-review.md
+    effort: xhigh
+    consensus:
+      mode: majority
+      tie_breaker: strict
+      min_reviewers: 1
+    on_fail: iterate
+exit_when: review-pass
+on_exhausted: fail

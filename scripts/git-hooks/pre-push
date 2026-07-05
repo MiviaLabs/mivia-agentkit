@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+fail() {
+  printf 'pre-push: %s\n' "$*" >&2
+  exit 1
+}
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || fail "missing required command '$1'"
+}
+
+require_cmd python3
+python3 scripts/verify_agent_config.py
+
+git diff --check
+
+require_cmd semgrep
+semgrep --validate --config semgrep/agent-standards.yml
+python3 scripts/test_semgrep_rules.py
+python3 scripts/test_git_hooks.py
+python3 scripts/test_agent_hook_guard.py
+python3 scripts/test_audit_loop_guard.py
+python3 scripts/test_agent_plan_contracts.py
+python3 scripts/test_plan_hook_guard.py
+python3 scripts/test_skill_contracts.py
+semgrep --config semgrep/agent-standards.yml --error --skip-unknown-extensions --metrics off --disable-nosem .
+
+if [[ ! -f go.mod ]]; then
+  printf 'pre-push: go.mod not present; skipping Go test/vet/build\n'
+  exit 0
+fi
+
+require_cmd go
+mapfile -d '' GO_FILES < <(git ls-files -z -- '*.go')
+if ((${#GO_FILES[@]})); then
+  UNFORMATTED="$(gofmt -l "${GO_FILES[@]}")"
+  if [[ -n "$UNFORMATTED" ]]; then
+    printf 'pre-push: gofmt required for:\n%s\n' "$UNFORMATTED" >&2
+    exit 1
+  fi
+fi
+
+go test ./...
+go vet ./...
+
+if [[ -d cmd/mivia-agent ]]; then
+  go build ./cmd/mivia-agent
+fi

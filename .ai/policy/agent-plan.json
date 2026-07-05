@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "planFormat": "mivia-agent-plan/v1",
+  "plannerSkill": "agent-dag-planner",
+  "implementerSkill": "agent-plan-implementer",
+  "planArtifactPattern": ".ai/plans/*.plan.json",
+  "gapStatuses": [
+    "open",
+    "missing",
+    "shallow",
+    "gated"
+  ],
+  "plannerPromptTriggers": [
+    "implementation plan",
+    "dag plan",
+    "dag decomposition",
+    "decompose",
+    "planning skill",
+    "save as .md",
+    "plan file",
+    "reverify plans"
+  ],
+  "implementerPromptTriggers": [
+    "implement this plan",
+    "implement the plan",
+    "implement from plan",
+    "run the plan",
+    "with hooks",
+    "bug audits"
+  ],
+  "plannerInstruction": "Use agent-dag-planner. Re-read current source, re-verify existing docs/plans, fill or correct plan gaps, emit mivia-agent-plan/v1 in .ai/plans, save the human implementation plan in docs/plans, and report PlanArtifact: <path>.",
+  "implementerInstruction": "Use agent-plan-implementer. Start from a validated .ai/plans/*.plan.json, execute one DAG node at a time, stay inside node scope, run node verifiers, and run deep-bug-audit, test-coverage-audit, and adversarial-test-review loops for implementation nodes."
+}

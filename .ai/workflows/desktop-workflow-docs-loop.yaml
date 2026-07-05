@@ -1,0 +1,22 @@
+version: 1
+name: desktop-workflow-docs-loop
+description: Codex checks desktop workflow docs, skills, and hook guidance for consistency.
+bound: iterations
+max_iterations: 2
+steps:
+  - id: desktop-docs
+    producer: codex
+    artifact: desktop-workflow-docs.md
+    effort: medium
+  - id: codex-review
+    reviewers:
+      - codex
+    artifact: desktop-workflow-docs.md
+    effort: high
+    consensus:
+      mode: majority
+      tie_breaker: strict
+      min_reviewers: 1
+    on_fail: iterate
+exit_when: review-pass
+on_exhausted: fail

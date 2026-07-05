@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "schema": "https://dot-agents.com/schemas/skills.json",
+  "generated_from": [
+    ".ai/skills",
+    ".agents/skills",
+    ".claude/skills"
+  ],
+  "skills": [
+    {
+      "name": "agent-dag-planner",
+      "agent": "canonical",
+      "source": "project",
+      "path": ".ai/skills/agent-dag-planner/SKILL.md",
+      "description": "Re-verify current source and existing plans, correct gaps, and emit a machine-readable DAG plan.",
+      "triggers": ["implementation plan", "dag planning", "dag decomposition", "agent plan", "reverify plans"]
+    },
+    {
+      "name": "agent-plan-implementer",
+      "agent": "canonical",
+      "source": "project",
+      "path": ".ai/skills/agent-plan-implementer/SKILL.md",
+      "description": "Implement a validated DAG plan with scoped edits, verifiers, mutation proofs, hooks, and audit loops.",
+      "triggers": ["implement this plan", "implement the plan", "execute dag plan", "run the plan", "plan implementation"]
+    },
+    {
+      "name": "adversarial-test-review",
+      "agent": "canonical",
+      "source": "project",
+      "path": ".ai/skills/adversarial-test-review/SKILL.md",
+      "description": "Pre-merge test review that tries to falsify the implementation and prove tests fail for meaningful mutations.",
+      "triggers": ["adversarial test review", "code review", "review this", "safe to ship"]
+    },
+    {
+      "name": "airtight-feature-delivery",
+      "agent": "canonical",
+      "source": "project",
+      "path": ".ai/skills/airtight-feature-delivery/SKILL.md",
+      "description": "End-to-end feature delivery checklist for implementing one scoped workstream task.",
+      "triggers": ["implement feature", "airtight delivery", "workstream implementation", "finish this task"]
+    },
+    {
+      "name": "deep-bug-audit",
+      "agent": "canonical",
+      "source": "project",
+      "path": ".ai/skills/deep-bug-audit/SKILL.md",
+      "description": "Broad bug-finding workflow for correctness, reliability, security, data loss, hooks, adapters, and test gaps.",
+      "triggers": ["deep bug audit", "bug hunt", "production readiness audit", "broad risk review"]
+    },
+    {
+      "name": "test-coverage-audit",
+      "agent": "canonical",
+      "source": "project",
+      "path": ".ai/skills/test-coverage-audit/SKILL.md",
+      "description": "Coverage-gap workflow for mapping implemented behavior to required tests, mutation proofs, and workstream contracts.",
+      "triggers": ["test coverage audit", "missing tests", "is this fully tested", "coverage gaps"]
+    },
+    {
+      "name": "mivia-agent-workflows",
+      "agent": "canonical",
+      "source": "project",
+      "path": ".ai/skills/mivia-agent-workflows/SKILL.md",
+      "description": "Workflow execution skill for mivia-agent init/run/review behavior, desktop-agent workflow routing, run artifacts, and adapter-loop verification.",
+      "triggers": ["mivia-agent workflow", "workflow artifacts", "desktop agent workflow", "run-store", "crush research loop"]
+    },
+    {
+      "name": "agent-dag-planner",
+      "agent": "codex",
+      "source": "project",
+      "path": ".agents/skills/agent-dag-planner/SKILL.md",
+      "description": "Codex adapter for machine-readable DAG planning.",
+      "triggers": ["implementation plan", "dag planning", "dag decomposition", "agent plan", "reverify plans"]
+    },
+    {
+      "name": "agent-plan-implementer",
+      "agent": "codex",
+      "source": "project",
+      "path": ".agents/skills/agent-plan-implementer/SKILL.md",
+      "description": "Codex adapter for implementing validated DAG plans.",
+      "triggers": ["implement this plan", "implement the plan", "execute dag plan", "run the plan", "plan implementation"]
+    },
+    {
+      "name": "mivia-agent-workflows",
+      "agent": "codex",
+      "source": "project",
+      "path": ".agents/skills/mivia-agent-workflows/SKILL.md",
+      "description": "Codex adapter for mivia-agent workflow execution and desktop-agent workflow routing.",
+      "triggers": ["mivia-agent workflow", "workflow artifacts", "desktop agent workflow", "run-store", "crush research loop"]
+    },
+    {
+      "name": "agent-dag-planner",
+      "agent": "claude",
+      "source": "project",
+      "path": ".claude/skills/agent-dag-planner/SKILL.md",
+      "description": "Claude Code adapter for machine-readable DAG planning.",
+      "triggers": ["implementation plan", "dag planning", "dag decomposition", "agent plan", "reverify plans"]
+    },
+    {
+      "name": "agent-plan-implementer",
+      "agent": "claude",
+      "source": "project",
+      "path": ".claude/skills/agent-plan-implementer/SKILL.md",
+      "description": "Claude Code adapter for implementing validated DAG plans.",
+      "triggers": ["implement this plan", "implement the plan", "execute dag plan", "run the plan", "plan implementation"]
+    },
+    {
+      "name": "adversarial-test-review",
+      "agent": "claude",
+      "source": "project",
+      "path": ".claude/skills/adversarial-test-review/SKILL.md",
+      "description": "Claude Code adapter for adversarial pre-merge review.",
+      "triggers": ["adversarial test review", "code review", "review this", "safe to ship"]
+    },
+    {
+      "name": "airtight-feature-delivery",
+      "agent": "claude",
+      "source": "project",
+      "path": ".claude/skills/airtight-feature-delivery/SKILL.md",
+      "description": "Claude Code adapter for end-to-end feature delivery.",
+      "triggers": ["implement feature", "airtight delivery", "workstream implementation"]
+    },
+    {
+      "name": "deep-bug-audit",
+      "agent": "claude",
+      "source": "project",
+      "path": ".claude/skills/deep-bug-audit/SKILL.md",
+      "description": "Claude Code adapter for structured bug-finding.",
+      "triggers": ["deep bug audit", "bug hunt", "production readiness audit"]
+    },
+    {
+      "name": "test-coverage-audit",
+      "agent": "claude",
+      "source": "project",
+      "path": ".claude/skills/test-coverage-audit/SKILL.md",
+      "description": "Claude Code adapter for coverage gap analysis.",
+      "triggers": ["test coverage audit", "missing tests", "coverage gaps"]
+    },
+    {
+      "name": "mivia-agent-workflows",
+      "agent": "claude",
+      "source": "project",
+      "path": ".claude/skills/mivia-agent-workflows/SKILL.md",
+      "description": "Claude Code adapter for mivia-agent workflow execution and desktop-agent workflow routing.",
+      "triggers": ["mivia-agent workflow", "workflow artifacts", "desktop agent workflow", "run-store", "crush research loop"]
+    }
+  ]
+}

@@ -1,0 +1,1210 @@
+{
+  "PlanFormat": "mivia-agent-plan/v1",
+  "plan_id": "agentkit-implementation-roadmap",
+  "version": 1,
+  "baseline_commit": "83e9ba1 plus current working-tree revalidation",
+  "scope": {
+    "in": [
+      "Mivia AgentKit implementation roadmap",
+      "docs/plans/agentkit-implementation-roadmap/**",
+      "cmd/mivia-agent/**",
+      "internal/**",
+      "templates/**",
+      "test/fixture/**",
+      ".ai/**",
+      ".agents/**",
+      ".claude/**",
+      ".codex/**",
+      ".github/**",
+      "scripts/**",
+      "semgrep/**"
+    ],
+    "out": [
+      "hosted services",
+      "remote Git writes",
+      "live connector setup",
+      "unbounded budget loops",
+      "raw prompt or provider payload persistence"
+    ],
+    "files": [
+      "AGENTS.md",
+      ".ai/INDEX.md",
+      ".ai/rules/00-operating-doctrine.md",
+      ".ai/rules/20-agent-quality.md",
+      ".ai/templates/agent-report-v1.md",
+      ".ai/templates/agent-plan-v1.json",
+      ".ai/schemas/agent-plan-v1.schema.json",
+      ".ai/plans/agentkit-implementation-roadmap.plan.json",
+      "docs/agent-planning.md",
+      "docs/plans/agentkit-implementation-roadmap/00-overview.md",
+      "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-00-bootstrap/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-01-manifest-git-pathpolicy/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-02-templates-init/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-03-doctor-audit/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-04-preflight-stamp/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-05-hooks/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-06-adapter-templates/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-07-import-update/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-14-real-runtime-coverage/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-08-ci-release-docs/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-09-adapters/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-10-orchestrator/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-11-consensus/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-12-governance/tasks.md",
+      "docs/plans/agentkit-implementation-roadmap/ws-13-run-review-adapters/tasks.md",
+      "docs/prd/0001-mivia-agentkit.md",
+      "docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md",
+      "scripts/validate_agent_plan.py",
+      "scripts/test_agent_plan_contracts.py",
+      "scripts/plan_hook_guard.py",
+      "scripts/test_plan_hook_guard.py",
+      "scripts/test_semgrep_rules.py",
+      "scripts/verify_agent_config.py",
+      "semgrep/agent-standards.yml"
+    ]
+  },
+  "source_evidence": [
+    {
+      "path": ".ai/INDEX.md",
+      "reason": "canonical control-surface registry",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": ".ai/schemas/agent-plan-v1.schema.json",
+      "reason": "machine plan schema contract",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": ".ai/templates/agent-plan-v1.json",
+      "reason": "machine plan template contract",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "AGENTS.md",
+      "reason": "canonical repo instructions and implementation boundaries",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "docs/agent-planning.md",
+      "reason": "human-facing DAG task directory contract",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "path": "docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md",
+      "reason": "product implementation contract and external re-verification requirements",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "docs/plans/agentkit-implementation-roadmap/00-overview.md",
+      "reason": "AgentKit workstream dependency graph and phase order",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "path": "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+      "reason": "task, verifier, and mutation-proof format",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-00-bootstrap/tasks.md",
+      "reason": "WS0 implementation tasks and verification",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-01-manifest-git-pathpolicy/tasks.md",
+      "reason": "WS1 implementation tasks and verification",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-02-templates-init/tasks.md",
+      "reason": "WS2 implementation tasks and verification",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-03-doctor-audit/tasks.md",
+      "reason": "WS3 implementation tasks and verification",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-04-preflight-stamp/tasks.md",
+      "reason": "WS4 implementation tasks and verification",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-05-hooks/tasks.md",
+      "reason": "WS5 implementation tasks and verification",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-06-adapter-templates/tasks.md",
+      "reason": "WS6 implementation tasks and verification",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-07-import-update/tasks.md",
+      "reason": "WS7 implementation tasks and verification",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-14-real-runtime-coverage/tasks.md",
+      "reason": "WS14 implementation tasks and real-runtime-coverage verification contract",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-08-ci-release-docs/tasks.md",
+      "reason": "WS8 implementation tasks and verification",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-09-adapters/tasks.md",
+      "reason": "WS9 implementation tasks and verification",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-10-orchestrator/tasks.md",
+      "reason": "WS10 implementation tasks and verification",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-11-consensus/tasks.md",
+      "reason": "WS11 implementation tasks and verification",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-12-governance/tasks.md",
+      "reason": "WS12 implementation tasks and verification",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "docs/plans/agentkit-implementation-roadmap/ws-13-run-review-adapters/tasks.md",
+      "reason": "WS13 implementation tasks and verification",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "docs/prd/0001-mivia-agentkit.md",
+      "reason": "functional requirements and phase gates",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "scripts/plan_hook_guard.py",
+      "reason": "planner Stop-hook PlanArtifact enforcement",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "scripts/test_agent_plan_contracts.py",
+      "reason": "contract tests for roadmap relocation and real plan artifacts",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "path": "scripts/validate_agent_plan.py",
+      "reason": "real validator for DAG, gaps, verifiers, mutations, and correction log",
+      "checked_at": "2026-07-04"
+    }
+  ],
+  "external_docs": [
+    {
+      "url": "https://developers.openai.com/codex/hooks",
+      "reason": "Codex hook surface must be re-verified before WS5 emitter implementation",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "url": "https://developers.openai.com/codex/noninteractive",
+      "reason": "Codex non-interactive execution must be re-verified before WS9 adapter implementation",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "url": "https://developers.openai.com/codex/cli/reference",
+      "reason": "Codex CLI command surface and flags must be re-verified before WS14 real subprocess coverage",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "url": "https://developers.openai.com/codex/skills",
+      "reason": "Codex skill packaging behavior informs generated adapter templates",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "url": "https://developers.openai.com/codex/mcp",
+      "reason": "Codex MCP configuration informs allow-list and adapter-template boundaries",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "url": "https://code.claude.com/docs/en/cli-reference",
+      "reason": "Claude Code CLI flags must be re-verified before WS9 adapter implementation",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "url": "https://developers.googleblog.com/an-important-update-transitioning-gemini-cli-to-antigravity-cli/",
+      "reason": "Antigravity CLI naming and transition status must be re-verified before WS14 adapter subprocess coverage",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "url": "https://code.claude.com/docs/en/hooks",
+      "reason": "Claude Code hook payload and output shapes must be re-verified before WS5 emitter implementation",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "url": "https://code.claude.com/docs/en/settings",
+      "reason": "Claude Code settings and permission modes inform hook and template safety",
+      "checked_at": "2026-07-04"
+    },
+    {
+      "url": "https://modelcontextprotocol.io/specification/2025-06-18/server/tools",
+      "reason": "MCP tool allow-list semantics inform agent plan and generated config boundaries",
+      "checked_at": "2026-07-04"
+    }
+  ],
+  "dag": {
+    "nodes": [
+      {
+        "id": "ws-00-bootstrap",
+        "title": "Repo bootstrap",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [],
+        "files_read": [
+          "AGENTS.md",
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-00-bootstrap/tasks.md",
+          "docs/prd/0001-mivia-agentkit.md"
+        ],
+        "files_edit": [
+          "go.mod",
+          "go.sum",
+          "cmd/mivia-agent/main.go",
+          "internal/cli/root.go",
+          "internal/cli/version.go",
+          "internal/version/version.go",
+          "internal/cli/cli_test.go",
+          "internal/templates/templates_test.go",
+          "README.md",
+          ".gitignore",
+          "templates/README.md",
+          "templates/**",
+          ".github/workflows/ci.yml",
+          "docs/plans/agentkit-implementation-roadmap/ws-00-bootstrap/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
+        ],
+        "allowed_mcp_tools": [
+          "none"
+        ],
+        "tests": [
+          "internal/cli/cli_test.go::TestRootCommandShowsHelp",
+          "internal/cli/cli_test.go::TestVersionCommandPrintsVersion",
+          "internal/cli/cli_test.go::TestUnknownCommandExitsNonZero",
+          "internal/cli/cli_test.go::TestUnknownCommandDoesNotWriteDuplicateError",
+          "internal/templates/templates_test.go::TestTemplatesDirExists",
+          "internal/templates/templates_test.go::TestTemplatesSubdirsExist"
+        ],
+        "verifiers": [
+          "go test ./... -count=1",
+          "go vet ./...",
+          "go run ./cmd/mivia-agent --help",
+          "go run ./cmd/mivia-agent version",
+          "test -f templates/README.md"
+        ],
+        "mutation": "Change the version command to omit the version string; internal/cli/cli_test.go::TestVersionCommandPrintsVersion must fail. Remove Cobra SilenceErrors from the root command; internal/cli/cli_test.go::TestUnknownCommandDoesNotWriteDuplicateError must fail. Delete templates/README.md; internal/templates/templates_test.go::TestTemplatesDirExists must fail.",
+        "outputs": [
+          "go.mod",
+          "go.sum",
+          "cmd/mivia-agent/main.go",
+          "internal/cli/root.go",
+          "internal/cli/version.go",
+          "internal/version/version.go",
+          "internal/templates/templates_test.go",
+          "templates/README.md",
+          ".github/workflows/ci.yml"
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-00-bootstrap/"
+      },
+      {
+        "id": "ws-01-manifest-git-pathpolicy",
+        "title": "Manifest, Git state, path policy, and global config",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-00-bootstrap"
+        ],
+        "files_read": [
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-01-manifest-git-pathpolicy/tasks.md",
+          "docs/prd/0001-mivia-agentkit.md"
+        ],
+        "files_edit": [
+          "internal/config/manifest.go",
+          "internal/config/manifest_test.go",
+          "internal/config/loop.go",
+          "internal/config/loop_test.go",
+          "internal/gitstate/gitstate.go",
+          "internal/gitstate/gitstate_test.go",
+          "internal/gitstate/diff.go",
+          "internal/gitstate/diff_test.go",
+          "internal/pathpolicy/pathpolicy.go",
+          "internal/pathpolicy/pathpolicy_test.go",
+          "internal/globalconfig/globalconfig.go",
+          "internal/globalconfig/globalconfig_test.go",
+          "docs/plans/agentkit-implementation-roadmap/ws-01-manifest-git-pathpolicy/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
+        ],
+        "allowed_mcp_tools": [
+          "none"
+        ],
+        "tests": [
+          "internal/config/manifest_test.go::TestManifestRejectsUnknownYAMLField",
+          "internal/config/loop_test.go::TestLoopValidateRejectsGuidanceAdapterAsProducer",
+          "internal/gitstate/gitstate_test.go::TestDetectRootFindsGitDir",
+          "internal/gitstate/diff_test.go::TestDiffHashChangesWhenStatusChanges",
+          "internal/pathpolicy/pathpolicy_test.go::TestPathPolicyRejectsSymlinkEscape",
+          "internal/globalconfig/globalconfig_test.go::TestGlobalConfigLayerProjectWinsOnConflict"
+        ],
+        "verifiers": [
+          "go test ./internal/config/... ./internal/gitstate/... ./internal/pathpolicy/... ./internal/globalconfig/... -count=1",
+          "go vet ./internal/config/... ./internal/gitstate/... ./internal/pathpolicy/... ./internal/globalconfig/...",
+          "grep -rnE 'http\\.|net\\.Dial' ./internal/config ./internal/gitstate ./internal/pathpolicy ./internal/globalconfig || echo no network",
+          "grep -rnE 'os\\.WriteFile|os\\.MkdirAll' ./internal/globalconfig || echo no writes"
+        ],
+        "mutation": "Disable traversal rejection, symlink escape rejection, diff status hashing, expert-profile rejection, or global-project precedence; the named WS1 tests must fail.",
+        "outputs": [
+          "internal/config/**",
+          "internal/gitstate/**",
+          "internal/pathpolicy/**",
+          "internal/globalconfig/**"
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-01-manifest-git-pathpolicy/"
+      },
+      {
+        "id": "ws-02-templates-init",
+        "title": "Templates, init, global layering, and managed blocks",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-01-manifest-git-pathpolicy"
+        ],
+        "files_read": [
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-02-templates-init/tasks.md",
+          "docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md"
+        ],
+        "files_edit": [
+          "internal/templates/templates.go",
+          "internal/templates/templates_test.go",
+          "templates/core/**",
+          "templates/adapters/codex/**",
+          "templates/adapters/claude/**",
+          "templates/adapters/copilot/**",
+          "templates/workflows/**",
+          "templates/prompts/**",
+          "internal/render/render.go",
+          "internal/render/render_test.go",
+          "internal/cli/init.go",
+          "internal/render/init.go",
+          "internal/render/init_integration_test.go",
+          "internal/render/managedblock.go",
+          "internal/render/managedblock_test.go",
+          "docs/plans/agentkit-implementation-roadmap/ws-02-templates-init/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
+        ],
+        "allowed_mcp_tools": [
+          "none"
+        ],
+        "tests": [
+          "internal/templates/templates_test.go::TestListStandardProfileReturnsExpectedFiles",
+          "internal/render/render_test.go::TestRenderErrorsOnUndefinedReferencedVar",
+          "internal/render/init_integration_test.go::TestInitDryRunWritesNothing",
+          "internal/render/init_integration_test.go::TestInitWriteIsIdempotent",
+          "internal/render/init_integration_test.go::TestInitRefusesToOverwriteUserOwnedFile",
+          "internal/render/managedblock_test.go::TestManagedBlockUpdatePreservesUserText"
+        ],
+        "verifiers": [
+          "go test ./internal/templates/... ./internal/render/... ./internal/cli/... -count=1",
+          "go vet ./internal/templates/... ./internal/render/... ./internal/cli/...",
+          "go run ./cmd/mivia-agent init --repo \"$tmp\" --profile standard --adapter codex --adapter claude --adapter copilot --dry-run",
+          "go run ./cmd/mivia-agent init --repo \"$tmp\" --profile standard --adapter codex --adapter claude --adapter copilot --write"
+        ],
+        "mutation": "Remove the overwrite guard or make dry-run write files; TestInitRefusesToOverwriteUserOwnedFile or TestInitDryRunWritesNothing must fail. Overwrite managed-block pre text; TestManagedBlockUpdatePreservesUserText must fail.",
+        "outputs": [
+          "internal/templates/**",
+          "internal/render/**",
+          "internal/cli/init.go",
+          "templates/**"
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-02-templates-init/"
+      },
+      {
+        "id": "ws-03-doctor-audit",
+        "title": "Doctor, audit, and stable reports",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-02-templates-init"
+        ],
+        "files_read": [
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-03-doctor-audit/tasks.md",
+          "docs/prd/0001-mivia-agentkit.md"
+        ],
+        "files_edit": [
+          "internal/report/report.go",
+          "internal/report/report_test.go",
+          "internal/doctor/doctor.go",
+          "internal/doctor/checks_core.go",
+          "internal/doctor/checks_loops.go",
+          "internal/doctor/doctor_test.go",
+          "internal/audit/audit.go",
+          "internal/audit/audit_test.go",
+          "internal/cli/doctor.go",
+          "internal/cli/audit.go",
+          "docs/plans/agentkit-implementation-roadmap/ws-03-doctor-audit/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
+        ],
+        "allowed_mcp_tools": [
+          "none"
+        ],
+        "tests": [
+          "internal/report/report_test.go::TestReportTextSortedBySeverity",
+          "internal/doctor/doctor_test.go::TestDoctorPassesFreshInit",
+          "internal/doctor/doctor_test.go::TestDoctorFailsHookNotCallingMiviaAgent",
+          "internal/doctor/doctor_test.go::TestDoctorFailsLoopWithNoBound",
+          "internal/audit/audit_test.go::TestAuditReportsDuplicatedAdapterPolicy",
+          "internal/cli/doctor_test.go::TestDoctorCmdExitsOneOnFinding"
+        ],
+        "verifiers": [
+          "go test ./internal/doctor/... ./internal/audit/... ./internal/report/... ./internal/cli/... -count=1",
+          "go vet ./internal/doctor/... ./internal/audit/... ./internal/report/... ./internal/cli/...",
+          "go run ./cmd/mivia-agent doctor --repo \"$tmp\" --json",
+          "go run ./cmd/mivia-agent audit --repo \"$tmp\" --json"
+        ],
+        "mutation": "Remove hook-target validation, loop-bound validation, or report severity sorting; the corresponding WS3 tests must fail.",
+        "outputs": [
+          "internal/report/**",
+          "internal/doctor/**",
+          "internal/audit/**",
+          "internal/cli/doctor.go",
+          "internal/cli/audit.go"
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-03-doctor-audit/"
+      },
+      {
+        "id": "ws-04-preflight-stamp",
+        "title": "Preflight quality stamp and staleness checks",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-01-manifest-git-pathpolicy"
+        ],
+        "files_read": [
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-04-preflight-stamp/tasks.md",
+          "docs/prd/0001-mivia-agentkit.md"
+        ],
+        "files_edit": [
+          "internal/preflight/stamp.go",
+          "internal/preflight/stamp_test.go",
+          "internal/preflight/risk.go",
+          "internal/preflight/risk_test.go",
+          "internal/preflight/preflight.go",
+          "internal/cli/preflight.go",
+          "internal/preflight/check.go",
+          "internal/preflight/check_test.go",
+          "docs/plans/agentkit-implementation-roadmap/ws-04-preflight-stamp/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
+        ],
+        "allowed_mcp_tools": [
+          "none"
+        ],
+        "tests": [
+          "internal/preflight/stamp_test.go::TestStampMarshalStableOrder",
+          "internal/preflight/risk_test.go::TestClassifyHighForCIChange",
+          "internal/preflight/preflight_test.go::TestPreflightRequiresContractRowsForHighRiskChange",
+          "internal/preflight/preflight_test.go::TestPreflightRequiresMutationProofForHighRiskChange",
+          "internal/preflight/check_test.go::TestCheckStampRejectsStaleDiffHash",
+          "internal/preflight/check_test.go::TestCheckStampRejectsChangedFilesMismatch"
+        ],
+        "verifiers": [
+          "go test ./internal/preflight/... -count=1",
+          "go vet ./internal/preflight/...",
+          "go run ./cmd/mivia-agent preflight --repo \"$tmp\" --focused-verifier \"go test ./...\" --mutation-proof x --contract-row hooks --contract-row ci --json"
+        ],
+        "mutation": "Drop high-risk contract, focused-verifier, mutation-proof, diff-hash, or changed-files requirements; the named WS4 tests must fail.",
+        "outputs": [
+          "internal/preflight/**",
+          "internal/cli/preflight.go"
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-04-preflight-stamp/"
+      },
+      {
+        "id": "ws-09-adapters",
+        "title": "Adapter interface, runner, scrubber, Codex, and Claude",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-01-manifest-git-pathpolicy"
+        ],
+        "files_read": [
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-09-adapters/tasks.md",
+          "docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md"
+        ],
+        "files_edit": [
+          "internal/adapter/adapter.go",
+          "internal/adapter/adapter_test.go",
+          "internal/adapter/runner.go",
+          "internal/adapter/fake_runner.go",
+          "internal/adapter/runner_test.go",
+          "internal/adapter/scrub.go",
+          "internal/adapter/scrub_test.go",
+          "internal/adapter/codex.go",
+          "internal/adapter/codex_test.go",
+          "internal/adapter/claude.go",
+          "internal/adapter/claude_test.go",
+          "docs/plans/agentkit-implementation-roadmap/ws-09-adapters/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
+        ],
+        "allowed_mcp_tools": [
+          "none"
+        ],
+        "tests": [
+          "internal/adapter/adapter_test.go::TestRequestRejectsEmptyApproval",
+          "internal/adapter/runner_test.go::TestOSRunnerRespectsTimeout",
+          "internal/adapter/scrub_test.go::TestScrubAWSKey",
+          "internal/adapter/codex_test.go::TestCodexRunEnforcesNonInteractiveApproval",
+          "internal/adapter/codex_test.go::TestCodexRunScrubsSecretsFromStdout",
+          "internal/adapter/claude_test.go::TestClaudeRunEnforcesNonInteractiveApproval"
+        ],
+        "verifiers": [
+          "go test ./internal/adapter/... -count=1",
+          "go vet ./internal/adapter/...",
+          "grep -rn 'exec.Command\\|os/exec' ./internal/adapter/*_test.go || echo no real exec in tests"
+        ],
+        "mutation": "Remove non-interactive approval flags, allow empty approval, ignore runner context, or empty the scrub pattern set; the named WS9 tests must fail.",
+        "outputs": [
+          "internal/adapter/**"
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-09-adapters/"
+      },
+      {
+        "id": "ws-12-governance",
+        "title": "Governance provider interface, noop, AGT stub, and doctor integration",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-01-manifest-git-pathpolicy"
+        ],
+        "files_read": [
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-12-governance/tasks.md",
+          "docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md"
+        ],
+        "files_edit": [
+          "internal/policy/policy.go",
+          "internal/policy/policy_test.go",
+          "internal/policy/noop.go",
+          "internal/policy/noop_test.go",
+          "internal/policy/agt.go",
+          "internal/policy/agt_test.go",
+          "internal/policy/agt_stub.go",
+          "internal/policy/agt_stub_test.go",
+          "internal/policy/factory.go",
+          "internal/policy/factory_test.go",
+          "internal/doctor/checks_governance.go",
+          "docs/plans/agentkit-implementation-roadmap/ws-12-governance/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
+        ],
+        "allowed_mcp_tools": [
+          "none"
+        ],
+        "tests": [
+          "internal/policy/policy_test.go::TestProtectActionRequiresProtectedKind",
+          "internal/policy/noop_test.go::TestNoopRecordsToAuditLog",
+          "internal/policy/agt_stub_test.go::TestAGTStubReturnsErrAGTNotCompiled",
+          "internal/policy/factory_test.go::TestFactoryReturnsNoop",
+          "internal/doctor/doctor_test.go::TestDoctorFailsWhenStrictRequiresAGTButUnavailable"
+        ],
+        "verifiers": [
+          "go test ./internal/policy/... ./internal/doctor/... -count=1",
+          "go vet ./internal/policy/...",
+          "go test -tags agt ./internal/policy/... -count=1 || echo agt sdk unavailable"
+        ],
+        "mutation": "Skip ProtectedKind validation, make noop Record a no-op, or downgrade strict AGT failure to warning; the named WS12 tests must fail.",
+        "outputs": [
+          "internal/policy/**",
+          "internal/doctor/checks_governance.go"
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-12-governance/"
+      },
+      {
+        "id": "ws-10-orchestrator",
+        "title": "Runstore, DAG resolver, engine, loop runner, and leak checks",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-04-preflight-stamp",
+          "ws-09-adapters"
+        ],
+        "files_read": [
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-10-orchestrator/tasks.md",
+          "docs/prd/0001-mivia-agentkit.md"
+        ],
+        "files_edit": [
+          "internal/runstore/runstore.go",
+          "internal/runstore/runstore_test.go",
+          "internal/orchestrator/dag.go",
+          "internal/orchestrator/dag_test.go",
+          "internal/orchestrator/engine.go",
+          "internal/orchestrator/engine_test.go",
+          "internal/orchestrator/loop.go",
+          "internal/orchestrator/loop_test.go",
+          "internal/orchestrator/leakcheck.go",
+          "docs/plans/agentkit-implementation-roadmap/ws-10-orchestrator/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
+        ],
+        "allowed_mcp_tools": [
+          "none"
+        ],
+        "tests": [
+          "internal/runstore/runstore_test.go::TestWriteArtifactRejectsTraversal",
+          "internal/orchestrator/dag_test.go::TestDAGRejectsCycle",
+          "internal/orchestrator/engine_test.go::TestExecuteReviewStepFansOutConcurrently",
+          "internal/orchestrator/engine_test.go::TestExecuteStepRecordsPolicyDecisionRef",
+          "internal/orchestrator/loop_test.go::TestLoopRejectsBudgetBoundInMVP",
+          "internal/orchestrator/loop_test.go::TestLoopRequiresFreshStampBeforeProtectedStep",
+          "internal/orchestrator/leakcheck_test.go::TestAssertNoLeaksFlagsSecret"
+        ],
+        "verifiers": [
+          "go test ./internal/runstore/... ./internal/orchestrator/... -count=1",
+          "go vet ./internal/runstore/... ./internal/orchestrator/...",
+          "go test ./internal/orchestrator/ -run TestExecuteReviewStepFansOutConcurrently -count=1 -v"
+        ],
+        "mutation": "Drop runstore pathpolicy, cycle detection, review fan-out concurrency, policy Decide recording, budget rejection, stamp-before-protect, or leak patterns; the named WS10 tests must fail.",
+        "outputs": [
+          "internal/runstore/**",
+          "internal/orchestrator/**"
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-10-orchestrator/"
+      },
+      {
+        "id": "ws-11-consensus",
+        "title": "Consensus policy and profile validation",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-09-adapters"
+        ],
+        "files_read": [
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-11-consensus/tasks.md",
+          "docs/prd/0001-mivia-agentkit.md"
+        ],
+        "files_edit": [
+          "internal/adapter/adapter.go",
+          "internal/consensus/consensus.go",
+          "internal/consensus/consensus_test.go",
+          "internal/consensus/evaluate.go",
+          "internal/consensus/evaluate_test.go",
+          "internal/consensus/profile.go",
+          "internal/consensus/profile_test.go",
+          "docs/plans/agentkit-implementation-roadmap/ws-11-consensus/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
+        ],
+        "allowed_mcp_tools": [
+          "none"
+        ],
+        "tests": [
+          "internal/consensus/evaluate_test.go::TestMajorityFailsAtOrBelowHalf",
+          "internal/consensus/evaluate_test.go::TestUnanimousFailsOnOneReject",
+          "internal/consensus/evaluate_test.go::TestMinReviewersUnsatisfiedErrors",
+          "internal/consensus/evaluate_test.go::TestTieBreakerStrictFailsOnTie",
+          "internal/consensus/profile_test.go::TestStrictProtectBoundRejectsFirstPass"
+        ],
+        "verifiers": [
+          "go test ./internal/consensus/... -count=1",
+          "go vet ./internal/consensus/..."
+        ],
+        "mutation": "Flip majority comparison to allow ties, ignore a unanimous reject, or allow first-pass under strict protected loops; the named WS11 tests must fail.",
+        "outputs": [
+          "internal/adapter/adapter.go",
+          "internal/consensus/**"
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-11-consensus/"
+      },
+      {
+        "id": "ws-13-run-review-adapters",
+        "title": "Run, review, and adapters commands",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-09-adapters",
+          "ws-10-orchestrator",
+          "ws-11-consensus",
+          "ws-12-governance"
+        ],
+        "files_read": [
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-13-run-review-adapters/tasks.md",
+          "docs/prd/0001-mivia-agentkit.md"
+        ],
+        "files_edit": [
+          "internal/cli/prompt.go",
+          "internal/cli/prompt_test.go",
+          "internal/cli/root.go",
+          "internal/cli/adapters.go",
+          "internal/cli/adapters_test.go",
+          "internal/cli/run.go",
+          "internal/cli/run_test.go",
+          "internal/cli/review.go",
+          "internal/cli/review_test.go",
+          "internal/orchestrator/engine.go",
+          "internal/orchestrator/engine_test.go",
+          "docs/plans/agentkit-implementation-roadmap/ws-13-run-review-adapters/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
+        ],
+        "allowed_mcp_tools": [
+          "none"
+        ],
+        "tests": [
+          "internal/cli/prompt_test.go::TestProducerPromptIncludesPriorNotesOnIterate",
+          "internal/cli/adapters_test.go::TestAdaptersExitsNonZeroWhenOrchestrableAdapterNotHeadless",
+          "internal/cli/run_test.go::TestRunDryRunPrintsPlanWithoutInvoking",
+          "internal/cli/run_test.go::TestRunExecutesResearchLoopFixture",
+          "internal/cli/run_test.go::TestRunArtifactContainsNoRawPromptsOrOutputs",
+          "internal/cli/review_test.go::TestReviewOneOffConsensus",
+          "internal/cli/review_test.go::TestReviewArtifactMustExist"
+        ],
+        "verifiers": [
+          "go test ./internal/cli/... -count=1",
+          "go vet ./internal/cli/...",
+          "go run ./cmd/mivia-agent adapters --repo \"$tmp\" --json",
+          "go run ./cmd/mivia-agent run --repo \"$tmp\" --workflow research --dry-run --json"
+        ],
+        "mutation": "Drop prior-note prompt injection, ignore headless in approved_for_run, make dry-run invoke an adapter, or bypass consensus; the named WS13 tests must fail.",
+        "outputs": [
+          "internal/cli/prompt.go",
+          "internal/cli/adapters.go",
+          "internal/cli/run.go",
+          "internal/cli/review.go",
+          "internal/orchestrator/engine.go"
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-13-run-review-adapters/"
+      },
+      {
+        "id": "ws-05-hooks",
+        "title": "Hook engine and Codex/Claude emitters",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-04-preflight-stamp",
+          "ws-12-governance"
+        ],
+        "files_read": [
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-05-hooks/tasks.md",
+          "docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md"
+        ],
+        "files_edit": [
+          "internal/hooks/hooks.go",
+          "internal/hooks/hooks_test.go",
+          "internal/hooks/codex.go",
+          "internal/hooks/codex_test.go",
+          "internal/hooks/claude.go",
+          "internal/hooks/claude_test.go",
+          "internal/hooks/testdata/**",
+          "internal/cli/hook.go",
+          "internal/cli/hook_test.go",
+          "docs/plans/agentkit-implementation-roadmap/ws-05-hooks/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
+        ],
+        "allowed_mcp_tools": [
+          "none"
+        ],
+        "tests": [
+          "internal/hooks/hooks_test.go::TestIsProtectedDetectsCommit",
+          "internal/hooks/hooks_test.go::TestMalformedPayloadFailsClosedForProtectedAction",
+          "internal/hooks/codex_test.go::TestCodexPreToolUseDenyShape",
+          "internal/hooks/claude_test.go::TestClaudePreToolUseDenyShape",
+          "internal/cli/hook_test.go::TestHookMalformedStdinFailsClosedForProtected"
+        ],
+        "verifiers": [
+          "go test ./internal/hooks/... ./internal/cli/... -count=1",
+          "go vet ./internal/hooks/...",
+          "echo '{\"tool\":\"bash\",\"command\":\"git push\"}' | go run ./cmd/mivia-agent hook claude pre-tool-use"
+        ],
+        "mutation": "Remove git commit from protected patterns, allow malformed protected payloads, rename the Codex deny field, or change Claude deny exit code to 0; the named WS5 tests must fail.",
+        "outputs": [
+          "internal/hooks/**",
+          "internal/cli/hook.go"
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-05-hooks/"
+      },
+      {
+        "id": "ws-06-adapter-templates",
+        "title": "Antigravity and Crush adapters and templates",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-02-templates-init",
+          "ws-09-adapters"
+        ],
+        "files_read": [
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-06-adapter-templates/tasks.md",
+          "docs/mivia-agentic-workflow-cli-proposal-2026-07-04.md"
+        ],
+        "files_edit": [
+          "internal/adapter/codex.go",
+          "internal/adapter/antigravity.go",
+          "internal/adapter/antigravity_test.go",
+          "templates/adapters/antigravity/GEMINI.md",
+          "internal/adapter/crush.go",
+          "internal/adapter/crush_test.go",
+          "templates/adapters/crush/README.md",
+          "internal/audit/checks_adapter_policy.go",
+          "internal/audit/audit_test.go",
+          "internal/config/manifest.go",
+          "internal/config/manifest_test.go",
+          "internal/templates/source/core/mivia-agent.yaml.tmpl",
+          "internal/templates/templates.go",
+          "internal/templates/templates_test.go",
+          "templates/core/mivia-agent.yaml.tmpl",
+          "internal/cli/adapters.go",
+          "docs/plans/agentkit-implementation-roadmap/ws-06-adapter-templates/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
+        ],
+        "allowed_mcp_tools": [
+          "none"
+        ],
+        "tests": [
+          "internal/adapter/antigravity_test.go::TestAntigravityRunEnforcesNonInteractiveApproval",
+          "internal/templates/templates_test.go::TestAntigravityAdapterOnlyRendersWhenSelected",
+          "internal/adapter/crush_test.go::TestCrushDetectReportsHeadlessCapability",
+          "internal/templates/templates_test.go::TestCrushAdapterShimRendersWhenSelected",
+          "internal/audit/audit_test.go::TestAdaptersDoNotDuplicateLongPolicy"
+        ],
+        "verifiers": [
+          "go test ./internal/adapter/... ./internal/render/... ./internal/audit/... -count=1",
+          "go vet ./internal/adapter/...",
+          "go run ./cmd/mivia-agent init --repo \"$tmp\" --profile standard --adapter codex --adapter claude --adapter antigravity --adapter crush --write",
+          "go run ./cmd/mivia-agent doctor --repo \"$tmp\"",
+          "go run ./cmd/mivia-agent adapters --repo \"$tmp\""
+        ],
+        "mutation": "Remove Antigravity approval flags, render Antigravity always, make non-headless Crush run successfully, duplicate long policy into adapter shims, or raise duplicate-policy threshold too high; the named WS6 tests must fail.",
+        "outputs": [
+          "internal/adapter/codex.go",
+          "internal/adapter/antigravity.go",
+          "internal/adapter/crush.go",
+          "templates/adapters/antigravity/GEMINI.md",
+          "templates/adapters/crush/README.md",
+          "internal/audit/checks_adapter_policy.go",
+          "internal/config/manifest.go",
+          "internal/config/manifest_test.go",
+          "internal/templates/source/core/mivia-agent.yaml.tmpl",
+          "templates/core/mivia-agent.yaml.tmpl",
+          "internal/cli/adapters.go"
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-06-adapter-templates/"
+      },
+      {
+        "id": "ws-07-import-update",
+        "title": "Import and update commands",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-02-templates-init",
+          "ws-03-doctor-audit"
+        ],
+        "files_read": [
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-07-import-update/tasks.md",
+          "docs/prd/0001-mivia-agentkit.md"
+        ],
+        "files_edit": [
+          "internal/importer/importer.go",
+          "internal/importer/importer_test.go",
+          "internal/importer/plan.go",
+          "internal/importer/plan_test.go",
+          "internal/cli/import.go",
+          "internal/update/update.go",
+          "internal/update/update_test.go",
+          "internal/cli/update.go",
+          "docs/plans/agentkit-implementation-roadmap/ws-07-import-update/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
+        ],
+        "allowed_mcp_tools": [
+          "none"
+        ],
+        "tests": [
+          "internal/importer/importer_test.go::TestImportReadsExistingAgentFiles",
+          "internal/importer/plan_test.go::TestImportPlanDoesNotWriteByDefault",
+          "internal/importer/plan_test.go::TestImportWritePreservesExistingUserFiles",
+          "internal/update/update_test.go::TestUpdateChangesManagedBlockOnly",
+          "internal/update/update_test.go::TestUpdateReportsConflictForUserEditedManagedBlock"
+        ],
+        "verifiers": [
+          "go test ./internal/importer/... ./internal/update/... ./internal/cli/... -count=1",
+          "go vet ./internal/importer/... ./internal/update/...",
+          "go run ./cmd/mivia-agent import --repo \"$tmp\" --json",
+          "go run ./cmd/mivia-agent import --repo \"$tmp\" --write",
+          "go run ./cmd/mivia-agent doctor --repo \"$tmp\""
+        ],
+        "mutation": "Make import write by default, overwrite user files, overwrite non-managed regions, or overwrite conflicted managed blocks without force; the named WS7 tests must fail.",
+        "outputs": [
+          "internal/importer/**",
+          "internal/update/**",
+          "internal/cli/import.go",
+          "internal/cli/update.go"
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-07-import-update/"
+      },
+      {
+        "id": "ws-14-real-runtime-coverage",
+        "title": "Real runtime coverage for commands and adapters",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-02-templates-init",
+          "ws-03-doctor-audit",
+          "ws-04-preflight-stamp",
+          "ws-05-hooks",
+          "ws-06-adapter-templates",
+          "ws-07-import-update",
+          "ws-09-adapters",
+          "ws-10-orchestrator",
+          "ws-11-consensus",
+          "ws-12-governance",
+          "ws-13-run-review-adapters"
+        ],
+        "files_read": [
+          "AGENTS.md",
+          ".ai/rules/20-agent-quality.md",
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-14-real-runtime-coverage/tasks.md",
+          "docs/prd/0001-mivia-agentkit.md",
+          "docs/adapter-authoring.md"
+        ],
+        "files_edit": [
+          "internal/integration/gate.go",
+          "internal/integration/gate_test.go",
+          "internal/cli/integration_harness.go",
+          "internal/cli/integration_harness_test.go",
+          "internal/cli/version.go",
+          "test/integration/core_commands_test.go",
+          "test/integration/core_commands_test_helpers.go",
+          "test/integration/orchestrated_commands_test.go",
+          "test/integration/orchestrated_commands_test_helpers.go",
+          "test/integration/adapters_real_test.go",
+          "test/integration/adapters_real_test_helpers.go",
+          "semgrep/agent-standards.yml",
+          "scripts/test_semgrep_rules.py",
+          "docs/adapter-authoring.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-14-real-runtime-coverage/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
+        ],
+        "allowed_mcp_tools": [
+          "none"
+        ],
+        "tests": [
+          "internal/integration/gate_test.go::TestGateRequireBinaryReportsMissingTool",
+          "internal/integration/gate_test.go::TestGateRequireEnvReportsMissingVariable",
+          "internal/integration/gate_test.go::TestGateAllowsExplicitlyEnabledRun",
+          "internal/cli/integration_harness_test.go::TestBuildBinaryProducesRunnableExecutable",
+          "internal/cli/integration_harness_test.go::TestRunBinaryCapturesExitCodeAndStreams",
+          "test/integration/core_commands_test.go::TestInitDoctorAuditPreflightFlow",
+          "test/integration/core_commands_test.go::TestUpdatePreservesUserContentOutsideManagedRegions",
+          "test/integration/core_commands_test.go::TestImportInspectsWithoutWriting",
+          "test/integration/core_commands_test.go::TestVersionCommandOutputsStructuredBuildInfo",
+          "test/integration/orchestrated_commands_test.go::TestHookRejectsProtectedActionWithoutFreshStamp",
+          "test/integration/orchestrated_commands_test.go::TestRunDryRunProducesBoundedPlan",
+          "test/integration/orchestrated_commands_test.go::TestReviewProducesConsensusReport",
+          "test/integration/adapters_real_test.go::TestCodexAdapterRealSubprocessContract",
+          "test/integration/adapters_real_test.go::TestClaudeAdapterRealSubprocessContract",
+          "test/integration/adapters_real_test.go::TestAntigravityAdapterRealSubprocessContract",
+          "test/integration/adapters_real_test.go::TestCrushAdapterRealSubprocessContract"
+        ],
+        "verifiers": [
+          "go test ./internal/integration ./internal/cli/... ./test/integration/... -count=1",
+          "go vet ./internal/integration ./internal/cli/... ./test/integration/...",
+          "MIVIA_AGENT_REAL_CLI_TESTS=1 go test ./test/integration/... -count=1",
+          "python3 scripts/test_semgrep_rules.py"
+        ],
+        "mutation": "Allow the integration gate to pass missing binaries, replace the built-binary harness with in-process execution, remove hook stamp enforcement, or drop adapter non-interactive flags at the subprocess boundary; the named WS14 tests must fail.",
+        "outputs": [
+          "internal/integration/**",
+          "internal/cli/integration_harness.go",
+          "internal/cli/integration_harness_test.go",
+          "internal/cli/version.go",
+          "test/integration/**",
+          "semgrep/agent-standards.yml",
+          "scripts/test_semgrep_rules.py",
+          "docs/adapter-authoring.md"
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-14-real-runtime-coverage/"
+      },
+      {
+        "id": "ws-08-ci-release-docs",
+        "title": "CI, release, fixture smoke, and user docs",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-00-bootstrap",
+          "ws-01-manifest-git-pathpolicy",
+          "ws-02-templates-init",
+          "ws-03-doctor-audit",
+          "ws-04-preflight-stamp",
+          "ws-05-hooks",
+          "ws-06-adapter-templates",
+          "ws-07-import-update",
+          "ws-14-real-runtime-coverage",
+          "ws-09-adapters",
+          "ws-10-orchestrator",
+          "ws-11-consensus",
+          "ws-12-governance",
+          "ws-13-run-review-adapters"
+        ],
+        "files_read": [
+          "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-08-ci-release-docs/tasks.md",
+          "docs/prd/0001-mivia-agentkit.md"
+        ],
+        "files_edit": [
+          "internal/version/version.go",
+          "internal/version/version_test.go",
+          ".github/workflows/release.yml",
+          ".github/workflows/ci.yml",
+          "test/fixture/fixture_test.go",
+          "docs/user-guide.md",
+          "docs/adapter-authoring.md",
+          "docs/loop-authoring.md",
+          "docs/template-authoring.md",
+          "docs/adr/0001-product-boundary.md",
+          "docs/plans/agentkit-implementation-roadmap/ws-08-ci-release-docs/tasks.md",
+          "docs/plans/agentkit-implementation-roadmap/00-overview.md"
+        ],
+        "allowed_mcp_tools": [
+          "none"
+        ],
+        "tests": [
+          "internal/version/version_test.go::TestReleaseVersionInjected",
+          "test/fixture/fixture_test.go::TestGeneratedFixtureDoctorPasses",
+          "test/fixture/fixture_test.go::TestGeneratedFixtureFileSetMatchesStandardProfile",
+          "test/fixture/fixture_test.go::TestGeneratedFixtureDryRunPlanNonEmpty"
+        ],
+        "verifiers": [
+          "go test ./... -count=1",
+          "GOOS=linux GOARCH=amd64 go build -o /tmp/ma-linux ./cmd/mivia-agent",
+          "GOOS=darwin GOARCH=arm64 go build -o /tmp/ma-darwin ./cmd/mivia-agent",
+          "GOOS=windows GOARCH=amd64 go build -o /tmp/ma-windows ./cmd/mivia-agent",
+          "go test ./test/fixture/... -count=1 -v"
+        ],
+        "mutation": "Drop release ldflags injection or remove one standard-profile expected file; TestReleaseVersionInjected or TestGeneratedFixtureFileSetMatchesStandardProfile must fail.",
+        "outputs": [
+          "internal/version/version_test.go",
+          ".github/workflows/release.yml",
+          ".github/workflows/ci.yml",
+          "test/fixture/fixture_test.go",
+          "docs/user-guide.md",
+          "docs/adapter-authoring.md",
+          "docs/loop-authoring.md",
+          "docs/template-authoring.md",
+          "docs/adr/0001-product-boundary.md"
+        ],
+        "task_dir": "docs/plans/agentkit-implementation-roadmap/ws-08-ci-release-docs/"
+      }
+    ]
+  },
+  "gaps": [
+    {
+      "id": "none",
+      "status": "closed",
+      "severity": "none",
+      "description": "none",
+      "required_fix": "none",
+      "required_test": "none"
+    }
+  ],
+  "correction_log": [
+    {
+      "source": "docs/plans/agentkit-implementation-roadmap/00-overview.md",
+      "gap": "roadmap files lived at the same root as future machine-oriented planner reports",
+      "correction": "moved the existing roadmap files to docs/plans/agentkit-implementation-roadmap and updated canonical references"
+    },
+    {
+      "source": "docs/plans/agentkit-implementation-roadmap/ws-00-bootstrap/tasks.md",
+      "gap": "WS0 duplicated the CI task under Verification and used invalid go vet -count syntax",
+      "correction": "removed duplicate prose and changed the verifier to go vet ./..."
+    },
+    {
+      "source": "docs/agent-planning.md",
+      "gap": "planning docs described all human plans as docs/plans/*.md and did not name the AgentKit roadmap artifact",
+      "correction": "split roadmap directory, planner report, and machine plan locations and named the AgentKit artifact"
+    },
+    {
+      "source": "scripts/test_agent_plan_contracts.py",
+      "gap": "contract tests did not fail on missing moved roadmap files, stale README roadmap links, broken planning links, placeholder plan artifacts, or invalid AgentKit plan references",
+      "correction": "added tests for moved roadmap files, README TOC, planning markdown links, real validated .ai/plans artifacts, and the named AgentKit plan"
+    },
+    {
+      "source": "semgrep/agent-standards.yml",
+      "gap": "Markdown-only agent-plan drift was only checked at docs/plans root",
+      "correction": "extended the Semgrep include path and fixture to cover nested docs/plans/agentkit-implementation-roadmap agent-plan files"
+    },
+    {
+      "source": ".ai/plans/agentkit-implementation-roadmap.plan.json",
+      "gap": "WS0 listed internal/templates/templates_test.go in tests but omitted it from files_edit and outputs",
+      "correction": "added internal/templates/templates_test.go to WS0 files_edit and outputs, and mirrored the test-file location in ws-00-bootstrap/tasks.md"
+    },
+    {
+      "source": ".ai/plans/agentkit-implementation-roadmap.plan.json",
+      "gap": "WS0 uses Cobra but omitted go.sum from files_edit and outputs",
+      "correction": "added go.sum to WS0 files_edit and outputs, and mirrored it in ws-00-bootstrap/tasks.md"
+    },
+    {
+      "source": "internal/cli/root.go",
+      "gap": "WS0 unknown-command path let Cobra and main both write the same error",
+      "correction": "added TestUnknownCommandDoesNotWriteDuplicateError to the WS0 test contract and enabled Cobra SilenceErrors"
+    },
+    {
+      "source": "docs/agent-planning.md",
+      "gap": "agent planning named human and machine artifacts but did not require a task directory per DAG node; the AgentKit roadmap plan relied on implicit workstream folders",
+      "correction": "added a required task_dir field to every DAG node, pointed each AgentKit node at its existing ws-XX task directory, and added validator plus contract-test coverage"
+    },
+    {
+      "source": ".ai/plans/agentkit-implementation-roadmap.plan.json",
+      "gap": "WS11 Evaluate required unique adapter names and prefer:<adapter> tie-breaking, but adapter.Verdict had no adapter identifier and WS11 files_edit omitted the required contract extension",
+      "correction": "added internal/adapter/adapter.go to WS11 files_edit and outputs so Verdict can carry the reviewer adapter name used by consensus"
+    },
+    {
+      "source": "internal/orchestrator/engine.go",
+      "gap": "WS13 run/review command integration required review prompt propagation through the orchestrator review path, but WS13 files_edit omitted the engine boundary",
+      "correction": "added internal/orchestrator/engine.go and internal/orchestrator/engine_test.go to WS13 files_edit, and added review-prompt propagation coverage"
+    },
+    {
+      "source": "docs/plans/agentkit-implementation-roadmap/ws-07-import-update/tasks.md",
+      "gap": "WS7 T2 specified both type Plan and func Plan in the same Go package, which is not a valid Go identifier combination",
+      "correction": "renamed the constructor contract to BuildPlan in the task file and implemented that symbol in internal/importer/plan.go"
+    },
+    {
+      "source": ".ai/plans/agentkit-implementation-roadmap.plan.json",
+      "gap": "WS8 listed internal/version/version_test.go in tests but omitted it from files_edit and outputs",
+      "correction": "added internal/version/version_test.go to WS8 files_edit and outputs so the release-version test is inside the permitted DAG scope"
+    },
+    {
+      "source": "AGENTS.md",
+      "gap": "canonical repo guidance and Phase 5 roadmap closure still treated fake-runner coverage as sufficient proof for shipped commands and adapters",
+      "correction": "updated repo policy to require real subprocess or built-binary coverage, added WS14 for that work, reopened WS8 behind WS14, and added Semgrep contract coverage for stale fake-only guidance"
+    },
+    {
+      "source": ".ai/plans/agentkit-implementation-roadmap.plan.json",
+      "gap": "WS14 requires a structured real-binary version command assertion but omitted internal/cli/version.go from the permitted edit scope",
+      "correction": "added internal/cli/version.go to WS14 files_edit and outputs so the built-binary version contract can land without widening to unrelated CLI files"
+    }
+  ],
+  "stop_conditions": [
+    "python3 scripts/validate_agent_plan.py .ai/plans/agentkit-implementation-roadmap.plan.json",
+    "python3 scripts/test_agent_plan_contracts.py",
+    "python3 scripts/test_plan_hook_guard.py",
+    "python3 scripts/test_semgrep_rules.py",
+    "python3 scripts/verify_agent_config.py",
+    "make verify",
+    ".githooks/pre-commit",
+    ".githooks/pre-push"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "types": [
+    "feat",
+    "fix",
+    "docs",
+    "chore",
+    "test",
+    "refactor",
+    "build",
+    "ci",
+    "perf",
+    "style",
+    "revert"
+  ],
+  "scopes": [
+    "agent",
+    "brand",
+    "config",
+    "docs",
+    "hooks",
+    "quality",
+    "setup",
+    "semgrep",
+    "workflow"
+  ],
+  "maxSubjectLength": 72
+}

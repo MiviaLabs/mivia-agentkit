@@ -1,0 +1,423 @@
+{
+  "PlanFormat": "mivia-agent-plan/v1",
+  "plan_id": "model-effort-config-implementation",
+  "version": 1,
+  "baseline_commit": "605fa21",
+  "scope": {
+    "in": [
+      "internal/config/**",
+      "internal/adapter/**",
+      "internal/orchestrator/**",
+      "internal/cli/run.go",
+      "internal/cli/run_test.go",
+      "internal/templates/**",
+      "templates/adapters/crush/README.md.tmpl",
+      "templates/core/mivia-agent.yaml.tmpl",
+      "docs/config-examples.md",
+      "docs/user-guide.md",
+      "docs/loop-authoring.md",
+      "docs/template-authoring.md",
+      "docs/plans/model-effort-config-implementation.md",
+      "docs/plans/model-effort-config-implementation/**"
+    ],
+    "out": [
+      "internal/adapter/crush.go runtime orchestration behavior",
+      "test/integration/**",
+      "hooks/**",
+      "governance/**",
+      "networked runtime verification",
+      "non-official Crush headless CLI assumptions"
+    ],
+    "files": [
+      "internal/config/manifest.go",
+      "internal/config/loop.go",
+      "internal/config/manifest_test.go",
+      "internal/config/loop_test.go",
+      "internal/adapter/adapter.go",
+      "internal/adapter/adapter_test.go",
+      "internal/adapter/codex.go",
+      "internal/adapter/codex_test.go",
+      "internal/adapter/claude.go",
+      "internal/adapter/claude_test.go",
+      "internal/adapter/crush.go",
+      "internal/adapter/crush_test.go",
+      "internal/orchestrator/engine.go",
+      "internal/orchestrator/engine_test.go",
+      "internal/cli/run.go",
+      "internal/cli/run_test.go",
+      "internal/templates/templates_test.go",
+      "templates/adapters/crush/README.md.tmpl",
+      "templates/core/mivia-agent.yaml.tmpl",
+      "docs/config-examples.md",
+      "docs/user-guide.md",
+      "docs/loop-authoring.md",
+      "docs/template-authoring.md"
+    ]
+  },
+  "source_evidence": [
+    {
+      "path": "internal/config/manifest.go",
+      "reason": "current manifest schema and adapter defaults surface",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "path": "internal/config/loop.go",
+      "reason": "current workflow step schema and override boundary",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "path": "internal/adapter/adapter.go",
+      "reason": "adapter request contract currently lacks model and effort fields",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "path": "internal/orchestrator/engine.go",
+      "reason": "runtime request assembly and step-to-adapter handoff",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "path": "internal/adapter/codex.go",
+      "reason": "Codex runtime argv shaping currently lacks model/effort pass-through",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "path": "internal/adapter/claude.go",
+      "reason": "Claude runtime argv shaping currently lacks model/effort pass-through",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "path": "internal/adapter/crush.go",
+      "reason": "Crush is guidance-only and currently blocked from orchestrated runtime execution",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "path": "internal/templates/templates.go",
+      "reason": "generated target-repo outputs and Crush shim generation contract",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "path": "docs/plans/model-effort-config-implementation.md",
+      "reason": "human implementation plan and scope split for Codex/Claude vs Crush",
+      "checked_at": "2026-07-05"
+    }
+  ],
+  "external_docs": [
+    {
+      "url": "https://developers.openai.com/codex/models",
+      "reason": "Codex model selection surface",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "url": "https://developers.openai.com/codex/config-reference",
+      "reason": "Codex config keys and reasoning-effort override path",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "url": "https://developers.openai.com/codex/config-advanced",
+      "reason": "Codex one-off config override mechanism for runtime pass-through",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "url": "https://code.claude.com/docs/en/cli-reference",
+      "reason": "Claude Code model and effort CLI flags",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "url": "https://code.claude.com/docs/en/headless",
+      "reason": "Claude Code non-interactive runtime invocation contract",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "url": "https://code.claude.com/docs/en/model-config",
+      "reason": "Claude model and effort capability semantics",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "url": "https://github.com/charmbracelet/crush",
+      "reason": "Crush provider/model configuration surface for repo-generated guidance",
+      "checked_at": "2026-07-05"
+    },
+    {
+      "url": "https://github.com/charmbracelet/crush/issues/1862",
+      "reason": "Crush still lacks a stable documented headless automation contract in this repo's current adapter boundary",
+      "checked_at": "2026-07-05"
+    }
+  ],
+  "dag": {
+    "nodes": [
+      {
+        "id": "ws-a-config-schema",
+        "title": "Manifest and loop schema for model and effort",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [],
+        "task_dir": "docs/plans/model-effort-config-implementation/ws-a-config-schema/",
+        "files_read": [
+          "internal/config/manifest.go",
+          "internal/config/loop.go",
+          "internal/config/manifest_test.go",
+          "internal/config/loop_test.go",
+          "docs/plans/model-effort-config-implementation.md"
+        ],
+        "files_edit": [
+          "internal/config/manifest.go",
+          "internal/config/loop.go",
+          "internal/config/manifest_test.go",
+          "internal/config/loop_test.go",
+          "docs/plans/model-effort-config-implementation/ws-a-config-schema/tasks.md"
+        ],
+        "allowed_mcp_tools": [],
+        "tests": [
+          "internal/config/manifest_test.go::TestManifestParsesAdapterModelDefaults",
+          "internal/config/loop_test.go::TestLoopParsesStepModelOverrides",
+          "internal/config/manifest_test.go::TestManifestRejectsUnknownEffort"
+        ],
+        "verifiers": [
+          "go test ./internal/config/... -count=1",
+          "go vet ./internal/config/..."
+        ],
+        "mutation": "Remove effort validation or step-level field parsing; the new config tests must fail.",
+        "outputs": [
+          "internal/config/manifest.go",
+          "internal/config/loop.go"
+        ]
+      },
+      {
+        "id": "ws-b-request-resolution",
+        "title": "Adapter request contract and orchestrator resolution",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-a-config-schema"
+        ],
+        "task_dir": "docs/plans/model-effort-config-implementation/ws-b-request-resolution/",
+        "files_read": [
+          "internal/adapter/adapter.go",
+          "internal/adapter/adapter_test.go",
+          "internal/orchestrator/engine.go",
+          "internal/orchestrator/engine_test.go",
+          "internal/config/manifest.go",
+          "internal/config/loop.go"
+        ],
+        "files_edit": [
+          "internal/adapter/adapter.go",
+          "internal/adapter/adapter_test.go",
+          "internal/orchestrator/engine.go",
+          "internal/orchestrator/engine_test.go",
+          "docs/plans/model-effort-config-implementation/ws-b-request-resolution/tasks.md"
+        ],
+        "allowed_mcp_tools": [],
+        "tests": [
+          "internal/adapter/adapter_test.go::TestRequestAcceptsModelAndEffort",
+          "internal/adapter/adapter_test.go::TestRequestRejectsUnknownEffort",
+          "internal/orchestrator/engine_test.go::TestExecuteProducerStepPassesResolvedModelAndEffort",
+          "internal/orchestrator/engine_test.go::TestExecuteReviewStepPassesResolvedModelAndEffort",
+          "internal/orchestrator/engine_test.go::TestStepOverrideWinsOverAdapterDefault"
+        ],
+        "verifiers": [
+          "go test ./internal/adapter/... ./internal/orchestrator/... -count=1",
+          "go vet ./internal/adapter/... ./internal/orchestrator/..."
+        ],
+        "mutation": "Ignore step override or allow unknown effort through request validation; the new adapter/orchestrator tests must fail.",
+        "outputs": [
+          "internal/adapter/adapter.go",
+          "internal/orchestrator/engine.go"
+        ]
+      },
+      {
+        "id": "ws-c-codex-claude-runtime",
+        "title": "Codex and Claude runtime pass-through",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-b-request-resolution"
+        ],
+        "task_dir": "docs/plans/model-effort-config-implementation/ws-c-codex-claude-runtime/",
+        "files_read": [
+          "internal/adapter/codex.go",
+          "internal/adapter/codex_test.go",
+          "internal/adapter/claude.go",
+          "internal/adapter/claude_test.go",
+          "internal/adapter/adapter.go"
+        ],
+        "files_edit": [
+          "internal/adapter/codex.go",
+          "internal/adapter/codex_test.go",
+          "internal/adapter/claude.go",
+          "internal/adapter/claude_test.go",
+          "docs/plans/model-effort-config-implementation/ws-c-codex-claude-runtime/tasks.md"
+        ],
+        "allowed_mcp_tools": [],
+        "tests": [
+          "internal/adapter/codex_test.go::TestCodexRunPassesModelFlag",
+          "internal/adapter/codex_test.go::TestCodexRunPassesReasoningEffortOverride",
+          "internal/adapter/claude_test.go::TestClaudeRunPassesModelFlag",
+          "internal/adapter/claude_test.go::TestClaudeRunPassesEffortFlag"
+        ],
+        "verifiers": [
+          "go test ./internal/adapter/... -run 'TestCodexRunPassesModelFlag|TestCodexRunPassesReasoningEffortOverride|TestClaudeRunPassesModelFlag|TestClaudeRunPassesEffortFlag' -count=1",
+          "go test ./internal/adapter/... -count=1",
+          "go vet ./internal/adapter/..."
+        ],
+        "mutation": "Drop Codex model or effort pass-through, or drop Claude model or effort flags; the matching adapter tests must fail.",
+        "outputs": [
+          "internal/adapter/codex.go",
+          "internal/adapter/claude.go"
+        ]
+      },
+      {
+        "id": "ws-d-crush-config-guidance",
+        "title": "Crush config and template guidance without runtime orchestration",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-a-config-schema"
+        ],
+        "task_dir": "docs/plans/model-effort-config-implementation/ws-d-crush-config-guidance/",
+        "files_read": [
+          "internal/adapter/crush.go",
+          "internal/adapter/crush_test.go",
+          "internal/templates/templates.go",
+          "internal/templates/templates_test.go",
+          "templates/adapters/crush/README.md.tmpl",
+          "templates/core/mivia-agent.yaml.tmpl",
+          "docs/template-authoring.md"
+        ],
+        "files_edit": [
+          "internal/templates/templates_test.go",
+          "templates/adapters/crush/README.md.tmpl",
+          "templates/core/mivia-agent.yaml.tmpl",
+          "docs/template-authoring.md",
+          "docs/plans/model-effort-config-implementation/ws-d-crush-config-guidance/tasks.md"
+        ],
+        "allowed_mcp_tools": [],
+        "tests": [
+          "internal/config/manifest_test.go::TestManifestParsesCrushParams",
+          "internal/templates/templates_test.go::TestCrushTemplateIncludesModelConfigGuidance"
+        ],
+        "verifiers": [
+          "go test ./internal/config/... ./internal/templates/... -count=1",
+          "go vet ./internal/config/... ./internal/templates/..."
+        ],
+        "mutation": "Remove Crush provider/model params from generated guidance; the new template test must fail.",
+        "outputs": [
+          "templates/adapters/crush/README.md.tmpl",
+          "templates/core/mivia-agent.yaml.tmpl"
+        ]
+      },
+      {
+        "id": "ws-e-cli-doc-surface",
+        "title": "Run dry-run surface and user docs",
+        "skill": "agent-plan-implementer",
+        "agent": "codex",
+        "depends_on": [
+          "ws-c-codex-claude-runtime",
+          "ws-d-crush-config-guidance"
+        ],
+        "task_dir": "docs/plans/model-effort-config-implementation/ws-e-cli-doc-surface/",
+        "files_read": [
+          "internal/cli/run.go",
+          "internal/cli/run_test.go",
+          "docs/user-guide.md",
+          "docs/config-examples.md",
+          "docs/loop-authoring.md",
+          "docs/plans/model-effort-config-implementation.md"
+        ],
+        "files_edit": [
+          "internal/cli/run.go",
+          "internal/cli/run_test.go",
+          "docs/user-guide.md",
+          "docs/config-examples.md",
+          "docs/loop-authoring.md",
+          "docs/plans/model-effort-config-implementation/ws-e-cli-doc-surface/tasks.md"
+        ],
+        "allowed_mcp_tools": [],
+        "tests": [
+          "internal/cli/run_test.go::TestRunDryRunPrintsModelAndEffort"
+        ],
+        "verifiers": [
+          "go test ./internal/cli/... -run 'TestRunDryRunPrintsModelAndEffort' -count=1",
+          "go test ./internal/cli/... -count=1",
+          "go vet ./internal/cli/...",
+          "git diff --check"
+        ],
+        "mutation": "Omit resolved model or effort from dry-run output; TestRunDryRunPrintsModelAndEffort must fail.",
+        "outputs": [
+          "internal/cli/run.go",
+          "docs/config-examples.md",
+          "docs/user-guide.md"
+        ]
+      },
+      {
+        "id": "ws-f-audit-review",
+        "title": "Post-implementation audit and review",
+        "skill": "deep-bug-audit",
+        "agent": "codex",
+        "depends_on": [
+          "ws-e-cli-doc-surface"
+        ],
+        "task_dir": "docs/plans/model-effort-config-implementation/ws-f-audit-review/",
+        "files_read": [
+          "internal/config/manifest.go",
+          "internal/config/loop.go",
+          "internal/adapter/adapter.go",
+          "internal/adapter/codex.go",
+          "internal/adapter/claude.go",
+          "internal/orchestrator/engine.go",
+          "internal/cli/run.go",
+          "templates/adapters/crush/README.md.tmpl",
+          "docs/config-examples.md"
+        ],
+        "files_edit": [
+          "docs/plans/model-effort-config-implementation/ws-f-audit-review/tasks.md"
+        ],
+        "allowed_mcp_tools": [],
+        "tests": [
+          "internal/config/manifest_test.go::TestManifestRejectsUnknownEffort",
+          "internal/orchestrator/engine_test.go::TestStepOverrideWinsOverAdapterDefault",
+          "internal/adapter/codex_test.go::TestCodexRunPassesReasoningEffortOverride",
+          "internal/adapter/claude_test.go::TestClaudeRunPassesEffortFlag",
+          "internal/cli/run_test.go::TestRunDryRunPrintsModelAndEffort"
+        ],
+        "verifiers": [
+          "go test ./internal/config/... ./internal/adapter/... ./internal/orchestrator/... ./internal/cli/... ./internal/templates/... -count=1",
+          "go vet ./internal/config/... ./internal/adapter/... ./internal/orchestrator/... ./internal/cli/... ./internal/templates/..."
+        ],
+        "mutation": "Re-run the load-bearing mutations from prior nodes; at least one named test per guard must fail before revert.",
+        "outputs": [
+          "docs/plans/model-effort-config-implementation/ws-f-audit-review/tasks.md"
+        ]
+      }
+    ]
+  },
+  "gaps": [
+    {
+      "id": "none",
+      "status": "closed",
+      "severity": "none",
+      "description": "none",
+      "required_fix": "none",
+      "required_test": "none"
+    }
+  ],
+  "correction_log": [
+    {
+      "source": "docs/plans/model-effort-config-implementation.md",
+      "gap": "human-only implementation plan existed without a machine-readable DAG or executable task directories",
+      "correction": "added a validated mivia-agent-plan/v1 artifact and node-specific task directories with exact tests, verifiers, and mutations"
+    },
+    {
+      "source": "internal/adapter/crush.go",
+      "gap": "request to treat Crush runtime flags like Codex and Claude would have conflicted with the repo's current guidance-only Crush adapter contract",
+      "correction": "split Crush into in-scope config/template model+params support and out-of-scope runtime orchestration until a documented headless contract exists"
+    },
+    {
+      "source": "internal/config/manifest.go and internal/config/loop.go",
+      "gap": "current config schema has no model/effort fields, so the implementation boundary needed explicit schema and precedence nodes before adapter work",
+      "correction": "decomposed the DAG into schema, request resolution, runtime pass-through, Crush guidance, CLI/docs, and audit follow-up"
+    }
+  ],
+  "stop_conditions": [
+    "python3 scripts/validate_agent_plan.py .ai/plans/model-effort-config-implementation.plan.json"
+  ]
+}

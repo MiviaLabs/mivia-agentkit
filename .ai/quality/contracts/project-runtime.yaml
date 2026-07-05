@@ -1,0 +1,52 @@
+version: 1
+project: mivia-agentkit
+contracts:
+  - name: agent-control-surface
+    required: true
+    paths:
+      - AGENTS.md
+      - .ai/**
+      - .agents/**
+      - .claude/**
+      - .codex/**
+      - .github/**
+      - mivia-agent.yaml
+    verifiers:
+      - python3 scripts/verify_agent_config.py
+      - ./mivia-agent doctor --repo . --json
+      - ./mivia-agent adapters --repo . --json
+    mutation_proof:
+      - remove shared hook-runner acceptance and expect doctor tests to fail
+      - remove Codex-only workflow adapter rejection and expect dry-run to fail
+
+  - name: workflow-runtime
+    required: true
+    paths:
+      - .ai/workflows/**
+      - internal/adapter/**
+      - internal/cli/run.go
+      - internal/orchestrator/**
+      - internal/runstore/**
+    verifiers:
+      - ./mivia-agent run --repo . --workflow research-loop --dry-run --json
+      - ./mivia-agent run --repo . --workflow bug-audit-loop --dry-run --json
+      - ./mivia-agent run --repo . --workflow roadmap-implementation-review-loop --dry-run --json
+      - ./mivia-agent run --repo . --workflow desktop-workflow-docs-loop --dry-run --json
+      - go test ./internal/adapter/... ./internal/cli/... ./internal/orchestrator/... ./internal/runstore/... -count=1
+    mutation_proof:
+      - change a workflow producer to crush and expect dry-run to reject it
+
+  - name: doctor-audit-quality
+    required: true
+    paths:
+      - internal/doctor/**
+      - internal/audit/**
+      - .github/workflows/agent-control.yml
+    verifiers:
+      - go test ./internal/doctor ./internal/audit -count=1
+      - ./mivia-agent doctor --repo . --json
+      - ./mivia-agent audit --repo . --json
+      - go vet ./...
+      - git diff --check
+    mutation_proof:
+      - weaken doctor hook, marker, CI, or global-conflict checks and expect focused tests to fail

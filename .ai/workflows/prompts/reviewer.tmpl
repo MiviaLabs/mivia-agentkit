@@ -1,0 +1,7 @@
+{{with index .Vars "objective"}}Objective: {{.}}
+{{end}}Review artifact {{.Step.Artifact}} for {{.Vars.project}}.
+
+Check whether the artifact is specific to AgentKit, uses the real mivia-agent workflow boundary, avoids raw prompt/provider output, and names residual risk honestly.
+
+Return JSON only:
+{"pass": true|false, "severity": "low|medium|high|critical", "notes": "short actionable notes"}

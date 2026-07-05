@@ -1,0 +1,82 @@
+version: "1"
+profile: standard
+template_version: dev
+
+project:
+  name: mivia-agentkit
+
+adapters:
+  codex:
+    enabled: true
+    role: orchestrable
+    effort: medium
+  claude:
+    enabled: false
+    role: guidance
+  copilot:
+    enabled: true
+    role: guidance
+  antigravity:
+    enabled: false
+    role: guidance
+  crush:
+    enabled: false
+    role: guidance
+
+routing:
+  default_producer: codex
+  default_reviewers:
+    - codex
+  consensus:
+    mode: majority
+    tie_breaker: strict
+    min_reviewers: 1
+  on_review_fail: iterate
+  max_iterations: 2
+
+commands:
+  doctor-local: ./mivia-agent doctor --repo . --json
+  adapters-local: ./mivia-agent adapters --repo . --json
+  verify-agent-config: python3 scripts/verify_agent_config.py
+
+protected_actions:
+  - commit
+  - push
+  - pull_request
+  - deploy
+  - release
+  - live_smoke
+
+quality:
+  required_verifiers:
+    - python3 scripts/verify_agent_config.py
+    - go test ./internal/adapter/... ./internal/cli/... ./internal/orchestrator/... ./internal/templates/... -count=1
+    - go vet ./...
+    - git diff --check
+
+paths:
+  allow:
+    - .ai/**
+    - .agents/**
+    - .claude/**
+    - .codex/**
+    - cmd/**
+    - docs/**
+    - internal/**
+    - scripts/**
+    - templates/**
+    - AGENTS.md
+    - README.md
+    - mivia-agent.yaml
+  deny:
+    - .ai/runs/**
+    - .env
+    - .env.*
+
+governance:
+  provider: noop
+  audit_log: .ai/audit.jsonl
+
+global:
+  layer: ~/.agents
+  merge: project_wins

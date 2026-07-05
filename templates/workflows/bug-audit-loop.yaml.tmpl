@@ -1,0 +1,21 @@
+version: 1
+name: bug-audit-loop
+bound: iterations
+max_iterations: 3
+steps:
+  - id: audit
+    producer: {{ .Routing.DefaultProducer }}
+    artifact: audit.md
+  - id: review
+    reviewers:
+{{- range .Routing.DefaultReviewers }}
+      - {{ . }}
+{{- end }}
+    artifact: audit.md
+    consensus:
+      mode: majority
+      tie_breaker: strict
+      min_reviewers: {{ .Routing.MinReviewers }}
+    on_fail: iterate
+exit_when: review-pass
+on_exhausted: fail

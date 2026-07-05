@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(go test ./...)",
+      "Bash(go vet ./...)",
+      "Bash(go build ./cmd/mivia-agent)",
+      "Bash(python3 scripts/verify_agent_config.py)",
+      "Bash(git diff)",
+      "Bash(git diff --check)",
+      "Bash(git diff --stat)",
+      "Bash(git status)",
+      "Bash(git status --short --branch)",
+      "Bash(git log)",
+      "Bash(git log --oneline --decorate -5)",
+      "Read(./AGENTS.md)",
+      "Read(./.ai/**)",
+      "Read(./docs/**)"
+    ],
+    "ask": [
+      "Edit",
+      "Write",
+      "MultiEdit",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.config/gh/hosts.yml)",
+      "Bash(git push *)",
+      "Bash(git reset *)",
+      "Bash(git clean *)",
+      "Bash(curl *)",
+      "Bash(wget *)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "filesystem": {
+      "denyRead": [
+        "./.env",
+        "./.env.*",
+        "./secrets/**",
+        "~/.aws/**",
+        "~/.config/gh/hosts.yml"
+      ]
+    }
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); exec \"$ROOT/scripts/run_agent_hook_guard.sh\" claude user-prompt-submit'"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); exec \"$ROOT/scripts/run_agent_hook_guard.sh\" claude pre-tool-use'"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); exec \"$ROOT/scripts/run_agent_hook_guard.sh\" claude permission-request'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); exec \"$ROOT/scripts/run_agent_hook_guard.sh\" claude stop'"
+          }
+        ]
+      }
+    ]
+  }
+}

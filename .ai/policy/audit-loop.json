@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "reportFormat": "mivia-agent-report/v1",
+  "skills": [
+    "deep-bug-audit",
+    "test-coverage-audit",
+    "adversarial-test-review"
+  ],
+  "promptTriggers": [
+    "deep-bug-audit",
+    "test-coverage-audit",
+    "adversarial-test-review",
+    "bug audit",
+    "coverage audit",
+    "test coverage audit",
+    "adversarial test review",
+    "safe to ship",
+    "review this"
+  ],
+  "gapStatuses": [
+    "open",
+    "missing",
+    "shallow",
+    "gated"
+  ],
+  "maxIterations": 10,
+  "hostContinuationCaps": {
+    "claude": 8
+  },
+  "cleanReportsToStop": 2,
+  "maxMalformedReports": 2,
+  "instruction": "Audit loop active: emit mivia-agent-report/v1 on every pass, fix every gap regardless of severity, continue until two consecutive clean reports have zero gap rows and ResidualRisk: none, or until the hook reaches the maximum iteration cap."
+}

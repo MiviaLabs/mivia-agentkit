@@ -1,0 +1,9 @@
+# Crush Adapter
+
+Read root `AGENTS.md` and `.ai/INDEX.md`.
+
+`mivia-agent run` can orchestrate Crush when local `crush run --help` confirms noninteractive run support. Runtime calls use `crush run --quiet --cwd <repo>` and pass prompts on stdin.
+
+Set `adapters.crush.model` in `mivia-agent.yaml` for the default model, for example `ollama/qwen3:14b`. Provider setup stays in Crush configuration (`.crush.json`, `crush.json`, or global config), not in `adapters.crush.params`.
+
+For local Ollama/Qwen use, pull a Qwen model with Ollama, configure Crush with an OpenAI-compatible Ollama provider at `http://localhost:11434/v1/`, then select that provider/model through `adapters.crush.model`.

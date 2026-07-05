@@ -1,0 +1,32 @@
+version: "1"
+profile: {{ .Profile }}
+template_version: {{ .Version }}
+project:
+  name: {{ .Project.Name }}
+adapters:
+{{- range $name, $enabled := .Adapters }}
+  {{ $name }}:
+    enabled: {{ $enabled }}
+    role: {{ if eq $name "copilot" }}guidance{{ else }}orchestrable{{ end }}
+{{- if eq $name "crush" }}
+    # model: ollama/qwen3:14b
+{{- end }}
+{{- end }}
+routing:
+  default_producer: {{ .Routing.DefaultProducer }}
+  default_reviewers:
+{{- range .Routing.DefaultReviewers }}
+    - {{ . }}
+{{- end }}
+  consensus:
+    mode: majority
+    tie_breaker: strict
+    min_reviewers: {{ .Routing.MinReviewers }}
+  on_review_fail: iterate
+  max_iterations: 3
+governance:
+  provider: noop
+  audit_log: .ai/audit.jsonl
+global:
+  layer: ~/.agents
+  merge: project_wins

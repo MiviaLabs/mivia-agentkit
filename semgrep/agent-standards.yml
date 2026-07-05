@@ -1,0 +1,343 @@
+rules:
+  - id: mivia.generic.no-wildcard-bash-allow
+    languages:
+      - generic
+    severity: ERROR
+    message: Do not grant wildcard Bash(...) permissions; allow exact commands only.
+    paths:
+      include:
+        - /AGENTS.md
+        - /CLAUDE.md
+        - /.claude/**
+        - /.codex/**
+        - /.github/**
+    patterns:
+      - pattern-inside: |
+          "allow": [
+            ...
+          ]
+      - pattern-regex: 'Bash\([^)\n]*\*[^)\n]*\)'
+
+  - id: mivia.generic.no-shell-metachar-bash-allow
+    languages:
+      - generic
+    severity: ERROR
+    message: Do not grant Bash(...) permissions containing shell metacharacters.
+    paths:
+      include:
+        - /AGENTS.md
+        - /CLAUDE.md
+        - /.claude/**
+        - /.codex/**
+        - /.github/**
+    patterns:
+      - pattern-inside: |
+          "allow": [
+            ...
+          ]
+      - pattern-regex: 'Bash\([^)\n]*[;&|`$<>][^)\n]*\)'
+
+  - id: mivia.generic.no-semgrep-suppression
+    languages:
+      - generic
+    severity: ERROR
+    message: Do not suppress Semgrep findings; fix the rule or document an explicit policy exception.
+    paths:
+      include:
+        - /cmd/**
+        - /internal/**
+        - /AGENTS.md
+        - /CLAUDE.md
+        - /.claude/**
+        - /.codex/**
+        - /.github/**
+    pattern-regex: '(?i)\bnosemgrep\b'
+
+  - id: mivia.generic.no-unresolved-drift-markers
+    languages:
+      - generic
+    severity: ERROR
+    message: Do not commit unresolved TODO/FIXME/HACK/XXX markers; either finish the work or put it in the workstream task file.
+    paths:
+      include:
+        - /cmd/**
+        - /internal/**
+        - /AGENTS.md
+        - /CLAUDE.md
+        - /.ai/**
+        - /.claude/**
+        - /.codex/**
+        - /.github/**
+    pattern-regex: '(?i)\b(TODO|FIXME|HACK|XXX)\b'
+
+  - id: mivia.generic.brand-mivialabs
+    languages:
+      - generic
+    severity: ERROR
+    message: Use MiviaLabs as the brand spelling, not Mivia Labs.
+    paths:
+      include:
+        - /AGENTS.md
+        - /CLAUDE.md
+        - /README.md
+        - /docs/**
+        - /.ai/**
+        - /.claude/**
+        - /.codex/**
+        - /.github/**
+    pattern-regex: '\bMivia Labs\b'
+
+  - id: mivia.generic.commit-policy-no-optional-scope-wording
+    languages:
+      - generic
+    severity: ERROR
+    message: Commit-message docs must require type(scope), not optional scope.
+    paths:
+      include:
+        - /.ai/policy/**
+        - /docs/development-hooks.md
+        - /scripts/git-hooks/commit-msg
+        - /scripts/test_git_hooks.py
+    pattern-regex: 'type\(optional-scope\)|optional scope'
+
+  - id: mivia.generic.no-git-hook-bypass-in-agent-config
+    languages:
+      - generic
+    severity: ERROR
+    message: Do not instruct agents to bypass Git hooks; fix validation failures or report blockers.
+    paths:
+      include:
+        - /AGENTS.md
+        - /CLAUDE.md
+        - /.agents/**
+        - /.claude/**
+        - /.codex/**
+        - /.github/**
+    pattern-regex: '(?i)(--no-verify|\bHUSKY\s*=\s*0\b|\bHUSKY_SKIP_HOOKS\b)'
+
+  - id: mivia.generic.no-skill-freeform-output-heading
+    languages:
+      - generic
+    severity: ERROR
+    message: Skills must use mivia-agent-report/v1 instead of free-form Output sections.
+    paths:
+      include:
+        - /.ai/skills/**/SKILL.md
+        - /.claude/skills/**/SKILL.md
+    pattern-regex: '^## Output\s*$'
+
+  - id: mivia.generic.no-severity-gated-skill-approval
+    languages:
+      - generic
+    severity: ERROR
+    message: Skill reports must fix all gaps; do not approve based on severity thresholds or justified exceptions.
+    paths:
+      include:
+        - /.ai/templates/**
+        - /.ai/skills/**/SKILL.md
+        - /.claude/skills/**/SKILL.md
+    pattern-regex: '(?i)(critical behavior|justified exception|no high severity|high severity issues?)'
+
+  - id: mivia.generic.agent-plan-docs-must-reference-machine-plan
+    languages:
+      - generic
+    severity: ERROR
+    message: Agent planning docs must reference mivia-agent-plan/v1 and a committed .ai/plans/*.plan.json artifact.
+    paths:
+      include:
+        - /docs/plans/*agent*plan*.md
+        - /docs/plans/**/*agent*plan*.md
+        - /docs/agent-planning.md
+    pattern-regex: '(?i)(free-form plan only|markdown plan only|without machine plan|no machine-readable plan)'
+
+  - id: mivia.generic.agent-planner-must-correct-plan-gaps
+    languages:
+      - generic
+    severity: ERROR
+    message: Planning skills must re-verify existing plans and correct gaps, not only list or defer them.
+    paths:
+      include:
+        - /.ai/skills/agent-dag-planner/SKILL.md
+        - /.agents/skills/agent-dag-planner/SKILL.md
+        - /.claude/skills/agent-dag-planner/SKILL.md
+    pattern-regex: '(?i)(only report gaps|just list gaps|defer plan gaps|do not correct plan gaps)'
+
+  - id: mivia.generic.agent-plan-implementation-must-run-audit-loop
+    languages:
+      - generic
+    severity: ERROR
+    message: Plan implementation skills must keep bug, coverage, and adversarial review loops in the implementation contract.
+    paths:
+      include:
+        - /.ai/skills/agent-plan-implementer/SKILL.md
+        - /.agents/skills/agent-plan-implementer/SKILL.md
+        - /.claude/skills/agent-plan-implementer/SKILL.md
+    pattern-regex: '(?i)(skip audit loop|audit loop optional|do not run deep-bug-audit|without adversarial-test-review)'
+
+  - id: mivia.generic.no-fake-only-runtime-coverage-guidance
+    languages:
+      - generic
+    severity: ERROR
+    message: Repo guidance must not claim fake-only adapter or command coverage is sufficient.
+    paths:
+      include:
+        - /AGENTS.md
+        - /docs/**/*.md
+        - /.ai/rules/**/*.md
+        - /.ai/skills/**/SKILL.md
+        - /.agents/skills/**/SKILL.md
+        - /.claude/skills/**/SKILL.md
+    pattern-regex: '(?i)(adapter tests use fake runners?, not real clis|tests use .*fake runner.*instead of real clis|never a real cli)'
+
+  - id: mivia.go.no-panic-in-internal
+    languages:
+      - go
+    severity: ERROR
+    message: Return errors from internal packages instead of panicking.
+    paths:
+      include:
+        - /internal/**/*.go
+      exclude:
+        - /**/*_test.go
+    pattern: panic(...)
+
+  - id: mivia.go.no-fatal-exit-in-internal
+    languages:
+      - go
+    severity: ERROR
+    message: Internal packages must return errors instead of terminating the process.
+    paths:
+      include:
+        - /internal/**/*.go
+      exclude:
+        - /**/*_test.go
+    pattern-either:
+      - pattern: log.Fatal(...)
+      - pattern: log.Fatalf(...)
+      - pattern: os.Exit(...)
+
+  - id: mivia.go.no-shell-exec
+    languages:
+      - go
+    severity: ERROR
+    message: Do not run shell interpreters from Go; use parameterized exec with allowlisted commands or Go APIs.
+    paths:
+      include:
+        - /cmd/**/*.go
+        - /internal/**/*.go
+      exclude:
+        - /**/*_test.go
+    pattern-either:
+      - pattern: exec.Command("sh", "-c", ...)
+      - pattern: exec.Command("bash", "-c", ...)
+      - pattern: exec.Command("/bin/sh", "-c", ...)
+      - pattern: exec.Command("/bin/bash", "-c", ...)
+      - pattern: exec.CommandContext($CTX, "sh", "-c", ...)
+      - pattern: exec.CommandContext($CTX, "bash", "-c", ...)
+      - pattern: exec.CommandContext($CTX, "/bin/sh", "-c", ...)
+      - pattern: exec.CommandContext($CTX, "/bin/bash", "-c", ...)
+
+  - id: mivia.go.no-syscall-exec
+    languages:
+      - go
+    severity: ERROR
+    message: Do not use syscall.Exec/ForkExec in mivia-agent; keep process execution behind reviewed adapters.
+    paths:
+      include:
+        - /cmd/**/*.go
+        - /internal/**/*.go
+      exclude:
+        - /**/*_test.go
+    pattern-either:
+      - pattern: syscall.Exec(...)
+      - pattern: syscall.ForkExec(...)
+
+  - id: mivia.go.no-network-calls
+    languages:
+      - go
+    severity: ERROR
+    message: mivia-agent must not make network calls; adapters use local CLI runners and tests use fakes.
+    paths:
+      include:
+        - /cmd/**/*.go
+        - /internal/**/*.go
+    pattern-either:
+      - pattern: http.Get(...)
+      - pattern: http.Post(...)
+      - pattern: http.PostForm(...)
+      - pattern: http.DefaultClient.Do(...)
+      - pattern: net.Dial(...)
+      - pattern: net.DialTimeout(...)
+      - pattern: grpc.Dial(...)
+      - pattern: websocket.DefaultDialer.Dial(...)
+
+  - id: mivia.go.no-world-writable-mode
+    languages:
+      - go
+    severity: ERROR
+    message: Do not create world-writable files or directories.
+    paths:
+      include:
+        - /cmd/**/*.go
+        - /internal/**/*.go
+    pattern-either:
+      - pattern: os.WriteFile(..., 0777)
+      - pattern: os.WriteFile(..., 0666)
+      - pattern: os.Mkdir(..., 0777)
+      - pattern: os.MkdirAll(..., 0777)
+      - pattern: os.Chmod(..., 0777)
+      - pattern: os.Chmod(..., 0666)
+
+  - id: mivia.go.no-raw-artifact-write
+    languages:
+      - go
+    severity: ERROR
+    message: Do not persist raw prompts, provider payloads, or model output; write scrubbed artifacts only.
+    paths:
+      include:
+        - /cmd/**/*.go
+        - /internal/**/*.go
+    patterns:
+      - pattern-either:
+          - pattern: os.WriteFile(..., $DATA, ...)
+          - pattern: ioutil.WriteFile(..., $DATA, ...)
+      - metavariable-regex:
+          metavariable: $DATA
+          regex: (?i).*(raw|prompt|payload|provider|model).*
+
+  - id: mivia.generic.real-integration-tests-no-fake-runner
+    languages:
+      - generic
+    severity: ERROR
+    message: Real integration test files must not close over FakeRunner or fake adapter helpers.
+    paths:
+      include:
+        - /test/integration/**/*.go
+        - /internal/**/*integration*_test.go
+    pattern-regex: '\b(FakeRunner|NewFakeRunner|fakeCLIAdapter|fakeDetectAdapter)\b'
+
+  - id: mivia.go.tests-use-t-tempdir
+    languages:
+      - go
+    severity: ERROR
+    message: Tests must use t.TempDir() for temporary filesystem state.
+    paths:
+      include:
+        - /cmd/**/*_test.go
+        - /internal/**/*_test.go
+    pattern-either:
+      - pattern: os.MkdirTemp("", ...)
+      - pattern: os.CreateTemp("", ...)
+      - pattern: ioutil.TempDir("", ...)
+      - pattern: ioutil.TempFile("", ...)
+
+  - id: mivia.go.tests-no-time-sleep
+    languages:
+      - go
+    severity: ERROR
+    message: Tests should use deterministic synchronization or fakes instead of time.Sleep.
+    paths:
+      include:
+        - /cmd/**/*_test.go
+        - /internal/**/*_test.go
+    pattern: time.Sleep(...)

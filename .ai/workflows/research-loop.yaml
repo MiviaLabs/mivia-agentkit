@@ -1,0 +1,22 @@
+version: 1
+name: research-loop
+description: Codex researches AgentKit source, docs, and plans, then reviews the artifact.
+bound: iterations
+max_iterations: 2
+steps:
+  - id: research
+    producer: codex
+    artifact: research.md
+    effort: low
+  - id: review
+    reviewers:
+      - codex
+    artifact: research.md
+    effort: medium
+    consensus:
+      mode: majority
+      tie_breaker: strict
+      min_reviewers: 1
+    on_fail: iterate
+exit_when: review-pass
+on_exhausted: warn

@@ -1,0 +1,22 @@
+version: 1
+name: bug-audit-loop
+description: Codex audits AgentKit implementation risk, then reviews the audit artifact.
+bound: iterations
+max_iterations: 2
+steps:
+  - id: audit
+    producer: codex
+    artifact: bug-audit.md
+    effort: high
+  - id: review
+    reviewers:
+      - codex
+    artifact: bug-audit.md
+    effort: medium
+    consensus:
+      mode: majority
+      tie_breaker: strict
+      min_reviewers: 1
+    on_fail: iterate
+exit_when: review-pass
+on_exhausted: fail

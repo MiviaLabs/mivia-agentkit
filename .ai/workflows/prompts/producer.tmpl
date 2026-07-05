@@ -1,0 +1,13 @@
+Objective: {{with index .Vars "objective"}}{{.}}{{else}}inspect the scoped AgentKit workflow and repo context{{end}}
+
+Repo: {{.Vars.project}}
+Step: {{.Step.ID}}
+Artifact: {{.Step.Artifact}}
+
+Read the relevant repo files before writing the artifact. Keep the artifact concise and operational:
+- state the exact scope inspected
+- list concrete findings or say none
+- include commands or verifiers the next agent should run
+- include residual risk, if any
+
+Do not modify files. Do not include raw prompts, raw provider output, secrets, credentials, or environment contents.
