@@ -27,6 +27,7 @@ func TestInitDoctorAuditPreflightFlow(t *testing.T) {
 	if initResult.ExitCode != 0 {
 		t.Fatalf("init exit = %d, stdout=%s stderr=%s", initResult.ExitCode, initResult.Stdout, initResult.Stderr)
 	}
+	writeTrustedVerifierManifest(t, env.repo)
 	if _, err := os.Stat(filepath.Join(env.repo, ".ai", "INDEX.md")); err != nil {
 		t.Fatalf("Stat(.ai/INDEX.md) error = %v", err)
 	}
@@ -57,7 +58,7 @@ func TestInitDoctorAuditPreflightFlow(t *testing.T) {
 		"preflight",
 		"--repo", env.repo,
 		"--contract-row", "ws14",
-		"--focused-verifier", "go test ./test/integration/... -count=1",
+		"--focused-verifier", "true",
 		"--mutation-proof", "ws14 integration flow coverage",
 		"--json",
 	)
@@ -66,6 +67,21 @@ func TestInitDoctorAuditPreflightFlow(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(env.repo, ".git", "mivia-agent-quality-stamp.json")); err != nil {
 		t.Fatalf("quality stamp missing: %v", err)
+	}
+}
+
+func TestInitWriteRejectsAISymlinkEscape(t *testing.T) {
+	env := newIntegrationEnv(t)
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(env.repo, ".ai")); err != nil {
+		t.Fatalf("Symlink() error = %v", err)
+	}
+	result := env.run(t, "init", "--repo", env.repo, "--adapter", "codex", "--write")
+	if result.ExitCode == 0 {
+		t.Fatalf("init exit = 0, want non-zero; stdout=%s stderr=%s", result.Stdout, result.Stderr)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "INDEX.md")); !os.IsNotExist(err) {
+		t.Fatalf("outside INDEX.md exists or Stat failed: %v", err)
 	}
 }
 

@@ -38,6 +38,72 @@ func TestIsProtectedReturnsFalseForBenign(t *testing.T) {
 	}
 }
 
+func TestIsProtectedParsesGitGlobalOptions(t *testing.T) {
+	for _, command := range []string{
+		"git -c user.name=test commit -m message",
+		"git --no-pager push origin main",
+		"git -C /tmp/repo --git-dir .git --work-tree . push --force origin feature:main",
+		"git --config-env http.extraHeader=GIT_HEADER push origin feature:main",
+	} {
+		kind, ok := IsProtected(map[string]any{"tool_name": "Bash", "tool_input": map[string]any{"command": command}})
+		if !ok || (kind != policy.ProtectedCommit && kind != policy.ProtectedPush) {
+			t.Fatalf("IsProtected(%q) = %q, %v; want protected git action", command, kind, ok)
+		}
+	}
+}
+
+func TestIsProtectedIgnoresNonCommandContent(t *testing.T) {
+	for _, raw := range []map[string]any{
+		{"tool_name": "Write", "tool_input": map[string]any{"file_path": "docs/release-notes.md", "content": "deploy release notes"}},
+		{"prompt": "please prepare a release", "path": "deploy/guide.md"},
+	} {
+		if kind, ok := IsProtected(raw); ok || kind != "" {
+			t.Fatalf("IsProtected(%v) = %q, %v; want unprotected non-command content", raw, kind, ok)
+		}
+	}
+}
+
+func TestIsProtectedHandlesShellWrappers(t *testing.T) {
+	kind, ok := IsProtected(map[string]any{"command": "env CI=1 git -c user.name=test commit -m message && git push"})
+	if !ok || kind != policy.ProtectedCommit {
+		t.Fatalf("IsProtected() = %q, %v; want commit, true", kind, ok)
+	}
+}
+
+func TestProtectedActionSetRejectsUnknown(t *testing.T) {
+	if _, err := ProtectedActionSet([]string{"commit", "surprise"}); err == nil {
+		t.Fatal("ProtectedActionSet() error = nil; want unknown action rejection")
+	}
+}
+
+func TestDecidePushUsesSourceRefChecker(t *testing.T) {
+	for _, command := range []string{
+		"git -C /tmp/repo --git-dir .git --work-tree . push --force origin feature:main",
+		"git push --receive-pack custom origin feature:main",
+		"git push --receive-pack=custom --push-option trace --repo mirror origin feature:main",
+		"git push -otrace origin feature:main",
+	} {
+		checker := &refStampOK{}
+		out, err := Decide(context.Background(), Payload{Raw: map[string]any{"command": command}}, checker, policy.Noop{AuditPath: tempAudit(t)})
+		if err != nil || !out.Allow {
+			t.Fatalf("Decide(%q) = %+v, %v; want allow", command, out, err)
+		}
+		if checker.ref != "feature" {
+			t.Fatalf("push source ref for %q = %q; want feature", command, checker.ref)
+		}
+	}
+}
+
+func TestDecideMalformedProtectedGitCommandFailsClosed(t *testing.T) {
+	out, err := Decide(context.Background(), Payload{Raw: map[string]any{"command": "git push --git-dir"}}, stampOK{}, policy.Noop{AuditPath: tempAudit(t)})
+	if err != nil {
+		t.Fatalf("Decide() error = %v", err)
+	}
+	if out.Allow || out.Reason != "malformed protected payload" {
+		t.Fatalf("Decide() = %+v; want malformed protected denial", out)
+	}
+}
+
 func TestDecideAllowsBenign(t *testing.T) {
 	out, err := Decide(context.Background(), Payload{Raw: map[string]any{"command": "go test ./..."}}, stampOK{}, policy.Noop{AuditPath: tempAudit(t)})
 	if err != nil {
@@ -108,6 +174,17 @@ type stampErr struct{ err error }
 
 func (s stampErr) CheckStamp(string) (preflight.Stamp, error) {
 	return preflight.Stamp{}, s.err
+}
+
+type refStampOK struct{ ref string }
+
+func (s *refStampOK) CheckStamp(repo string) (preflight.Stamp, error) {
+	return stampOK{}.CheckStamp(repo)
+}
+
+func (s *refStampOK) CheckStampForRef(repo, ref string) (preflight.Stamp, error) {
+	s.ref = ref
+	return stampOK{}.CheckStamp(repo)
 }
 
 type denyProvider struct{}

@@ -12,17 +12,39 @@ import (
 
 // Stamp records the repository state and proofs accepted by preflight.
 type Stamp struct {
-	Head               string   `json:"head"`
-	DiffSHA256         string   `json:"diff_sha256"`
-	ChangedFiles       []string `json:"changed_files"`
-	ContractRows       []string `json:"contract_rows"`
-	FocusedVerifiers   []string `json:"focused_verifiers"`
-	BroadVerifiers     []string `json:"broad_verifiers"`
-	MutationProofs     []string `json:"mutation_proofs"`
-	NotRun             []string `json:"not_run"`
-	PolicyDecisionRefs []string `json:"policy_decision_refs"`
-	PipelinePreflight  Metadata `json:"pipeline_preflight,omitempty"`
-	CreatedAt          string   `json:"created_at"`
+	Head               string             `json:"head"`
+	DiffSHA256         string             `json:"diff_sha256"`
+	ChangedFiles       []string           `json:"changed_files"`
+	ContractRows       []string           `json:"contract_rows"`
+	FocusedVerifiers   []string           `json:"focused_verifiers"`
+	BroadVerifiers     []string           `json:"broad_verifiers"`
+	MutationProofs     []string           `json:"mutation_proofs"`
+	NotRun             []string           `json:"not_run"`
+	PolicyDecisionRefs []string           `json:"policy_decision_refs"`
+	PipelinePreflight  Metadata           `json:"pipeline_preflight,omitempty"`
+	CreatedAt          string             `json:"created_at"`
+	Subject            Subject            `json:"subject"`
+	VerifierEvidence   []VerifierEvidence `json:"verifier_evidence"`
+}
+
+// Subject is the exact Git content to which a stamp is bound.
+type Subject struct {
+	BaseHead  string `json:"base_head"`
+	IndexTree string `json:"index_tree"`
+	Commit    string `json:"commit,omitempty"`
+}
+
+// VerifierEvidence is the recorded local result of one verifier execution.
+type VerifierEvidence struct {
+	SchemaVersion  int    `json:"schema_version"`
+	CommandID      string `json:"command_id"`
+	DefinitionHash string `json:"definition_hash"`
+	SubjectHash    string `json:"subject_hash"`
+	ExitCode       int    `json:"exit_code"`
+	StartedAt      string `json:"started_at"`
+	FinishedAt     string `json:"finished_at"`
+	ToolVersion    string `json:"tool_version"`
+	Source         string `json:"source"`
 }
 
 // Metadata records extension metadata that hooks must preserve without owning
@@ -42,6 +64,7 @@ func NewStamp(head, diff string, changed []string) Stamp {
 		NotRun:             []string{},
 		PolicyDecisionRefs: []string{},
 		CreatedAt:          time.Now().UTC().Format(time.RFC3339),
+		VerifierEvidence:   []VerifierEvidence{},
 	}
 }
 
@@ -58,17 +81,19 @@ func (s Stamp) Marshal() ([]byte, error) {
 	}
 	normalizeStamp(&s)
 	type orderedStamp struct {
-		BroadVerifiers     []string `json:"broad_verifiers"`
-		ChangedFiles       []string `json:"changed_files"`
-		ContractRows       []string `json:"contract_rows"`
-		CreatedAt          string   `json:"created_at"`
-		DiffSHA256         string   `json:"diff_sha256"`
-		FocusedVerifiers   []string `json:"focused_verifiers"`
-		Head               string   `json:"head"`
-		MutationProofs     []string `json:"mutation_proofs"`
-		NotRun             []string `json:"not_run"`
-		PipelinePreflight  Metadata `json:"pipeline_preflight,omitempty"`
-		PolicyDecisionRefs []string `json:"policy_decision_refs"`
+		BroadVerifiers     []string           `json:"broad_verifiers"`
+		ChangedFiles       []string           `json:"changed_files"`
+		ContractRows       []string           `json:"contract_rows"`
+		CreatedAt          string             `json:"created_at"`
+		DiffSHA256         string             `json:"diff_sha256"`
+		FocusedVerifiers   []string           `json:"focused_verifiers"`
+		Head               string             `json:"head"`
+		MutationProofs     []string           `json:"mutation_proofs"`
+		NotRun             []string           `json:"not_run"`
+		PipelinePreflight  Metadata           `json:"pipeline_preflight,omitempty"`
+		PolicyDecisionRefs []string           `json:"policy_decision_refs"`
+		Subject            Subject            `json:"subject"`
+		VerifierEvidence   []VerifierEvidence `json:"verifier_evidence"`
 	}
 	data, err := json.Marshal(orderedStamp{
 		BroadVerifiers:     s.BroadVerifiers,
@@ -82,6 +107,8 @@ func (s Stamp) Marshal() ([]byte, error) {
 		NotRun:             s.NotRun,
 		PipelinePreflight:  s.PipelinePreflight,
 		PolicyDecisionRefs: s.PolicyDecisionRefs,
+		Subject:            s.Subject,
+		VerifierEvidence:   s.VerifierEvidence,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("marshal stamp: %w", err)
@@ -108,6 +135,9 @@ func ParseStamp(b []byte) (Stamp, error) {
 	if s.DiffSHA256 == "" {
 		return Stamp{}, fmt.Errorf("stamp missing diff_sha256")
 	}
+	if s.Subject.BaseHead == "" || s.Subject.IndexTree == "" {
+		return Stamp{}, fmt.Errorf("stamp missing Git subject")
+	}
 	if s.CreatedAt != "" {
 		created, err := time.Parse(time.RFC3339, s.CreatedAt)
 		if err != nil {
@@ -127,6 +157,9 @@ func normalizeStamp(s *Stamp) {
 	s.MutationProofs = sortedCopy(s.MutationProofs)
 	s.NotRun = sortedCopy(s.NotRun)
 	s.PolicyDecisionRefs = sortedCopy(s.PolicyDecisionRefs)
+	if s.VerifierEvidence == nil {
+		s.VerifierEvidence = []VerifierEvidence{}
+	}
 }
 
 func sortedCopy(in []string) []string {

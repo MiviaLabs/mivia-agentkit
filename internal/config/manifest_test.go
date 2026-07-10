@@ -169,6 +169,18 @@ func TestManifestRejectsUnknownConsensusMode(t *testing.T) {
 	}
 }
 
+func TestManifestRejectsInvalidConsensusWeights(t *testing.T) {
+	for _, weights := range []map[string]int{{"codex": 0}, {"codex": -1}, {"": 1}} {
+		t.Run("invalid", func(t *testing.T) {
+			m := Defaults()
+			m.Routing.Consensus.Weights = weights
+			if err := m.Validate(); err == nil || !strings.Contains(err.Error(), "weight") {
+				t.Fatalf("Validate() error = %v, want invalid weight rejection", err)
+			}
+		})
+	}
+}
+
 func TestManifestRejectsUnknownYAMLField(t *testing.T) {
 	_, err := Parse([]byte("profile: standard\nsurprise: true\n"))
 	if err == nil || !strings.Contains(err.Error(), "field surprise not found") {

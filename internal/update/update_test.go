@@ -98,6 +98,25 @@ func TestUpdateNoOpWhenAlreadyCurrent(t *testing.T) {
 	}
 }
 
+func TestUpdateRejectsAISymlinkEscape(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	repo := freshRepo(t)
+	outside := t.TempDir()
+	if err := os.RemoveAll(filepath.Join(repo, ".ai")); err != nil {
+		t.Fatalf("RemoveAll(.ai) error = %v", err)
+	}
+	if err := os.Symlink(outside, filepath.Join(repo, ".ai")); err != nil {
+		t.Fatalf("Symlink() error = %v", err)
+	}
+	bumpTemplateVersion(t, repo, "v0.0.1")
+	if _, err := Apply(repo, true); err == nil {
+		t.Fatal("Apply() error = nil, want symlink rejection")
+	}
+	if _, err := os.Stat(filepath.Join(outside, "INDEX.md")); !os.IsNotExist(err) {
+		t.Fatalf("outside INDEX.md exists or Stat failed: %v", err)
+	}
+}
+
 func TestUpdateNoOpKeepsMiviaAgentWorkflowSkillRegistry(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	repo := freshRepo(t)

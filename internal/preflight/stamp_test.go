@@ -11,6 +11,7 @@ import (
 
 func TestStampMarshalRoundTrip(t *testing.T) {
 	stamp := NewStamp("abc", "def", []string{"b.go", "a.go"})
+	stamp.Subject = Subject{BaseHead: "abc", IndexTree: "tree"}
 	stamp.ContractRows = []string{"hooks"}
 	stamp.PipelinePreflight = Metadata{
 		"created_at": "2026-07-05T00:00:00Z",
@@ -40,6 +41,7 @@ func TestStampMarshalRoundTrip(t *testing.T) {
 
 func TestStampMarshalStableOrder(t *testing.T) {
 	stamp := NewStamp("abc", "def", []string{"z.go", "a.go"})
+	stamp.Subject = Subject{BaseHead: "abc", IndexTree: "tree"}
 	stamp.MutationProofs = []string{"proof-b", "proof-a"}
 	first, err := stamp.Marshal()
 	if err != nil {
@@ -74,6 +76,7 @@ func TestParseStampRejectsMalformedJSON(t *testing.T) {
 func TestParseStampAcceptsPipelinePreflightMetadata(t *testing.T) {
 	data := []byte(`{
   "head": "abc",
+  "subject": {"base_head":"abc","index_tree":"tree"},
   "diff_sha256": "def",
   "changed_files": ["b.go", "a.go"],
   "contract_rows": [],

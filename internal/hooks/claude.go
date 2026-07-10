@@ -8,7 +8,8 @@ import (
 	"os"
 )
 
-// ClaudeExitError carries the exit code Claude Code expects for hook blocking.
+// ClaudeExitError is retained for compatibility with callers that use an
+// explicit exit-code denial instead of Claude's structured hook response.
 type ClaudeExitError struct {
 	Code   int
 	Reason string
@@ -22,9 +23,9 @@ func (e ClaudeExitError) Error() string {
 // EmitClaude writes the current Claude Code hook JSON shape to stdout.
 //
 // Re-verified 2026-07-05 against Claude Code hook docs: PreToolUse structured
-// denies use hookSpecificOutput.permissionDecision=deny on exit 0, while exit 2
-// blocks with stderr and ignores stdout. This emitter returns ClaudeExitError{2}
-// for denials so the CLI can provide the fail-closed exit code.
+// denies use hookSpecificOutput.permissionDecision=deny on exit 0. Exit code 2
+// is an alternative stderr-only block, so this emitter never combine it with a
+// structured JSON response that Claude would ignore.
 func EmitClaude(ctx context.Context, event Event, payload Payload, out Outcome) error {
 	_ = ctx
 	_ = payload
@@ -41,14 +42,14 @@ func EmitClaude(ctx context.Context, event Event, payload Payload, out Outcome) 
 	if err := enc.Encode(doc); err != nil {
 		return err
 	}
-	return ClaudeExitError{Code: 2, Reason: reason}
+	return nil
 }
 
 func claudeDocument(event Event, reason string) map[string]any {
 	if event == EventStop {
 		return map[string]any{
-			"continue":   false,
-			"stopReason": reason,
+			"decision": "block",
+			"reason":   reason,
 		}
 	}
 	return map[string]any{

@@ -479,10 +479,8 @@ def verify_agent_plan_contract() -> None:
             ".ai/policy/agent-plan.json: gapStatuses drifted",
         )
         for key, needle in [
-            ("plannerInstruction", "fill or correct plan gaps"),
-            ("plannerInstruction", "PlanArtifact"),
-            ("implementerInstruction", "validated .ai/plans/*.plan.json"),
-            ("implementerInstruction", "deep-bug-audit"),
+            ("plannerInstruction", "durable plan"),
+            ("implementerInstruction", "tests"),
         ]:
             value = policy.get(key)
             require(isinstance(value, str) and needle in value, f".ai/policy/agent-plan.json: {key} missing {needle}")

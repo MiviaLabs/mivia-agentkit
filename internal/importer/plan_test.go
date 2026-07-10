@@ -48,6 +48,25 @@ func TestImportWriteCreatesAIMappedFiles(t *testing.T) {
 	}
 }
 
+func TestImportWriteRejectsAISymlinkEscape(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	repo := tempRepo(t)
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(repo, ".ai")); err != nil {
+		t.Fatalf("Symlink() error = %v", err)
+	}
+	plan, err := BuildPlan(repo, config.Defaults())
+	if err != nil {
+		t.Fatalf("BuildPlan() error = %v", err)
+	}
+	if _, err := plan.Apply(repo, true); err == nil {
+		t.Fatal("Apply() error = nil, want symlink rejection")
+	}
+	if _, err := os.Stat(filepath.Join(outside, "INDEX.md")); !os.IsNotExist(err) {
+		t.Fatalf("outside INDEX.md exists or Stat failed: %v", err)
+	}
+}
+
 func TestImportWritePreservesExistingUserFiles(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	repo := tempRepo(t)

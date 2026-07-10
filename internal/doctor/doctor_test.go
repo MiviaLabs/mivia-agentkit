@@ -3,6 +3,8 @@
 package doctor
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -140,6 +142,48 @@ func TestDoctorPassesWithNoGlobalConfig(t *testing.T) {
 	if hasCode(got.Findings, "global.rule_conflict") || hasCode(got.Findings, "global.unreadable") {
 		t.Fatalf("Run() global findings = %+v, want none", got.Findings)
 	}
+}
+
+func TestDoctorReportsWalkFailure(t *testing.T) {
+	previous := walkDir
+	walkDir = func(root string, visit fs.WalkDirFunc) error {
+		return visit(filepath.Join(root, "unreadable"), nil, errors.New("permission denied"))
+	}
+	t.Cleanup(func() { walkDir = previous })
+	repo, home := freshRepo(t)
+	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")}), "skills.walk_failed")
+}
+
+func TestDoctorReportsSkillsReadFailure(t *testing.T) {
+	repo, home := freshRepo(t)
+	previous := readOSFile
+	readOSFile = func(path string) ([]byte, error) {
+		if filepath.Base(path) == "SKILL.md" {
+			return nil, errors.New("permission denied")
+		}
+		return previous(path)
+	}
+	t.Cleanup(func() { readOSFile = previous })
+	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")}), "skills.read_failed")
+}
+
+func TestDoctorReportsManagedReadFailure(t *testing.T) {
+	repo, home := freshRepo(t)
+	previous := readOSFile
+	readOSFile = func(path string) ([]byte, error) {
+		if filepath.Base(path) == "AGENTS.md" {
+			return nil, errors.New("permission denied")
+		}
+		return previous(path)
+	}
+	t.Cleanup(func() { readOSFile = previous })
+	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")}), "generated.read_failed")
+}
+
+func TestDoctorReportsGitFailure(t *testing.T) {
+	repo, home := freshRepo(t)
+	removePath(t, repo, ".git")
+	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")}), "git.status_failed")
 }
 
 func TestDoctorIgnoresGitIgnoredSecretLikeLocalFiles(t *testing.T) {

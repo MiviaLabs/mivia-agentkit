@@ -21,7 +21,16 @@ import (
 type RunID string
 
 // Store writes run data under <repo>/.ai/runs.
-type Store struct{ Root string }
+type Store struct {
+	Root            string
+	AppendTraceFunc func(RunID, TraceEvent) error
+	now             func() time.Time
+}
+
+// randomBytes provides random run ID entropy. It is replaceable only by
+// package tests so persistence failures can be proven without weakening the
+// production source.
+var randomBytes = rand.Read
 
 // TraceEvent is one JSONL trace event.
 type TraceEvent struct {
@@ -40,15 +49,17 @@ func New(repo string) Store {
 	return Store{Root: filepath.Join(repo, ".ai", "runs")}
 }
 
-// NewRun creates and returns a new run ID.
-func (s Store) NewRun() RunID {
-	var b [4]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		copy(b[:], "fail")
+// NewRun creates a unique durable run directory and returns its ID.
+func (s Store) NewRun() (RunID, error) {
+	var b [16]byte
+	if _, err := randomBytes(b[:]); err != nil {
+		return "", fmt.Errorf("generate run ID: %w", err)
 	}
-	id := RunID(time.Now().UTC().Format("20060102T150405Z") + "-" + hex.EncodeToString(b[:]))
-	_ = os.MkdirAll(s.Dir(id), 0o755)
-	return id
+	id := RunID(s.clock().UTC().Format("20060102T150405Z") + "-" + hex.EncodeToString(b[:]))
+	if err := pathpolicy.CreateDirExclusive(s.repoRoot(), filepath.Join(".ai", "runs", string(id))); err != nil {
+		return "", fmt.Errorf("create run %q: %w", id, err)
+	}
+	return id, nil
 }
 
 // Dir returns the absolute directory for id.
@@ -69,10 +80,7 @@ func (s Store) WriteArtifact(id RunID, step string, iteration int, name string, 
 	if err := pathpolicy.NewDefault().Check(s.repoRoot(), rel); err != nil {
 		return "", fmt.Errorf("run artifact path: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
-		return "", fmt.Errorf("create artifact dir: %w", err)
-	}
-	if err := os.WriteFile(abs, b, 0o644); err != nil {
+	if err := pathpolicy.WriteFile(s.repoRoot(), rel, b, 0o644); err != nil {
 		return "", fmt.Errorf("write artifact: %w", err)
 	}
 	return abs, nil
@@ -93,6 +101,9 @@ func (s Store) ReadArtifact(id RunID, step string, iteration int, name string) (
 
 // AppendTrace appends one deterministic JSON trace line.
 func (s Store) AppendTrace(id RunID, event TraceEvent) error {
+	if s.AppendTraceFunc != nil {
+		return s.AppendTraceFunc(id, event)
+	}
 	runDir, err := s.checkedRunDir(id)
 	if err != nil {
 		return err
@@ -103,19 +114,15 @@ func (s Store) AppendTrace(id RunID, event TraceEvent) error {
 	if event.Payload == nil {
 		event.Payload = map[string]any{}
 	}
-	if err := os.MkdirAll(runDir, 0o755); err != nil {
-		return fmt.Errorf("create run dir: %w", err)
-	}
 	line, err := marshalTrace(event)
 	if err != nil {
 		return err
 	}
-	f, err := os.OpenFile(filepath.Join(runDir, "trace.jsonl"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	rel, err := filepath.Rel(s.repoRoot(), filepath.Join(runDir, "trace.jsonl"))
 	if err != nil {
-		return fmt.Errorf("open trace: %w", err)
+		return fmt.Errorf("trace relative path: %w", err)
 	}
-	defer f.Close()
-	if _, err := f.Write(append(line, '\n')); err != nil {
+	if err := pathpolicy.AppendFile(s.repoRoot(), rel, append(line, '\n'), 0o644); err != nil {
 		return fmt.Errorf("write trace: %w", err)
 	}
 	return nil
@@ -184,6 +191,13 @@ func (s Store) root() string {
 		return filepath.Join(".", ".ai", "runs")
 	}
 	return s.Root
+}
+
+func (s Store) clock() time.Time {
+	if s.now != nil {
+		return s.now()
+	}
+	return time.Now()
 }
 
 func (s Store) repoRoot() string { return filepath.Dir(filepath.Dir(s.root())) }

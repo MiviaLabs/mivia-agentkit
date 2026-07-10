@@ -5,12 +5,18 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
 	"github.com/MiviaLabs/mivia-agentkit/internal/render"
 )
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("output unavailable") }
 
 func TestReviewOneOffConsensus(t *testing.T) {
 	t.Run("pass", func(t *testing.T) {
@@ -55,6 +61,70 @@ func TestReviewRespectsWeights(t *testing.T) {
 	cmd.SetArgs([]string{"--repo", repo, "--artifact", artifactPath, "--reviewers", "codex,claude", "--mode", "weighted", "--min-reviewers", "2", "--weights", "claude=2,codex=1"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("review error = %v, want weighted pass", err)
+	}
+}
+
+func TestReviewUsesManifestWeights(t *testing.T) {
+	repo, artifactPath := reviewRepo(t)
+	mustWrite(t, filepath.Join(repo, "mivia-agent.yaml"), "version: \"1\"\nrouting:\n  consensus:\n    mode: weighted\n    min_reviewers: 2\n    weights: {codex: 3, claude: 1}\nadapters:\n  codex: {enabled: true, role: orchestrable}\n  claude: {enabled: true, role: orchestrable}\n")
+	withRuntimeAdapters(t,
+		fakeCLIAdapter{name: "codex", headless: true, verdict: adapter.Verdict{Pass: false}},
+		fakeCLIAdapter{name: "claude", headless: true, verdict: adapter.Verdict{Pass: true}},
+	)
+	cmd := newReviewCommand()
+	cmd.SetArgs([]string{"--repo", repo, "--artifact", artifactPath, "--reviewers", "codex,claude"})
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "review failed") {
+		t.Fatalf("review error = %v, want manifest weighted failure distinct from default equal weights", err)
+	}
+}
+
+func TestReviewRejectsMalformedWeights(t *testing.T) {
+	for _, weights := range []string{"codex=nope", "codex=NaN", "codex=0", "codex=1,codex=2"} {
+		t.Run(weights, func(t *testing.T) {
+			repo, artifactPath := reviewRepo(t)
+			cmd := newReviewCommand()
+			cmd.SetArgs([]string{"--repo", filepath.Join(repo, "missing"), "--artifact", artifactPath, "--weights", weights})
+			if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "invalid --weights") {
+				t.Fatalf("review error = %v, want exact malformed weights rejection before repository access", err)
+			}
+		})
+	}
+}
+
+func TestReviewPropagatesJSONWriteError(t *testing.T) {
+	repo, artifactPath := reviewRepo(t)
+	withRuntimeAdapters(t, fakeCLIAdapter{name: "codex", headless: true, verdict: adapter.Verdict{Pass: true}})
+	cmd := newReviewCommand()
+	cmd.SetOut(failingWriter{})
+	cmd.SetArgs([]string{"--repo", repo, "--artifact", artifactPath, "--reviewers", "codex", "--min-reviewers", "1", "--json"})
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "output unavailable") {
+		t.Fatalf("review error = %v, want JSON write failure", err)
+	}
+}
+
+func TestReviewTieBreakers(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		tieBreaker string
+		wantPass   bool
+	}{
+		{name: "strict", tieBreaker: "strict", wantPass: false},
+		{name: "manual", tieBreaker: "manual", wantPass: false},
+		{name: "prefer passing reviewer", tieBreaker: "prefer:codex", wantPass: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			repo, artifactPath := reviewRepo(t)
+			withRuntimeAdapters(t,
+				fakeCLIAdapter{name: "codex", headless: true, verdict: adapter.Verdict{Pass: true}},
+				fakeCLIAdapter{name: "claude", headless: true, verdict: adapter.Verdict{Pass: false}},
+			)
+			cmd := newReviewCommand()
+			cmd.SetArgs([]string{"--repo", repo, "--artifact", artifactPath, "--reviewers", "codex,claude", "--mode", "majority", "--min-reviewers", "2", "--tie-breaker", tt.tieBreaker})
+			err := cmd.Execute()
+			if (err == nil) != tt.wantPass {
+				t.Fatalf("review error = %v, want pass=%t", err, tt.wantPass)
+			}
+		})
 	}
 }
 

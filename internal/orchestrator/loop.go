@@ -39,16 +39,19 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 	if err != nil {
 		return LoopResult{Err: err}, err
 	}
-	runID := e.Store.NewRun()
 	max := loop.MaxIterations
 	if max <= 0 {
 		max = 1
 	}
 	if e.MaxIterations > 0 {
 		if e.MaxIterations > max {
-			return LoopResult{Trace: runID, Err: ErrMaxIterationsExceeded}, ErrMaxIterationsExceeded
+			return LoopResult{Err: ErrMaxIterationsExceeded}, ErrMaxIterationsExceeded
 		}
 		max = e.MaxIterations
+	}
+	runID, err := e.Store.NewRun()
+	if err != nil {
+		return LoopResult{Err: err}, err
 	}
 	var prior []adapter.Verdict
 	var currentArtifact string
@@ -88,7 +91,9 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 		err := errors.New("loop exhausted")
 		return LoopResult{Outcome: "fail", Iterations: max, Trace: runID, Err: err}, err
 	}
-	_ = e.Store.AppendTrace(runID, runstore.TraceEvent{Kind: "loop.exhausted", Payload: map[string]any{"on_exhausted": loop.OnExhausted}})
+	if err := e.Store.AppendTrace(runID, runstore.TraceEvent{Kind: "loop.exhausted", Payload: map[string]any{"on_exhausted": loop.OnExhausted}}); err != nil {
+		return LoopResult{Iterations: max, Trace: runID, Err: err}, err
+	}
 	return LoopResult{Outcome: "warn", Iterations: max, Trace: runID}, nil
 }
 

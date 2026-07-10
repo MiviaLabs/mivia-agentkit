@@ -17,6 +17,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var walkDir = filepath.WalkDir
+var readOSFile = os.ReadFile
+
 type manifestResult struct {
 	manifest config.Manifest
 	raw      []byte
@@ -116,33 +119,48 @@ func checkSkillsFrontmatter(ctx *Context) []report.Finding {
 	var findings []report.Finding
 	for _, root := range []string{".ai/skills", ".claude/skills"} {
 		base := filepath.Join(ctx.Repo, filepath.FromSlash(root))
-		_ = filepath.WalkDir(base, func(path string, d os.DirEntry, err error) error {
-			if err != nil || d.IsDir() || d.Name() != "SKILL.md" {
+		if err := walkDir(base, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				findings = append(findings, finding(report.SeverityError, "skills.walk_failed", root, err.Error()))
+				return nil
+			}
+			if d.IsDir() || d.Name() != "SKILL.md" {
 				return nil
 			}
 			rel := relSlash(ctx.Repo, path)
-			data, err := os.ReadFile(path)
-			if err != nil || !validSkillFrontmatter(data) {
+			data, err := readOSFile(path)
+			if err != nil {
+				findings = append(findings, finding(report.SeverityError, "skills.read_failed", rel, err.Error()))
+				return nil
+			}
+			if !validSkillFrontmatter(data) {
 				findings = append(findings, finding(report.SeverityError, "skills.invalid_frontmatter", rel, "SKILL.md frontmatter must include name and description"))
 			}
 			return nil
-		})
+		}); err != nil {
+			findings = append(findings, finding(report.SeverityError, "skills.walk_failed", root, err.Error()))
+		}
 	}
 	return findings
 }
 
 func checkManagedMarkers(ctx *Context) []report.Finding {
 	var findings []report.Finding
-	_ = filepath.WalkDir(ctx.Repo, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || strings.Contains(path, string(filepath.Separator)+".git"+string(filepath.Separator)) {
+	if err := walkDir(ctx.Repo, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			findings = append(findings, finding(report.SeverityError, "generated.walk_failed", ".", err.Error()))
+			return nil
+		}
+		if d.IsDir() || strings.Contains(path, string(filepath.Separator)+".git"+string(filepath.Separator)) {
 			return nil
 		}
 		rel := relSlash(ctx.Repo, path)
 		if !isManagedMarkerPath(rel) {
 			return nil
 		}
-		data, err := os.ReadFile(path)
+		data, err := readOSFile(path)
 		if err != nil {
+			findings = append(findings, finding(report.SeverityError, "generated.read_failed", rel, err.Error()))
 			return nil
 		}
 		starts := bytes.Count(data, []byte("mivia-agent:managed:start"))
@@ -151,7 +169,9 @@ func checkManagedMarkers(ctx *Context) []report.Finding {
 			findings = append(findings, finding(report.SeverityError, "generated.markers_invalid", rel, "managed block markers must be balanced"))
 		}
 		return nil
-	})
+	}); err != nil {
+		findings = append(findings, finding(report.SeverityError, "generated.walk_failed", ".", err.Error()))
+	}
 	return findings
 }
 
@@ -182,7 +202,10 @@ func ciCallsDoctorJSON(data []byte) bool {
 func checkGeneratedArtifactsStaged(ctx *Context) []report.Finding {
 	cmd := exec.Command("git", "-C", ctx.Repo, "status", "--porcelain=v1", "-z", "--", ".ai/runs")
 	out, err := cmd.Output()
-	if err != nil || len(out) == 0 {
+	if err != nil {
+		return []report.Finding{finding(report.SeverityError, "git.status_failed", ".ai/runs", err.Error())}
+	}
+	if len(out) == 0 {
 		return nil
 	}
 	return []report.Finding{finding(report.SeverityError, "generated.artifacts_staged", ".ai/runs", "runtime artifacts must not be staged")}
@@ -190,10 +213,14 @@ func checkGeneratedArtifactsStaged(ctx *Context) []report.Finding {
 
 func checkSecretPaths(ctx *Context) []report.Finding {
 	policy := pathpolicy.NewDefault()
-	ignored := gitIgnored(ctx.Repo)
+	ignored, err := gitIgnored(ctx.Repo)
+	if err != nil {
+		return []report.Finding{finding(report.SeverityError, "git.ignored_status_failed", ".", err.Error())}
+	}
 	var findings []report.Finding
-	_ = filepath.WalkDir(ctx.Repo, func(path string, d os.DirEntry, err error) error {
+	if err := walkDir(ctx.Repo, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
+			findings = append(findings, finding(report.SeverityError, "paths.walk_failed", ".", err.Error()))
 			return nil
 		}
 		rel := relSlash(ctx.Repo, path)
@@ -222,7 +249,9 @@ func checkSecretPaths(ctx *Context) []report.Finding {
 			findings = append(findings, finding(report.SeverityError, "paths.secret_generated", rel, err.Error()))
 		}
 		return nil
-	})
+	}); err != nil {
+		findings = append(findings, finding(report.SeverityError, "paths.walk_failed", ".", err.Error()))
+	}
 	return findings
 }
 
@@ -249,11 +278,11 @@ func isKnownLargeAppDir(rel string) bool {
 	}
 }
 
-func gitIgnored(repo string) map[string]struct{} {
+func gitIgnored(repo string) (map[string]struct{}, error) {
 	cmd := exec.Command("git", "-C", repo, "status", "--ignored", "--porcelain=v1", "-z")
 	out, err := cmd.Output()
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	ignored := map[string]struct{}{}
 	for _, item := range bytes.Split(out, []byte{0}) {
@@ -263,7 +292,7 @@ func gitIgnored(repo string) map[string]struct{} {
 		rel := filepath.ToSlash(string(item[3:]))
 		ignored[rel] = struct{}{}
 	}
-	return ignored
+	return ignored, nil
 }
 
 func isIgnoredPath(ignored map[string]struct{}, rel string) bool {

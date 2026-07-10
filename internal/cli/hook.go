@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/hooks"
@@ -49,6 +50,10 @@ func runHook(ctx context.Context, r io.Reader, adapter, event, repo string) erro
 		raw = map[string]any{
 			"malformed": string(data),
 		}
+		if kind, protected := hooks.ProtectedCommandText(string(data)); protected {
+			raw["command"] = string(data)
+			raw["protected_kind"] = string(kind)
+		}
 	}
 	p := hooks.Payload{
 		Event:   normalizeEvent(adapter, event),
@@ -57,7 +62,27 @@ func runHook(ctx context.Context, r io.Reader, adapter, event, repo string) erro
 		Repo:    repo,
 		Raw:     raw,
 	}
-	out, err := hooks.Decide(ctx, p, hooks.StampCheckerFunc(preflight.CheckStamp), policy.Noop{AuditPath: repo + "/.ai/audit.jsonl"})
+	manifest, err := loadManifest(repo)
+	if err != nil {
+		return fmt.Errorf("load hook manifest: %w", err)
+	}
+	actions, err := hooks.ProtectedActionSet(manifest.ProtectedActions)
+	if err != nil {
+		return err
+	}
+	p.ProtectedActions = actions
+	auditPath := manifest.Governance.AuditLog
+	if auditPath == "" {
+		auditPath = ".ai/audit.jsonl"
+	}
+	if !filepath.IsAbs(auditPath) {
+		auditPath = filepath.Join(absRepoPath(repo), auditPath)
+	}
+	provider, err := policy.New(manifest.Governance.Provider, auditPath)
+	if err != nil {
+		return fmt.Errorf("load hook governance provider: %w", err)
+	}
+	out, err := hooks.Decide(ctx, p, hookStampChecker{}, provider)
 	if err != nil {
 		return err
 	}
@@ -78,6 +103,16 @@ func runHook(ctx context.Context, r io.Reader, adapter, event, repo string) erro
 	default:
 		return fmt.Errorf("unknown hook adapter %q", adapter)
 	}
+}
+
+type hookStampChecker struct{}
+
+func (hookStampChecker) CheckStamp(repo string) (preflight.Stamp, error) {
+	return preflight.CheckStamp(repo)
+}
+
+func (hookStampChecker) CheckStampForRef(repo, ref string) (preflight.Stamp, error) {
+	return preflight.CheckStampForRef(repo, ref)
 }
 
 func normalizeEvent(adapter, event string) hooks.Event {

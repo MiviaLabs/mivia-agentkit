@@ -13,7 +13,10 @@ import (
 const adapterDuplicateBlockBytes = 80
 
 func duplicatedAdapterPolicy(ctx Context) []report.Finding {
-	canonical := readMarkdownBlocks(filepath.Join(ctx.Repo, ".ai"))
+	canonical, err := readMarkdownBlocksChecked(filepath.Join(ctx.Repo, ".ai"))
+	if err != nil {
+		return []report.Finding{{Severity: report.SeverityError, Code: "policy.tree_unreadable", Path: ".ai", Message: err.Error()}}
+	}
 	if len(canonical) == 0 {
 		return nil
 	}

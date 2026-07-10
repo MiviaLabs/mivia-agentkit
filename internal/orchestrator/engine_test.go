@@ -13,13 +13,14 @@ import (
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
 	"github.com/MiviaLabs/mivia-agentkit/internal/config"
+	"github.com/MiviaLabs/mivia-agentkit/internal/consensus"
 	"github.com/MiviaLabs/mivia-agentkit/internal/policy"
 	"github.com/MiviaLabs/mivia-agentkit/internal/runstore"
 )
 
 func TestExecuteProducerStepWritesArtifact(t *testing.T) {
 	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}})
-	res, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "produce", Producer: "codex", Artifact: "out.md"}}, 1)
+	res, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "produce", Producer: "codex", Artifact: "out.md"}}, 1)
 	if err != nil {
 		t.Fatalf("ExecuteStep error = %v", err)
 	}
@@ -34,7 +35,7 @@ func TestExecuteProducerStepWritesArtifact(t *testing.T) {
 
 func TestExecuteProducerStepUsesIterationArtifactPath(t *testing.T) {
 	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}})
-	res, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "produce", Producer: "codex", Artifact: "out.md"}}, 2)
+	res, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "produce", Producer: "codex", Artifact: "out.md"}}, 2)
 	if err != nil {
 		t.Fatalf("ExecuteStep error = %v", err)
 	}
@@ -46,7 +47,7 @@ func TestExecuteProducerStepUsesIterationArtifactPath(t *testing.T) {
 func TestExecuteProducerStepPassesArtifactOutAndStoresAdapterFile(t *testing.T) {
 	producer := &artifactOutAdapter{name: "codex", stdout: []byte(`{"type":"event"}`), fileContent: []byte("final artifact")}
 	e := testEngine(t, producer)
-	res, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "produce", Producer: "codex", Artifact: "out.md"}}, 1)
+	res, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "produce", Producer: "codex", Artifact: "out.md"}}, 1)
 	if err != nil {
 		t.Fatalf("ExecuteStep error = %v", err)
 	}
@@ -65,7 +66,7 @@ func TestExecuteProducerStepPassesArtifactOutAndStoresAdapterFile(t *testing.T) 
 func TestExecuteReviewStepFansOutConcurrently(t *testing.T) {
 	e := testEngine(t, scriptedAdapter{name: "a", delay: 200 * time.Millisecond, verdict: adapter.Verdict{Pass: true}}, scriptedAdapter{name: "b", delay: 200 * time.Millisecond, verdict: adapter.Verdict{Pass: true}})
 	start := time.Now()
-	_, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "review", Reviewers: []string{"a", "b"}}}, 1)
+	_, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "review", Reviewers: []string{"a", "b"}}}, 1)
 	if err != nil {
 		t.Fatalf("ExecuteStep error = %v", err)
 	}
@@ -76,7 +77,7 @@ func TestExecuteReviewStepFansOutConcurrently(t *testing.T) {
 
 func TestExecuteReviewStepCollectsAllVerdicts(t *testing.T) {
 	e := testEngine(t, scriptedAdapter{name: "a", verdict: adapter.Verdict{Pass: true, Notes: "a"}}, scriptedAdapter{name: "b", verdict: adapter.Verdict{Pass: false, Notes: "b"}})
-	res, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "review", Reviewers: []string{"a", "b"}}}, 1)
+	res, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "review", Reviewers: []string{"a", "b"}}}, 1)
 	if err != nil {
 		t.Fatalf("ExecuteStep error = %v", err)
 	}
@@ -87,12 +88,45 @@ func TestExecuteReviewStepCollectsAllVerdicts(t *testing.T) {
 
 func TestExecuteReviewStepSetsVerdictAdapterNames(t *testing.T) {
 	e := testEngine(t, scriptedAdapter{name: "a", verdict: adapter.Verdict{Pass: true}}, scriptedAdapter{name: "b", verdict: adapter.Verdict{Pass: false}})
-	res, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "review", Reviewers: []string{"a", "b"}}}, 1)
+	res, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "review", Reviewers: []string{"a", "b"}}}, 1)
 	if err != nil {
 		t.Fatalf("ExecuteStep error = %v", err)
 	}
 	if len(res.Verdicts) != 2 || res.Verdicts[0].Adapter != "a" || res.Verdicts[1].Adapter != "b" {
 		t.Fatalf("verdict adapters = %#v, want reviewer names in order", res.Verdicts)
+	}
+}
+
+func TestExecuteReviewStepUsesMajority(t *testing.T) {
+	e := testEngine(t, scriptedAdapter{name: "a", verdict: adapter.Verdict{Pass: true}}, scriptedAdapter{name: "b", verdict: adapter.Verdict{Pass: true}}, scriptedAdapter{name: "c", verdict: adapter.Verdict{Pass: false}})
+	e.ConsensusDefaults = config.Consensus{Mode: "majority", MinReviewers: 3}
+	res, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "review", Reviewers: []string{"a", "b", "c"}}}, 1)
+	if err != nil {
+		t.Fatalf("ExecuteStep error = %v", err)
+	}
+	if !res.Consensus {
+		t.Fatalf("Consensus = false, want majority pass")
+	}
+}
+
+func TestExecuteReviewStepEnforcesMinReviewers(t *testing.T) {
+	e := testEngine(t, scriptedAdapter{name: "a", verdict: adapter.Verdict{Pass: true}})
+	e.ConsensusDefaults = config.Consensus{Mode: "majority", MinReviewers: 2}
+	_, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "review", Reviewers: []string{"a"}}}, 1)
+	if !errors.Is(err, consensus.ErrMinReviewersUnsatisfied) {
+		t.Fatalf("ExecuteStep error = %v, want ErrMinReviewersUnsatisfied", err)
+	}
+}
+
+func TestExecuteReviewStepUsesWeightedPolicy(t *testing.T) {
+	e := testEngine(t, scriptedAdapter{name: "a", verdict: adapter.Verdict{Pass: false}}, scriptedAdapter{name: "b", verdict: adapter.Verdict{Pass: true}})
+	e.ConsensusDefaults = config.Consensus{Mode: "majority", MinReviewers: 2}
+	res, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "review", Reviewers: []string{"a", "b"}, Consensus: config.Consensus{Mode: "weighted", Weights: map[string]int{"a": 1, "b": 2}}}}, 1)
+	if err != nil {
+		t.Fatalf("ExecuteStep error = %v", err)
+	}
+	if !res.Consensus {
+		t.Fatalf("Consensus = false, want weighted pass")
 	}
 }
 
@@ -103,7 +137,7 @@ func TestExecuteReviewStepSendsReviewPrompt(t *testing.T) {
 	e.PromptBuilder = func(step config.Step, iteration int, prior []adapter.Verdict, artifactPath string) (string, error) {
 		return "review " + artifactPath, nil
 	}
-	if _, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "review", Reviewers: []string{"a"}, Artifact: "artifact.md"}}, 1); err != nil {
+	if _, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "review", Reviewers: []string{"a"}, Artifact: "artifact.md"}}, 1); err != nil {
 		t.Fatalf("ExecuteStep error = %v", err)
 	}
 	if a.prompt != "review /tmp/run/produce/iter-001/artifact.md" {
@@ -117,7 +151,7 @@ func TestExecuteReviewStepValidatesRequestsBeforeFanout(t *testing.T) {
 	blocked := &validatingReviewAdapter{name: "blocked", validateErr: errors.New("blocked invalid request")}
 	e := testEngine(t, started, blocked)
 
-	_, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "review", Reviewers: []string{"started", "blocked"}}}, 1)
+	_, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "review", Reviewers: []string{"started", "blocked"}}}, 1)
 	if err == nil || !strings.Contains(err.Error(), "blocked invalid request") {
 		t.Fatalf("ExecuteStep error = %v, want blocked invalid request", err)
 	}
@@ -131,7 +165,7 @@ func TestExecuteProducerStepValidatesRequestBeforeRun(t *testing.T) {
 	producer := &validatingReviewAdapter{name: "codex", validateErr: errors.New("producer invalid request"), runCalls: &runCalls}
 	e := testEngine(t, producer)
 
-	_, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "produce", Producer: "codex"}}, 1)
+	_, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "produce", Producer: "codex"}}, 1)
 	if err == nil || !strings.Contains(err.Error(), "producer invalid request") {
 		t.Fatalf("ExecuteStep error = %v, want producer invalid request", err)
 	}
@@ -145,7 +179,7 @@ func TestExecuteProducerStepValidatesGenericRequestBeforeRun(t *testing.T) {
 	producer := scriptedAdapter{name: "codex", runCalls: &runCalls}
 	e := testEngine(t, producer)
 
-	_, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "produce", Producer: "codex", MaxTurns: -1}}, 1)
+	_, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "produce", Producer: "codex", MaxTurns: -1}}, 1)
 	if err == nil || !strings.Contains(err.Error(), "max turns cannot be negative") {
 		t.Fatalf("ExecuteStep error = %v, want max turns validation error", err)
 	}
@@ -159,7 +193,7 @@ func TestExecuteReviewStepValidatesGenericRequestBeforeReview(t *testing.T) {
 	reviewer := scriptedAdapter{name: "reviewer", reviewCalls: &reviewCalls}
 	e := testEngine(t, reviewer)
 
-	_, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "review", Reviewers: []string{"reviewer"}, MaxTurns: -1}}, 1)
+	_, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "review", Reviewers: []string{"reviewer"}, MaxTurns: -1}}, 1)
 	if err == nil || !strings.Contains(err.Error(), "max turns cannot be negative") {
 		t.Fatalf("ExecuteStep error = %v, want max turns validation error", err)
 	}
@@ -170,7 +204,7 @@ func TestExecuteReviewStepValidatesGenericRequestBeforeReview(t *testing.T) {
 
 func TestExecuteProducerStepAppendsTrace(t *testing.T) {
 	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}})
-	id := e.Store.NewRun()
+	id := mustNewRun(t, e.Store)
 	if _, err := e.ExecuteStep(context.Background(), id, Node{Step: config.Step{ID: "produce", Producer: "codex"}}, 1); err != nil {
 		t.Fatalf("ExecuteStep error = %v", err)
 	}
@@ -189,7 +223,7 @@ func TestExecuteProducerStepPassesResolvedModelAndEffort(t *testing.T) {
 	e.AdapterDefaults = map[string]config.AdapterConfig{
 		"codex": {Model: "gpt-5.5", Effort: "high"},
 	}
-	if _, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "produce", Producer: "codex"}}, 1); err != nil {
+	if _, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "produce", Producer: "codex"}}, 1); err != nil {
 		t.Fatalf("ExecuteStep error = %v", err)
 	}
 	if producer.runReq.Model != "gpt-5.5" || producer.runReq.Effort != "high" {
@@ -203,7 +237,7 @@ func TestExecuteReviewStepPassesResolvedModelAndEffort(t *testing.T) {
 	e.AdapterDefaults = map[string]config.AdapterConfig{
 		"claude": {Model: "sonnet", Effort: "medium"},
 	}
-	if _, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "review", Reviewers: []string{"claude"}}}, 1); err != nil {
+	if _, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "review", Reviewers: []string{"claude"}}}, 1); err != nil {
 		t.Fatalf("ExecuteStep error = %v", err)
 	}
 	if reviewer.reviewReq.Model != "sonnet" || reviewer.reviewReq.Effort != "medium" {
@@ -218,7 +252,7 @@ func TestStepOverrideWinsOverAdapterDefault(t *testing.T) {
 		"codex": {Model: "gpt-5.5", Effort: "high"},
 	}
 	step := config.Step{ID: "produce", Producer: "codex", Model: "gpt-5.5-mini", Effort: "low"}
-	if _, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: step}, 1); err != nil {
+	if _, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: step}, 1); err != nil {
 		t.Fatalf("ExecuteStep error = %v", err)
 	}
 	if producer.runReq.Model != "gpt-5.5-mini" || producer.runReq.Effort != "low" {
@@ -228,7 +262,7 @@ func TestStepOverrideWinsOverAdapterDefault(t *testing.T) {
 
 func TestExecuteStepRespectsTimeout(t *testing.T) {
 	e := testEngine(t, scriptedAdapter{name: "codex", delay: 100 * time.Millisecond})
-	if _, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "produce", Producer: "codex", Timeout: "10ms"}}, 1); err == nil {
+	if _, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "produce", Producer: "codex", Timeout: "10ms"}}, 1); err == nil {
 		t.Fatalf("ExecuteStep timeout error = nil, want error")
 	}
 }
@@ -237,13 +271,22 @@ func TestExecuteStepRecordsPolicyDecisionRef(t *testing.T) {
 	prov := &recordingPolicy{}
 	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}})
 	e.Policy = prov
-	res, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "produce", Producer: "codex"}}, 1)
+	res, err := e.ExecuteStep(context.Background(), mustNewRun(t, e.Store), Node{Step: config.Step{ID: "produce", Producer: "codex"}}, 1)
 	if err != nil {
 		t.Fatalf("ExecuteStep error = %v", err)
 	}
 	if len(res.DecisionRefs) != 1 || res.DecisionRefs[0] == "" || prov.calls != 1 {
 		t.Fatalf("decision refs = %v calls=%d, want one recorded ref", res.DecisionRefs, prov.calls)
 	}
+}
+
+func mustNewRun(t *testing.T, store runstore.Store) runstore.RunID {
+	t.Helper()
+	id, err := store.NewRun()
+	if err != nil {
+		t.Fatalf("NewRun() error = %v", err)
+	}
+	return id
 }
 
 func testEngine(t *testing.T, adapters ...adapter.Adapter) Engine {

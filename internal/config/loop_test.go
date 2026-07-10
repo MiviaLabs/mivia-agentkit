@@ -59,6 +59,26 @@ func TestLoopValidateRejectsNonPositiveMaxIterations(t *testing.T) {
 	}
 }
 
+func TestLoopRejectsMalformedTimeout(t *testing.T) {
+	loop := validLoop()
+	loop.Steps[0].Timeout = "50mss"
+	if err := loop.Validate(enabledAdapters()); err == nil || !strings.Contains(err.Error(), "timeout") {
+		t.Fatalf("Validate() error = %v, want malformed timeout rejection", err)
+	}
+}
+
+func TestLoopRejectsNonPositiveTimeout(t *testing.T) {
+	for _, timeout := range []string{"0s", "-1s"} {
+		t.Run(timeout, func(t *testing.T) {
+			loop := validLoop()
+			loop.Steps[0].Timeout = timeout
+			if err := loop.Validate(enabledAdapters()); err == nil || !strings.Contains(err.Error(), "positive") {
+				t.Fatalf("Validate() error = %v, want non-positive timeout rejection", err)
+			}
+		})
+	}
+}
+
 func TestLoopValidateRejectsDuplicateStepIDs(t *testing.T) {
 	loop := validLoop()
 	loop.Steps = append(loop.Steps, Step{ID: "produce", Producer: "claude"})

@@ -13,3 +13,8 @@ func writeResearchWorkflow(t *testing.T, repo string) string {
 	mustWriteFile(t, path, "bound: iterations\nmax_iterations: 2\nsteps:\n- id: research\n  producer: codex\n  artifact: research.md\n- id: review\n  reviewers: [codex, claude]\n  artifact: research.md\n  on_fail: iterate\nexit_when: review-pass\non_exhausted: fail\n")
 	return path
 }
+
+func writeTrustedVerifierManifest(t *testing.T, repo string) {
+	t.Helper()
+	mustWriteFile(t, filepath.Join(repo, "mivia-agent.yaml"), "quality:\n  required_verifiers: ['true']\n  verifiers:\n    'true':\n      command: ['true']\n")
+}

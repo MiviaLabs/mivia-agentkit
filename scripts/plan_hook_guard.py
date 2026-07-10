@@ -215,6 +215,10 @@ def handle_stop(payload: dict[str, Any], policy: dict[str, Any], state: dict[str
     artifact = plan_artifact(message)
     if tracked_skill or was_planning or was_implementation:
         if not artifact:
+            if not policy.get("planArtifactsRequired", False):
+                clear_record(state, payload)
+                save_state(path, state)
+                return 0
             return emit_continue("Planning or implementation report must include PlanArtifact: .ai/plans/<id>.plan.json and validate mivia-agent-plan/v1.")
         valid, reason = validate_plan_artifact(artifact)
         if not valid:

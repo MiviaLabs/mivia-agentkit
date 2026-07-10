@@ -11,6 +11,7 @@ import (
 	"sort"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/config"
+	"github.com/MiviaLabs/mivia-agentkit/internal/pathpolicy"
 	"github.com/MiviaLabs/mivia-agentkit/internal/render"
 	"github.com/MiviaLabs/mivia-agentkit/internal/templates"
 	"github.com/MiviaLabs/mivia-agentkit/internal/version"
@@ -89,10 +90,7 @@ func Apply(repo string, force bool) (Report, error) {
 		path := filepath.Join(repo, filepath.FromSlash(rel))
 		have, err := os.ReadFile(path)
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-				return report, err
-			}
-			if err := os.WriteFile(path, want, 0o644); err != nil {
+			if err := pathpolicy.WriteFile(repo, rel, want, 0o644); err != nil {
 				return report, err
 			}
 			report.Updated = append(report.Updated, rel)
@@ -109,7 +107,7 @@ func Apply(repo string, force bool) (Report, error) {
 				report.Conflicts = append(report.Conflicts, Conflict{Path: rel, Reason: "manifest was edited locally"})
 				continue
 			}
-			if err := os.WriteFile(path, want, 0o644); err != nil {
+			if err := pathpolicy.WriteFile(repo, rel, want, 0o644); err != nil {
 				return report, err
 			}
 			report.Updated = append(report.Updated, rel)
@@ -132,7 +130,7 @@ func Apply(repo string, force bool) (Report, error) {
 		if err != nil {
 			return report, err
 		}
-		if err := os.WriteFile(path, next, 0o644); err != nil {
+		if err := pathpolicy.WriteFile(repo, rel, next, 0o644); err != nil {
 			return report, err
 		}
 		report.Updated = append(report.Updated, rel)

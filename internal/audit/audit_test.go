@@ -3,6 +3,8 @@
 package audit
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +14,29 @@ import (
 	"github.com/MiviaLabs/mivia-agentkit/internal/render"
 	"github.com/MiviaLabs/mivia-agentkit/internal/report"
 )
+
+func TestAuditReportsUnreadablePolicyTree(t *testing.T) {
+	previous := walkDir
+	walkDir = func(root string, visit fs.WalkDirFunc) error {
+		return visit(filepath.Join(root, "unreadable.md"), nil, errors.New("permission denied"))
+	}
+	t.Cleanup(func() { walkDir = previous })
+	repo, home := freshRepo(t)
+	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")}), "policy.tree_unreadable")
+}
+
+func TestAuditReportsPolicyReadFailure(t *testing.T) {
+	repo, home := freshRepo(t)
+	previous := readOSFile
+	readOSFile = func(path string) ([]byte, error) {
+		if filepath.Ext(path) == ".md" {
+			return nil, errors.New("permission denied")
+		}
+		return previous(path)
+	}
+	t.Cleanup(func() { readOSFile = previous })
+	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")}), "policy.tree_unreadable")
+}
 
 func TestAuditReportsDuplicatedAdapterPolicy(t *testing.T) {
 	repo, home := freshRepo(t)

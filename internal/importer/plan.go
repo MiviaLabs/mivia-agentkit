@@ -142,10 +142,7 @@ func (p Plan) Apply(repo string, force bool) (Report, error) {
 		} else if !os.IsNotExist(err) {
 			return report, err
 		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return report, err
-		}
-		if err := os.WriteFile(target, data, 0o644); err != nil {
+		if err := pathpolicy.WriteFile(repo, item.OutPath, data, 0o644); err != nil {
 			return report, err
 		}
 		report.Written = append(report.Written, item.OutPath)
@@ -172,10 +169,7 @@ func (p Plan) Apply(repo string, force bool) (Report, error) {
 		} else if !os.IsNotExist(err) {
 			return report, err
 		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return report, err
-		}
-		if err := os.WriteFile(target, data, 0o644); err != nil {
+		if err := pathpolicy.WriteFile(repo, action.Path, data, 0o644); err != nil {
 			return report, err
 		}
 		report.Written = append(report.Written, action.Path)

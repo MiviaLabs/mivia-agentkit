@@ -7,6 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/MiviaLabs/mivia-agentkit/internal/gitstate"
 )
 
 func TestCheckStampRejectsMissingStamp(t *testing.T) {
@@ -17,40 +20,46 @@ func TestCheckStampRejectsMissingStamp(t *testing.T) {
 	}
 }
 
-func TestCheckStampRejectsStaleHead(t *testing.T) {
+func TestStampPromotesFromValidatedIndexToMatchingCommit(t *testing.T) {
 	repo := newRepo(t)
 	writeFile(t, repo, "docs/readme.md", "hello\n")
 	runGit(t, repo, "add", "docs/readme.md")
-	if _, err := Run(Context{Repo: repo, PipelinePreflight: true}); err != nil {
+	if _, err := Run(Context{Repo: repo, BroadVerifiers: []string{"true"}, PipelinePreflight: true}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 	runGit(t, repo, "add", "docs/readme.md")
 	runGit(t, repo, "commit", "-q", "-m", "docs")
-	_, err := CheckStamp(repo)
-	assertStale(t, err)
+	stamp, err := CheckStamp(repo)
+	if err != nil {
+		t.Fatalf("CheckStamp() error = %v", err)
+	}
+	if stamp.Subject.Commit == "" {
+		t.Fatal("CheckStamp() did not promote matching commit")
+	}
 }
 
-func TestCheckStampRejectsStaleDiffHash(t *testing.T) {
+func TestCheckStampKeepsIndexEvidenceValidWithUnstagedChanges(t *testing.T) {
 	repo := newRepo(t)
 	writeFile(t, repo, "docs/readme.md", "hello\n")
 	runGit(t, repo, "add", "docs/readme.md")
-	if _, err := Run(Context{Repo: repo, PipelinePreflight: true}); err != nil {
+	if _, err := Run(Context{Repo: repo, BroadVerifiers: []string{"true"}, PipelinePreflight: true}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 	writeFile(t, repo, "docs/readme.md", "changed\n")
-	_, err := CheckStamp(repo)
-	assertStale(t, err)
+	if _, err := CheckStamp(repo); err != nil {
+		t.Fatalf("CheckStamp() error = %v; unstaged content must not invalidate index evidence", err)
+	}
 }
 
-func TestCheckStampRejectsChangedFilesMismatch(t *testing.T) {
+func TestCheckStampRejectsForgedEvidence(t *testing.T) {
 	repo := newRepo(t)
 	writeFile(t, repo, "docs/readme.md", "hello\n")
 	runGit(t, repo, "add", "docs/readme.md")
-	stamp, err := Run(Context{Repo: repo, PipelinePreflight: true})
+	stamp, err := Run(Context{Repo: repo, BroadVerifiers: []string{"true"}, PipelinePreflight: true})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-	stamp.ChangedFiles = []string{"docs/other.md"}
+	stamp.VerifierEvidence[0].SubjectHash = "forged"
 	data, err := stamp.Marshal()
 	if err != nil {
 		t.Fatalf("Marshal() error = %v", err)
@@ -62,11 +71,52 @@ func TestCheckStampRejectsChangedFilesMismatch(t *testing.T) {
 	assertStale(t, err)
 }
 
+func TestCheckStampRejectsFutureAndDuplicateEvidence(t *testing.T) {
+	repo := newRepo(t)
+	writeFile(t, repo, "docs/readme.md", "hello\n")
+	runGit(t, repo, "add", "docs/readme.md")
+	stamp, err := Run(Context{Repo: repo, BroadVerifiers: []string{"true"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stamp.VerifierEvidence[0].StartedAt = time.Now().UTC().Add(time.Minute).Format(time.RFC3339)
+	data, err := stamp.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, stampRelPath), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = CheckStamp(repo)
+	assertStale(t, err)
+}
+
+func TestCheckStampRejectsDuplicateEvidence(t *testing.T) {
+	repo := newRepo(t)
+	writeFile(t, repo, "docs/readme.md", "hello\n")
+	runGit(t, repo, "add", "docs/readme.md")
+	stamp, err := Run(Context{Repo: repo, BroadVerifiers: []string{"true"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stamp.VerifierEvidence = append(stamp.VerifierEvidence, stamp.VerifierEvidence[0])
+	writeFile(t, repo, "mivia-agent.yaml", "quality:\n  required_verifiers: ['true', 'true']\n  verifiers:\n    'true':\n      command: ['true']\n")
+	data, err := stamp.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, stampRelPath), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = CheckStamp(repo)
+	assertStale(t, err)
+}
+
 func TestCheckStampAcceptsFreshStamp(t *testing.T) {
 	repo := newRepo(t)
 	writeFile(t, repo, "docs/readme.md", "hello\n")
 	runGit(t, repo, "add", "docs/readme.md")
-	if _, err := Run(Context{Repo: repo, PipelinePreflight: true}); err != nil {
+	if _, err := Run(Context{Repo: repo, BroadVerifiers: []string{"true"}, PipelinePreflight: true}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 	stamp, err := CheckStamp(repo)
@@ -78,6 +128,63 @@ func TestCheckStampAcceptsFreshStamp(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(repo, stampRelPath)); err != nil {
 		t.Fatalf("stamp path missing: %v", err)
+	}
+}
+
+func TestPushRejectsUnvalidatedAdditionalCommit(t *testing.T) {
+	repo := newRepo(t)
+	writeFile(t, repo, "docs/readme.md", "first\n")
+	runGit(t, repo, "add", "docs/readme.md")
+	if _, err := Run(Context{Repo: repo, BroadVerifiers: []string{"true"}}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	runGit(t, repo, "commit", "-q", "-m", "first")
+	if _, err := CheckStamp(repo); err != nil {
+		t.Fatalf("CheckStamp() promotion error = %v", err)
+	}
+	writeFile(t, repo, "docs/second.md", "second\n")
+	runGit(t, repo, "add", "docs/second.md")
+	runGit(t, repo, "commit", "-q", "-m", "second")
+	_, err := CheckStamp(repo)
+	assertStale(t, err)
+}
+
+func TestValidateCommitCandidateRejectsWrongParentWithSameTree(t *testing.T) {
+	repo := newRepo(t)
+	writeFile(t, repo, "docs/a.md", "a\n")
+	runGit(t, repo, "add", "docs/a.md")
+	stamp, err := Run(Context{Repo: repo, BroadVerifiers: []string{"true"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, repo, "commit", "-q", "-m", "a")
+	first, err := gitstate.Head(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stamp.Subject.BaseHead = first
+	if err := validateCommitCandidate(repo, stamp, first); err == nil {
+		t.Fatal("validateCommitCandidate() error = nil; want wrong parent")
+	}
+}
+
+func TestValidateCommitCandidateRejectsSameParentWrongTree(t *testing.T) {
+	repo := newRepo(t)
+	writeFile(t, repo, "docs/a.md", "a\n")
+	runGit(t, repo, "add", "docs/a.md")
+	stamp, err := Run(Context{Repo: repo, BroadVerifiers: []string{"true"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, repo, "docs/a.md", "different\n")
+	runGit(t, repo, "add", "docs/a.md")
+	runGit(t, repo, "commit", "-q", "-m", "different")
+	head, err := gitstate.Head(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := validateCommitCandidate(repo, stamp, head); err == nil {
+		t.Fatal("validateCommitCandidate() error = nil; want wrong tree")
 	}
 }
 

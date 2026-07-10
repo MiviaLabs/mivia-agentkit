@@ -16,6 +16,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var walkDir = filepath.WalkDir
+var readOSFile = os.ReadFile
+
 // Context carries read-only audit inputs.
 type Context struct {
 	Repo      string
@@ -229,24 +232,28 @@ func globalRuleConflict(ctx Context) []report.Finding {
 	return findings
 }
 
-func readMarkdownBlocks(root string) [][]byte {
+func readMarkdownBlocksChecked(root string) ([][]byte, error) {
 	var blocks [][]byte
-	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || filepath.Ext(path) != ".md" {
+	err := walkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || filepath.Ext(path) != ".md" {
 			return nil
 		}
-		data, err := os.ReadFile(path)
-		if err == nil {
-			for _, block := range strings.Split(string(data), "\n\n") {
-				trimmed := strings.TrimSpace(block)
-				if len(trimmed) >= 80 {
-					blocks = append(blocks, []byte(trimmed))
-				}
+		data, err := readOSFile(path)
+		if err != nil {
+			return err
+		}
+		for _, block := range strings.Split(string(data), "\n\n") {
+			trimmed := strings.TrimSpace(block)
+			if len(trimmed) >= 80 {
+				blocks = append(blocks, []byte(trimmed))
 			}
 		}
 		return nil
 	})
-	return blocks
+	return blocks, err
 }
 
 func extractHTMLOrHashManaged(data []byte) (pre, managed, post []byte, ok bool) {
