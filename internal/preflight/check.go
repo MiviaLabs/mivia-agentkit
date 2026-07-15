@@ -110,17 +110,28 @@ func validateEvidence(repo string, stamp Stamp) error {
 	if len(stamp.VerifierEvidence) != len(manifest.RequiredVerifiers) {
 		return fmt.Errorf("incomplete verifier evidence")
 	}
-	seen := map[string]struct{}{}
+	// Match required verifiers to evidence by command id, NOT by array position.
+	// required_verifiers is a set: the manifest list order and the order
+	// preflight emits evidence (which follows CLI/run order, not the manifest)
+	// carry no meaning, so a positional comparison rejected otherwise-complete
+	// stamps whenever the two orders differed -- a spurious "incomplete verifier
+	// evidence" that blocked every commit until the hook was disabled.
+	byID := make(map[string]VerifierEvidence, len(stamp.VerifierEvidence))
+	for _, evidence := range stamp.VerifierEvidence {
+		if _, duplicate := byID[evidence.CommandID]; duplicate {
+			return fmt.Errorf("incomplete verifier evidence")
+		}
+		byID[evidence.CommandID] = evidence
+	}
 	now := time.Now().UTC()
-	for i, id := range manifest.RequiredVerifiers {
-		evidence := stamp.VerifierEvidence[i]
+	for _, id := range manifest.RequiredVerifiers {
+		evidence, present := byID[id]
 		definition, ok := manifest.Verifiers[id]
 		started, startErr := time.Parse(time.RFC3339, evidence.StartedAt)
 		finished, finishErr := time.Parse(time.RFC3339, evidence.FinishedAt)
-		if _, duplicate := seen[evidence.CommandID]; duplicate || !ok || evidence.SchemaVersion != 1 || evidence.CommandID != id || evidence.DefinitionHash != verifierHash(definition) || evidence.SubjectHash != expected || evidence.ExitCode != 0 || evidence.Source != "local" || startErr != nil || finishErr != nil || started.After(now) || finished.After(now) || finished.Before(started) || now.Sub(finished) > 24*time.Hour {
+		if !present || !ok || evidence.SchemaVersion != 1 || evidence.CommandID != id || evidence.DefinitionHash != verifierHash(definition) || evidence.SubjectHash != expected || evidence.ExitCode != 0 || evidence.Source != "local" || startErr != nil || finishErr != nil || started.After(now) || finished.After(now) || finished.Before(started) || now.Sub(finished) > 24*time.Hour {
 			return fmt.Errorf("incomplete verifier evidence")
 		}
-		seen[evidence.CommandID] = struct{}{}
 	}
 	return nil
 }
