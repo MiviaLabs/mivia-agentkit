@@ -81,6 +81,11 @@ func validateProofs(changed []string, ctx Context) error {
 	if len(ctx.NotRun) > 0 && len(ctx.BroadVerifiers) > 0 {
 		return fmt.Errorf("not-run reason is only allowed when broad verifier is missing")
 	}
+	// Broad verifier is required unless the caller documented a not-run reason
+	// or explicitly opted into pipeline-preflight (broad runs outside this command).
+	if len(ctx.BroadVerifiers) == 0 && len(ctx.NotRun) == 0 && !ctx.PipelinePreflight {
+		missing = append(missing, "broad verifier")
+	}
 	if Classify(changed, ContractMatrix{RequireContractRowsFor: ctx.ContractRows}) == High {
 		if len(ctx.ContractRows) == 0 {
 			missing = append(missing, "contract row")

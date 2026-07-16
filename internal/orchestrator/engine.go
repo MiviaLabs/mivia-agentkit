@@ -98,6 +98,9 @@ func (e Engine) executeProducer(ctx context.Context, runID runstore.RunID, node 
 	if written, readErr := os.ReadFile(path); readErr == nil && len(written) > 0 {
 		content = written
 	}
+	// Always scrub before persisting under .ai/runs — adapter file writes may
+	// bypass stdout scrubbing (e.g. Codex --output-last-message).
+	content = adapter.Scrub(content)
 	path, err = e.Store.WriteArtifact(runID, node.Step.ID, iteration, artifactName(node.Step), content)
 	if err != nil {
 		return StepResult{}, err

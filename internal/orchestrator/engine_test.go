@@ -63,6 +63,30 @@ func TestExecuteProducerStepPassesArtifactOutAndStoresAdapterFile(t *testing.T) 
 	}
 }
 
+func TestExecuteProducerScrubsSecretsFromArtifactOut(t *testing.T) {
+	secret := "API_KEY=" + strings.Repeat("a", 16)
+	producer := &artifactOutAdapter{
+		name:        "codex",
+		stdout:      []byte(`{"type":"event"}`),
+		fileContent: []byte("leaked " + secret + " value"),
+	}
+	e := testEngine(t, producer)
+	res, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "produce", Producer: "codex", Artifact: "out.md"}}, 1)
+	if err != nil {
+		t.Fatalf("ExecuteStep error = %v", err)
+	}
+	got, err := os.ReadFile(res.Artifact)
+	if err != nil {
+		t.Fatalf("read artifact: %v", err)
+	}
+	if strings.Contains(string(got), secret) {
+		t.Fatalf("artifact still contains secret %q: %q", secret, got)
+	}
+	if !strings.Contains(string(got), "<redacted:env>") {
+		t.Fatalf("artifact = %q, want redacted env secret", got)
+	}
+}
+
 func TestExecuteReviewStepFansOutConcurrently(t *testing.T) {
 	e := testEngine(t, scriptedAdapter{name: "a", delay: 200 * time.Millisecond, verdict: adapter.Verdict{Pass: true}}, scriptedAdapter{name: "b", delay: 200 * time.Millisecond, verdict: adapter.Verdict{Pass: true}})
 	start := time.Now()

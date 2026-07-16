@@ -65,6 +65,39 @@ func TestPreflightAcceptsNotRunReasonForMissingBroad(t *testing.T) {
 	}
 }
 
+func TestPreflightRequiresBroadOrNotRunOrPipeline(t *testing.T) {
+	repo := newRepo(t)
+	writeFile(t, repo, "docs/readme.md", "hello\n")
+	runGit(t, repo, "add", "docs/readme.md")
+
+	// No broad, no not-run, no pipeline flag → reject.
+	_, err := Run(Context{Repo: repo})
+	if err == nil || !strings.Contains(err.Error(), "broad verifier") {
+		t.Fatalf("Run() error = %v, want broad verifier requirement", err)
+	}
+
+	// Broad present → accept.
+	if _, err := Run(Context{Repo: repo, BroadVerifiers: []string{"go test ./..."}}); err != nil {
+		t.Fatalf("Run() with broad error = %v", err)
+	}
+
+	// Not-run reason alone → accept.
+	repo2 := newRepo(t)
+	writeFile(t, repo2, "docs/readme.md", "hello\n")
+	runGit(t, repo2, "add", "docs/readme.md")
+	if _, err := Run(Context{Repo: repo2, NotRun: []string{"runs in CI"}}); err != nil {
+		t.Fatalf("Run() with not-run error = %v", err)
+	}
+
+	// Pipeline-preflight alone → accept.
+	repo3 := newRepo(t)
+	writeFile(t, repo3, "docs/readme.md", "hello\n")
+	runGit(t, repo3, "add", "docs/readme.md")
+	if _, err := Run(Context{Repo: repo3, PipelinePreflight: true}); err != nil {
+		t.Fatalf("Run() with pipeline-preflight error = %v", err)
+	}
+}
+
 func TestPreflightRejectsNotRunWhenBroadVerifierPresent(t *testing.T) {
 	repo := newRepo(t)
 	writeFile(t, repo, "docs/readme.md", "hello\n")

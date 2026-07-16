@@ -32,6 +32,68 @@ func TestIsProtectedDetectsDeploy(t *testing.T) {
 	}
 }
 
+func TestIsProtectedDetectsWindowsGitExe(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload map[string]any
+		want    policy.ProtectedKind
+	}{
+		{
+			"git.exe push command string",
+			map[string]any{"command": "git.exe push origin main"},
+			policy.ProtectedPush,
+		},
+		{
+			"git.cmd commit command string",
+			map[string]any{"command": "git.cmd commit -m x"},
+			policy.ProtectedCommit,
+		},
+		{
+			"program git.exe with push args",
+			map[string]any{"program": "git.exe", "args": []any{"push", "origin"}},
+			policy.ProtectedPush,
+		},
+		{
+			"program path with git.cmd",
+			map[string]any{"program": `C:\Program Files\Git\cmd\git.cmd`, "args": []any{"commit", "-m", "x"}},
+			policy.ProtectedCommit,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := IsProtected(tc.payload)
+			if !ok || got != tc.want {
+				t.Fatalf("IsProtected() = %q, %v; want %q, true", got, ok, tc.want)
+			}
+		})
+	}
+}
+
+func TestIsProtectedDoesNotTripOnDeployPathSegment(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload map[string]any
+	}{
+		{"go test package path", map[string]any{"command": "go test ./internal/deploy"}},
+		{"list deploy directory", map[string]any{"command": "ls ./deploy"}},
+		{"cat deploy yaml", map[string]any{"command": "cat charts/deploy/values.yaml"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got, ok := IsProtected(tc.payload); ok {
+				t.Fatalf("IsProtected() = %q, true; want false for path-only deploy token", got)
+			}
+		})
+	}
+	// Real deploy verbs still trip the gate.
+	if got, ok := IsProtected(map[string]any{"command": "deploy production"}); !ok || got != policy.ProtectedDeploy {
+		t.Fatalf("IsProtected(deploy production) = %q, %v; want deploy, true", got, ok)
+	}
+	if got, ok := IsProtected(map[string]any{"command": "kubectl apply -f manifest.yaml"}); !ok || got != policy.ProtectedDeploy {
+		t.Fatalf("IsProtected(kubectl apply) = %q, %v; want deploy, true", got, ok)
+	}
+}
+
 func TestIsProtectedReturnsFalseForBenign(t *testing.T) {
 	if got, ok := IsProtected(map[string]any{"command": "go test ./..."}); ok || got != "" {
 		t.Fatalf("IsProtected() = %q, %v; want empty, false", got, ok)

@@ -47,6 +47,7 @@ func TestGeneratedFixtureDoctorPasses(t *testing.T) {
 		"--repo", env.repo,
 		"--contract-row", "fixture",
 		"--focused-verifier", "go test ./test/fixture/... -count=1",
+		"--broad-verifier", "go test ./...",
 		"--mutation-proof", "fixture expected file set mismatch fails",
 		"--json",
 	)

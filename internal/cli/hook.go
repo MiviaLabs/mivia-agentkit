@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/hooks"
@@ -53,14 +54,19 @@ func runHook(ctx context.Context, r io.Reader, adapter, event, repo string) erro
 			"malformed": string(data),
 		}
 	}
+	absRepo := absRepoPath(repo)
 	p := hooks.Payload{
 		Event:   normalizeEvent(adapter, event),
 		Adapter: adapter,
 		Tool:    toolName(raw),
-		Repo:    repo,
+		Repo:    absRepo,
 		Raw:     raw,
 	}
-	out, err := hooks.Decide(ctx, p, hooks.StampCheckerFunc(preflight.CheckStamp), policy.Noop{AuditPath: repo + "/.ai/audit.jsonl"})
+	pol, err := hookPolicy(absRepo)
+	if err != nil {
+		return err
+	}
+	out, err := hooks.Decide(ctx, p, hooks.StampCheckerFunc(preflight.CheckStamp), pol)
 	if err != nil {
 		return err
 	}
@@ -106,4 +112,24 @@ func toolName(raw map[string]any) string {
 		}
 	}
 	return ""
+}
+
+// hookPolicy loads the project governance provider for the hook surface.
+// Missing manifests fall back to defaults (noop). Unknown or unavailable
+// providers fail closed so hooks never silently ignore configured policy.
+func hookPolicy(repo string) (policy.Provider, error) {
+	manifest, err := loadManifest(repo)
+	if err != nil {
+		return nil, fmt.Errorf("load governance for hook: %w", err)
+	}
+	auditPath := filepath.Join(absRepoPath(repo), ".ai", "audit.jsonl")
+	if manifest.Governance.AuditLog != "" {
+		// Only accept project-relative .ai/audit.jsonl style paths via provider checks.
+		if filepath.IsAbs(manifest.Governance.AuditLog) {
+			auditPath = manifest.Governance.AuditLog
+		} else {
+			auditPath = filepath.Join(absRepoPath(repo), filepath.FromSlash(manifest.Governance.AuditLog))
+		}
+	}
+	return policy.New(manifest.Governance.Provider, auditPath)
 }

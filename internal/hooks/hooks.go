@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -98,11 +99,13 @@ var protectedPatterns = func() []struct {
 		kind policy.ProtectedKind
 		re   *regexp.Regexp
 	}{
+		// git.exe / git.cmd are normalized to git before matching.
 		{policy.ProtectedCommit, regexp.MustCompile(`\bgit\s+commit\b`)},
 		{policy.ProtectedPush, regexp.MustCompile(`\bgit\s+push\b`)},
 		{policy.ProtectedPullRequest, regexp.MustCompile(`\bgh\s+pr\b|\bpull[-_ ]request\b|\bcreate[-_ ]pr\b`)},
 		{policy.ProtectedRelease, regexp.MustCompile(`\bgh\s+release\b`)},
-		{policy.ProtectedDeploy, regexp.MustCompile(`\bdeploy\b|\bkubectl\s+apply\b|\bterraform\s+apply\b`)},
+		// Deploy verbs/CLIs only — not path tokens like ./internal/deploy.
+		{policy.ProtectedDeploy, regexp.MustCompile(`(?:^|[;&|]\s*|\s)deploy(?:\s|$)|(?:^|\s)(?:helm|kubectl|terraform)\s+apply\b|\bkubectl\s+apply\b|\bterraform\s+apply\b|\bhelm\s+(?:upgrade|install)\b`)},
 		{policy.ProtectedLiveSmoke, regexp.MustCompile(`\blive[-_ ]smoke\b|\bsmoke\s+live\b`)},
 	}
 	return p
@@ -139,17 +142,17 @@ func commandTexts(raw map[string]any) []string {
 			for key, val := range t {
 				switch strings.ToLower(key) {
 				case "command", "cmd", "malformed":
-					out = append(out, strings.ToLower(flatten(val)))
+					out = append(out, normalizeCommandText(flatten(val)))
 				}
 			}
 			if prog, ok := t["program"].(string); ok {
-				parts := []string{prog}
+				parts := []string{normalizeExeBase(prog)}
 				if args, ok := t["args"].([]any); ok {
 					for _, a := range args {
 						parts = append(parts, flatten(a))
 					}
 				}
-				out = append(out, strings.ToLower(strings.Join(parts, " ")))
+				out = append(out, normalizeCommandText(strings.Join(parts, " ")))
 			}
 			for _, val := range t {
 				walk(val)
@@ -162,6 +165,36 @@ func commandTexts(raw map[string]any) []string {
 	}
 	walk(raw)
 	return out
+}
+
+// normalizeExeBase strips Windows executable suffixes and path prefixes so
+// git.exe / C:\Program Files\Git\cmd\git.cmd match the same patterns as git.
+func normalizeExeBase(name string) string {
+	base := filepath.Base(strings.TrimSpace(name))
+	lower := strings.ToLower(base)
+	for _, ext := range []string{".exe", ".cmd", ".bat", ".com"} {
+		if strings.HasSuffix(lower, ext) {
+			return lower[:len(lower)-len(ext)]
+		}
+	}
+	return lower
+}
+
+// normalizeCommandText lowercases and rewrites Windows git/gh host binaries
+// so protected-action patterns can stay simple and portable.
+func normalizeCommandText(s string) string {
+	lower := strings.ToLower(s)
+	// Replace bare and path-suffixed host tools with their base names.
+	for _, pair := range []struct{ from, to string }{
+		{"git.exe", "git"},
+		{"git.cmd", "git"},
+		{"git.bat", "git"},
+		{"gh.exe", "gh"},
+		{"gh.cmd", "gh"},
+	} {
+		lower = strings.ReplaceAll(lower, pair.from, pair.to)
+	}
+	return lower
 }
 
 // RawPayload decodes JSON stdin into a map.
