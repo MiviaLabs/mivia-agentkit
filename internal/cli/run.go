@@ -72,7 +72,10 @@ func newRunCommand() *cobra.Command {
 			if jsonOut {
 				_ = json.NewEncoder(cmd.OutOrStdout()).Encode(result)
 			} else {
-				fmt.Fprintf(cmd.OutOrStdout(), "outcome=%s iterations=%d trace=%s\n", result.Outcome, result.Iterations, result.Trace)
+				fmt.Fprintf(cmd.OutOrStdout(), "outcome=%s iterations=%d trace=%s run_dir=%s\n", result.Outcome, result.Iterations, result.Trace, result.RunDir)
+				for _, a := range result.Artifacts {
+					fmt.Fprintf(cmd.OutOrStdout(), "artifact=%s\n", a)
+				}
 			}
 			if err != nil {
 				if result.Outcome == "warn" && !strict {
