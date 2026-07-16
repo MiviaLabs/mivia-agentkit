@@ -145,6 +145,48 @@ func TestPreflightStampWrittenUnderDotGit(t *testing.T) {
 	}
 }
 
+func TestPreflightWorksOnGitWorktree(t *testing.T) {
+	main := newRepo(t)
+	writeFile(t, main, "docs/readme.md", "hello\n")
+	runGit(t, main, "add", "docs/readme.md")
+	runGit(t, main, "commit", "-q", "-m", "docs")
+
+	// Create a linked worktree with its own .git file (not a directory).
+	wt := filepath.Join(t.TempDir(), "wt")
+	runGit(t, main, "worktree", "add", "-q", wt, "HEAD")
+	if info, err := os.Lstat(filepath.Join(wt, ".git")); err != nil || info.IsDir() {
+		t.Fatalf("worktree .git Lstat = %v err=%v, want file not dir", info, err)
+	}
+
+	writeFile(t, wt, "docs/worktree.md", "wt\n")
+	stamp, err := Run(Context{Repo: wt, BroadVerifiers: []string{"go test ./..."}})
+	if err != nil {
+		t.Fatalf("Run(worktree) error = %v", err)
+	}
+	if stamp.Head == "" {
+		t.Fatalf("Run(worktree) returned empty head")
+	}
+	// Stamp lives under the worktree gitdir (outside wt/.git file), not at the
+	// literal wt/.git/... path which cannot be a directory.
+	resolved, err := stampPath(wt)
+	if err != nil {
+		t.Fatalf("stampPath(worktree) error = %v", err)
+	}
+	if _, err := os.Stat(resolved); err != nil {
+		t.Fatalf("resolved stamp missing at %q: %v", resolved, err)
+	}
+	if strings.HasPrefix(resolved, filepath.Join(wt, ".git")+string(filepath.Separator)) {
+		t.Fatalf("resolved stamp %q still under worktree .git file path", resolved)
+	}
+	got, err := CheckStamp(wt)
+	if err != nil {
+		t.Fatalf("CheckStamp(worktree) error = %v", err)
+	}
+	if got.Head != stamp.Head {
+		t.Fatalf("CheckStamp head = %q, want %q", got.Head, stamp.Head)
+	}
+}
+
 func TestNewRepoDisablesGlobalSigning(t *testing.T) {
 	global := filepath.Join(t.TempDir(), "gitconfig")
 	if err := os.WriteFile(global, []byte("[commit]\n\tgpgsign = true\n"), 0o600); err != nil {

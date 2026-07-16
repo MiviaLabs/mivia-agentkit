@@ -5,6 +5,7 @@ package preflight
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -138,20 +139,59 @@ func expandDirectoryEntries(repo string, files []string) ([]string, error) {
 	return expanded, nil
 }
 
-// stampPath resolves the on-disk quality stamp location under repo/.git.
-// policy.Abs already rejects any resolved location outside repo (including
-// one reached by a .git symlink redirecting elsewhere), so no additional
-// literal-path comparison is needed here. An earlier version compared the
-// resolved path against a raw, unresolved filepath.Join and rejected any
-// mismatch — that broke on any repo whose ancestry includes a legitimate,
-// unrelated symlink (e.g. macOS aliasing /var to /private/var), which is
-// the common case for a temp-directory-backed repo in tests and CI.
+// stampPath resolves the on-disk quality stamp location for a repository.
+//
+// Normal checkouts store the stamp at repo/.git/mivia-agent-quality-stamp.json
+// and keep pathpolicy containment under the repo root (rejecting a .git symlink
+// that escapes the tree). Linked worktrees use a `.git` *file* pointing at a
+// gitdir outside the worktree; there we resolve via `git rev-parse --git-path`
+// and keep the stamp under that worktree gitdir.
 func stampPath(repo string) (string, error) {
-	policy := pathpolicy.NewDefault()
-	if err := policy.Check(repo, stampRelPath); err != nil {
-		return "", err
+	gitMeta := filepath.Join(repo, ".git")
+	info, err := os.Lstat(gitMeta)
+	if err != nil {
+		return "", fmt.Errorf("stat .git: %w", err)
 	}
-	return policy.Abs(repo, stampRelPath)
+	// Directory or symlink: keep the stamp under the repo via pathpolicy.
+	// Symlink escapes still fail Abs containment.
+	if info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		policy := pathpolicy.NewDefault()
+		if err := policy.Check(repo, stampRelPath); err != nil {
+			return "", err
+		}
+		return policy.Abs(repo, stampRelPath)
+	}
+	// Worktree: `.git` is a file with gitdir: <path>.
+	return stampPathWorktree(repo)
+}
+
+func stampPathWorktree(repo string) (string, error) {
+	pathOut, err := exec.Command("git", "-C", repo, "rev-parse", "--git-path", "mivia-agent-quality-stamp.json").Output()
+	if err != nil {
+		return "", fmt.Errorf("resolve worktree stamp path: %w", err)
+	}
+	path := strings.TrimSpace(string(pathOut))
+	if path == "" {
+		return "", fmt.Errorf("empty worktree stamp path")
+	}
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(repo, path)
+	}
+	path = filepath.Clean(path)
+
+	gitDirOut, err := exec.Command("git", "-C", repo, "rev-parse", "--absolute-git-dir").Output()
+	if err != nil {
+		return "", fmt.Errorf("resolve worktree git dir: %w", err)
+	}
+	gitDir := filepath.Clean(strings.TrimSpace(string(gitDirOut)))
+	if gitDir == "" {
+		return "", fmt.Errorf("empty worktree git dir")
+	}
+	rel, err := filepath.Rel(gitDir, path)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("stamp path %q escapes git dir %q", path, gitDir)
+	}
+	return path, nil
 }
 
 func defaultRepo(repo string) string {
