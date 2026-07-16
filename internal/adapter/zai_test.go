@@ -5,6 +5,7 @@ package adapter
 import (
 	"bytes"
 	"context"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +31,22 @@ func TestZaiDetectHeadlessCapability(t *testing.T) {
 	}
 	if !d.HeadlessCapable || d.Version != "0.3.5" {
 		t.Fatalf("Detection = %#v, want headless version 0.3.5", d)
+	}
+}
+
+// TestZaiDetectRealBinary exercises the production default-runner path
+// (OSRunner{}) against the real zai binary. It is the real-subprocess
+// integration closure required by AGENTS.md Testing Standards for shipped
+// adapters; the FakeRunner tests above are not sufficient on their own.
+func TestZaiDetectRealBinary(t *testing.T) {
+	if _, err := exec.LookPath("zai"); err != nil {
+		t.Skip("zai binary not on PATH")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	d, err := (Zai{}).Detect(ctx)
+	if err != nil || d.Name != "zai" || d.HeadlessCapable != true || d.Version == "" {
+		t.Fatalf("Detect = %#v, want headless zai with non-empty version", d)
 	}
 }
 
@@ -166,6 +183,33 @@ func TestZaiRunPassesMaxTurnsAsToolRounds(t *testing.T) {
 	}
 }
 
+// TestZaiRunPassesPromptIntact asserts the prompt is forwarded as the exact
+// value immediately following -p (not dropped, truncated, or shell-escaped),
+// guarding against the regression class where a joined-string Contains check
+// would still pass even if the prompt value itself were mangled.
+func TestZaiRunPassesPromptIntact(t *testing.T) {
+	r := zaiRunner([]byte(`{"role":"assistant","content":"ok"}`), nil)
+	prompt := "multi word prompt with -m and --flag-like substrings"
+	_, err := (Zai{Runner: r}).Run(context.Background(), Request{Prompt: prompt, Approval: "never"})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	args := r.Calls[0].Args
+	idx := -1
+	for i, a := range args {
+		if a == "-p" {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 || idx+1 >= len(args) {
+		t.Fatalf("args = %#v, want -p immediately followed by the prompt value", args)
+	}
+	if args[idx+1] != prompt {
+		t.Fatalf("-p argument = %q, want exact prompt %q", args[idx+1], prompt)
+	}
+}
+
 func TestZaiRunRejectsUnsupportedEffort(t *testing.T) {
 	r := zaiRunner([]byte(`{"role":"assistant","content":"ok"}`), nil)
 	_, err := (Zai{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: "never", Effort: "high"})
@@ -228,6 +272,9 @@ func TestZaiReviewFailsClosedOnUnparseable(t *testing.T) {
 	}
 }
 
+// zaiRunner returns a FakeRunner scripted to respond to the "zai" command with
+// the given stdout and error, matching the helper shape used by codexRunner
+// and claudeRunner.
 func zaiRunner(stdout []byte, err error) *FakeRunner {
 	return &FakeRunner{Scripts: map[string]FakeResponse{"zai": {Result: RunResult{Stdout: stdout}, Err: err}}}
 }
