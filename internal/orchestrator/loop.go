@@ -76,7 +76,13 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 	for iteration := 1; iteration <= max; iteration++ {
 		var last StepResult
 		var lastNode Node
+		// skipRemaining is set when a mid-loop review fails with on_fail:iterate
+		// so later nodes (including protect:) do not run in this iteration.
+		skipRemaining := false
 		for _, node := range nodes {
+			if skipRemaining {
+				break
+			}
 			lastNode = node
 			e.CurrentStamp = ""
 			if _, ok := protectedKind(node.Step); ok {
@@ -104,19 +110,25 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 			if len(last.Verdicts) > 0 {
 				prior = last.Verdicts
 			}
-		}
-		// Review gates only apply when the last node is a review step.
-		if len(lastNode.Step.Reviewers) > 0 {
-			if last.Consensus && loop.ExitWhen == "review-pass" {
-				return result("pass", iteration, nil)
-			}
-			if !last.Consensus {
-				failAction := stepOnFailValue(lastNode.Step.OnFail, "fail")
-				if failAction == "fail" {
+			// Apply review gates immediately so later protect steps never run
+			// after a failed review that demands fail or iterate.
+			if len(node.Step.Reviewers) > 0 && !last.Consensus {
+				failAction := stepOnFailValue(node.Step.OnFail, "fail")
+				switch failAction {
+				case "fail":
 					return result("fail", iteration, errors.New("review gate failed"))
+				case "iterate":
+					skipRemaining = true
 				}
+				// "proceed" continues to subsequent nodes despite the failed review.
 			}
+		}
+		if skipRemaining {
 			continue
+		}
+		// Successful review-pass exit after all nodes in the iteration.
+		if len(lastNode.Step.Reviewers) > 0 && last.Consensus && loop.ExitWhen == "review-pass" {
+			return result("pass", iteration, nil)
 		}
 		// Producer-final protected_action loops pass after a successful protect step.
 		if loop.ExitWhen == "protected_action" {
