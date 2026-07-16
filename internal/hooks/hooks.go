@@ -128,14 +128,15 @@ func IsProtected(raw map[string]any) (policy.ProtectedKind, bool) {
 	}
 	// Check all field pairs: "git" in one field and "push" in another
 	// won't be caught by single-field checks when they are not adjacent in
-	// the extraction order. Use all-pairs to avoid map iteration order
-	// dependence.
+	// the extraction order. Check both join orderings per pair so detection
+	// is independent of Go's nondeterministic map iteration order.
 	for i := 0; i < len(fields); i++ {
 		for j := i + 1; j < len(fields); j++ {
-			joined := fields[i] + " " + fields[j]
-			for _, pattern := range protectedPatterns {
-				if pattern.re.MatchString(joined) {
-					return pattern.kind, true
+			for _, joined := range []string{fields[i] + " " + fields[j], fields[j] + " " + fields[i]} {
+				for _, pattern := range protectedPatterns {
+					if pattern.re.MatchString(joined) {
+						return pattern.kind, true
+					}
 				}
 			}
 		}
