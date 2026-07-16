@@ -64,9 +64,21 @@ type legacyHooks struct {
 	DefaultPolicyProvider string   `yaml:"default_policy_provider"`
 }
 
+// homeDir returns the caller's home directory, honoring a HOME environment
+// override on every platform. os.UserHomeDir already does this on Unix; on
+// Windows it consults %USERPROFILE% instead and ignores HOME entirely,
+// which breaks the HOME-based isolation this repo's tests rely on. Falling
+// back to os.UserHomeDir keeps real (no-override) behavior unchanged.
+func homeDir() (string, error) {
+	if home := os.Getenv("HOME"); home != "" {
+		return home, nil
+	}
+	return os.UserHomeDir()
+}
+
 // Read loads ~/.agents if present. Absence is not an error.
 func Read() (GlobalConfig, error) {
-	home, err := os.UserHomeDir()
+	home, err := homeDir()
 	if err != nil {
 		return GlobalConfig{}, fmt.Errorf("home dir: %w", err)
 	}

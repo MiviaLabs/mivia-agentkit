@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -361,36 +362,82 @@ func mustWrite(t *testing.T, path, data string) {
 	}
 }
 
+// writeCrushStub builds a real, native crush executable rather than a
+// POSIX shell script: Go's exec package does not interpret shebangs on
+// Windows, so a "#!/bin/sh" script fails to launch there. Compiling a
+// tiny Go program (the same approach test/integration's buildStubCLI
+// uses) produces a stub that behaves identically on every platform.
 func writeCrushStub(t *testing.T, dir string) {
 	t.Helper()
-	path := filepath.Join(dir, "crush")
-	script := `#!/bin/sh
-set -eu
-if [ "$#" -eq 1 ] && [ "$1" = "--version" ]; then
-  printf 'crush version v0.79.1\n'
-  exit 0
-fi
-if [ "$#" -eq 2 ] && [ "$1" = "run" ] && [ "$2" = "--help" ]; then
-  printf 'Run a single prompt in non-interactive mode and exit.\n'
-  printf 'The prompt can be provided as arguments or piped from stdin.\n'
-  printf 'USAGE\n  crush run [prompt...] [--flags]\n'
-  exit 0
-fi
-if [ "$#" -gt 0 ] && [ "$1" = "run" ]; then
-  : "${CRUSH_STUB_DIR:?}"
-  printf '%s\n' "$@" >> "$CRUSH_STUB_DIR/run.args"
-  stdin=$(cat)
-  printf '%s\n---CALL---\n' "$stdin" >> "$CRUSH_STUB_DIR/run.stdin"
-  case "$stdin" in
-    *"Return JSON only"*) printf '{"pass":true,"severity":"low","notes":"ok"}\n' ;;
-    *) printf 'crush artifact\n' ;;
-  esac
-  exit 0
-fi
-exit 64
+	srcDir := filepath.Join(dir, "crush-src")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(%s) error = %v", srcDir, err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "go.mod"), []byte("module crushstub\n\ngo 1.22\n"), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	program := `package main
+
+import (
+	"fmt"
+	"io"
+	"os"
+	"strings"
+)
+
+func main() {
+	args := os.Args[1:]
+	if len(args) == 1 && args[0] == "--version" {
+		fmt.Print("crush version v0.79.1\n")
+		return
+	}
+	if len(args) == 2 && args[0] == "run" && args[1] == "--help" {
+		fmt.Print("Run a single prompt in non-interactive mode and exit.\n")
+		fmt.Print("The prompt can be provided as arguments or piped from stdin.\n")
+		fmt.Print("USAGE\n  crush run [prompt...] [--flags]\n")
+		return
+	}
+	if len(args) > 0 && args[0] == "run" {
+		stubDir := os.Getenv("CRUSH_STUB_DIR")
+		if stubDir == "" {
+			fmt.Fprintln(os.Stderr, "CRUSH_STUB_DIR is required")
+			os.Exit(1)
+		}
+		argsFile, err := os.OpenFile(stubDir+string(os.PathSeparator)+"run.args", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Fprintln(argsFile, strings.Join(args, "\n"))
+		argsFile.Close()
+
+		stdinData, _ := io.ReadAll(os.Stdin)
+		stdinFile, err := os.OpenFile(stubDir+string(os.PathSeparator)+"run.stdin", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Fprintf(stdinFile, "%s\n---CALL---\n", string(stdinData))
+		stdinFile.Close()
+
+		if strings.Contains(string(stdinData), "Return JSON only") {
+			fmt.Print("{\"pass\":true,\"severity\":\"low\",\"notes\":\"ok\"}\n")
+		} else {
+			fmt.Print("crush artifact\n")
+		}
+		return
+	}
+	os.Exit(64)
+}
 `
-	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
-		t.Fatalf("write crush stub: %v", err)
+	if err := os.WriteFile(filepath.Join(srcDir, "main.go"), []byte(program), 0o644); err != nil {
+		t.Fatalf("write crush stub source: %v", err)
+	}
+	bin := filepath.Join(dir, "crush"+binarySuffix())
+	cmd := exec.Command("go", "build", "-buildvcs=false", "-o", bin, ".")
+	cmd.Dir = srcDir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("go build crush stub: %v\n%s", err, out)
 	}
 }
 
