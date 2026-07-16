@@ -271,6 +271,35 @@ func TestExecuteStepRecordsPolicyDecisionRef(t *testing.T) {
 	}
 }
 
+func TestDecideReceivesStampForProtectedStep(t *testing.T) {
+	prov := &recordingPolicy{}
+	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}})
+	e.Policy = prov
+	e.CurrentStamp = "stamp-head-abc"
+	_, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: config.Step{ID: "protect", Producer: "codex", Approval: "protect:commit"}}, 1)
+	if err != nil {
+		t.Fatalf("ExecuteStep error = %v", err)
+	}
+	if prov.last.Stamp != "stamp-head-abc" {
+		t.Fatalf("policy Action.Stamp = %q, want stamp-head-abc", prov.last.Stamp)
+	}
+	if prov.last.Kind != policy.ActionProtect || prov.last.ProtectedKind != policy.ProtectedCommit {
+		t.Fatalf("policy action = %+v, want protect:commit", prov.last)
+	}
+}
+
+func TestStepConsensusInheritsMinReviewers(t *testing.T) {
+	// Step only sets mode; MinReviewers must inherit from DefaultConsensus (2).
+	// A single reviewer must fail min_reviewers rather than silently pass.
+	e := testEngine(t, scriptedAdapter{name: "a", verdict: adapter.Verdict{Pass: true}})
+	e.DefaultConsensus = consensus.Policy{Mode: consensus.Majority, MinReviewers: 2, TieBreaker: consensus.Strict}
+	step := config.Step{ID: "review", Reviewers: []string{"a"}, Consensus: config.Consensus{Mode: "majority"}}
+	_, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: step}, 1)
+	if err == nil || !errors.Is(err, consensus.ErrMinReviewersUnsatisfied) {
+		t.Fatalf("ExecuteStep error = %v, want ErrMinReviewersUnsatisfied", err)
+	}
+}
+
 func TestExecuteReviewUsesConsensusPolicy(t *testing.T) {
 	// 3 reviewers: 2 pass, 1 fail. Majority consensus passes; the old
 	// unanimity implementation returned false here, so this is the key
@@ -482,11 +511,15 @@ func (v *validatingReviewAdapter) Review(context.Context, adapter.Request) (adap
 	return v.verdict, nil
 }
 
-type recordingPolicy struct{ calls int }
+type recordingPolicy struct {
+	calls int
+	last  policy.Action
+}
 
 func (r *recordingPolicy) Name() string { return "recording" }
 func (r *recordingPolicy) Decide(ctx context.Context, action policy.Action) (policy.Decision, error) {
 	r.calls++
+	r.last = action
 	return (policy.Decision{Allowed: true, Reason: "ok"}).EnsureRef(r.Name(), action), nil
 }
 func (r *recordingPolicy) Record(context.Context, policy.Event) error { return nil }

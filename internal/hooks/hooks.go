@@ -73,7 +73,8 @@ func Decide(ctx context.Context, p Payload, stamp StampChecker, pol policy.Provi
 	}
 	data, err := s.Marshal()
 	if err != nil {
-		return Outcome{}, err
+		// Fail closed: never leave host CLIs without an explicit deny decision.
+		return Outcome{Allow: false, Reason: fmt.Sprintf("stamp marshal failed: %v", err), Kind: kind}, nil
 	}
 	decision, err := pol.Decide(ctx, policy.Action{
 		Kind:          policy.ActionProtect,
@@ -81,7 +82,9 @@ func Decide(ctx context.Context, p Payload, stamp StampChecker, pol policy.Provi
 		Stamp:         strings.TrimSpace(string(data)),
 	})
 	if err != nil {
-		return Outcome{}, err
+		// Fail closed: policy/audit errors must deny protected actions so
+		// adapters emit Claude exit-2 / Codex deny JSON instead of exit 1.
+		return Outcome{Allow: false, Reason: fmt.Sprintf("policy decision failed: %v", err), Kind: kind}, nil
 	}
 	if !decision.Allowed {
 		return Outcome{Allow: false, Reason: decision.Reason, Kind: kind}, nil
@@ -122,11 +125,91 @@ var protectedPatterns = func() []struct {
 // call executes.
 func IsProtected(raw map[string]any) (policy.ProtectedKind, bool) {
 	for _, text := range commandTexts(raw) {
+		if kind, ok := detectGitLikeProtected(text); ok {
+			return kind, true
+		}
 		for _, pattern := range protectedPatterns {
 			if pattern.re.MatchString(text) {
 				return pattern.kind, true
 			}
 		}
+	}
+	return "", false
+}
+
+// detectGitLikeProtected finds git/gh subcommands after global flags so forms
+// like `git -C repo push` and `git --no-pager commit` still gate.
+func detectGitLikeProtected(text string) (policy.ProtectedKind, bool) {
+	tokens := strings.Fields(text)
+	for i := 0; i < len(tokens); i++ {
+		tool := normalizeExeBase(tokens[i])
+		switch tool {
+		case "git":
+			sub, ok := nextGitSubcommand(tokens[i+1:])
+			if !ok {
+				continue
+			}
+			switch sub {
+			case "commit":
+				return policy.ProtectedCommit, true
+			case "push":
+				return policy.ProtectedPush, true
+			}
+		case "gh":
+			sub, ok := nextSimpleSubcommand(tokens[i+1:])
+			if !ok {
+				continue
+			}
+			switch sub {
+			case "pr":
+				return policy.ProtectedPullRequest, true
+			case "release":
+				return policy.ProtectedRelease, true
+			}
+		}
+	}
+	return "", false
+}
+
+// nextGitSubcommand skips git global options (including those that take an
+// argument) and returns the first positional subcommand token.
+func nextGitSubcommand(tokens []string) (string, bool) {
+	// Global options that consume a following argument.
+	takesArg := map[string]struct{}{
+		"-C": {}, "-c": {}, "--git-dir": {}, "--work-tree": {},
+		"--namespace": {}, "--config-env": {}, "--super-prefix": {},
+		"--list-cmds": {}, "-o": {},
+	}
+	for i := 0; i < len(tokens); i++ {
+		tok := tokens[i]
+		if tok == "" {
+			continue
+		}
+		if !strings.HasPrefix(tok, "-") {
+			return strings.ToLower(tok), true
+		}
+		// --flag=value forms carry their own argument.
+		if strings.Contains(tok, "=") {
+			continue
+		}
+		// -c key=value can appear as two tokens when split on spaces only when
+		// written as `-c key=value`; Fields keeps key=value as one token after -c.
+		if _, ok := takesArg[tok]; ok {
+			i++ // skip argument
+			continue
+		}
+		// Bare global flags: --no-pager, --bare, -p, etc.
+	}
+	return "", false
+}
+
+// nextSimpleSubcommand returns the first non-flag token (for gh-style CLIs).
+func nextSimpleSubcommand(tokens []string) (string, bool) {
+	for _, tok := range tokens {
+		if tok == "" || strings.HasPrefix(tok, "-") {
+			continue
+		}
+		return strings.ToLower(tok), true
 	}
 	return "", false
 }

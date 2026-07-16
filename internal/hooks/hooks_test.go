@@ -5,6 +5,7 @@ package hooks
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/policy"
@@ -29,6 +30,48 @@ func TestIsProtectedDetectsDeploy(t *testing.T) {
 	got, ok := IsProtected(map[string]any{"command": "deploy production"})
 	if !ok || got != policy.ProtectedDeploy {
 		t.Fatalf("IsProtected() = %q, %v; want deploy, true", got, ok)
+	}
+}
+
+func TestIsProtectedDetectsGitWithGlobalFlags(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload map[string]any
+		want    policy.ProtectedKind
+	}{
+		{
+			"git -C path push",
+			map[string]any{"command": "git -C /tmp/repo push origin main"},
+			policy.ProtectedPush,
+		},
+		{
+			"git --no-pager commit",
+			map[string]any{"command": "git --no-pager commit -m x"},
+			policy.ProtectedCommit,
+		},
+		{
+			"git -c commit.gpgsign=false commit",
+			map[string]any{"command": "git -c commit.gpgsign=false commit -m x"},
+			policy.ProtectedCommit,
+		},
+		{
+			"structured program git with -C and push",
+			map[string]any{"program": "git", "args": []any{"-C", "/tmp/repo", "push", "origin"}},
+			policy.ProtectedPush,
+		},
+		{
+			"git --git-dir=.git push",
+			map[string]any{"command": "git --git-dir=.git push"},
+			policy.ProtectedPush,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := IsProtected(tc.payload)
+			if !ok || got != tc.want {
+				t.Fatalf("IsProtected() = %q, %v; want %q, true", got, ok, tc.want)
+			}
+		})
 	}
 }
 
@@ -224,6 +267,19 @@ func TestDecideAllowsProtectedWithFreshStampAndPolicyAllow(t *testing.T) {
 	}
 }
 
+func TestDecidePolicyErrorFailsClosed(t *testing.T) {
+	out, err := Decide(context.Background(), Payload{Raw: map[string]any{"command": "git push"}}, stampOK{}, errProvider{err: errors.New("audit write failed")})
+	if err != nil {
+		t.Fatalf("Decide() error = %v; want deny outcome without error", err)
+	}
+	if out.Allow {
+		t.Fatalf("Decide().Allow = true; want fail-closed deny")
+	}
+	if !strings.Contains(out.Reason, "policy decision failed") {
+		t.Fatalf("Decide().Reason = %q; want policy decision failed", out.Reason)
+	}
+}
+
 func TestMalformedPayloadFailsClosedForProtectedAction(t *testing.T) {
 	out, err := Decide(context.Background(), Payload{Raw: map[string]any{"tool": "bash", "malformed": "git commit"}}, stampOK{}, policy.Noop{AuditPath: tempAudit(t)})
 	if err != nil {
@@ -256,6 +312,18 @@ func (denyProvider) Decide(context.Context, policy.Action) (policy.Decision, err
 
 func (denyProvider) Record(context.Context, policy.Event) error {
 	return errors.New("not used")
+}
+
+type errProvider struct{ err error }
+
+func (e errProvider) Name() string { return "err" }
+
+func (e errProvider) Decide(context.Context, policy.Action) (policy.Decision, error) {
+	return policy.Decision{}, e.err
+}
+
+func (e errProvider) Record(context.Context, policy.Event) error {
+	return e.err
 }
 
 func tempAudit(t *testing.T) string {

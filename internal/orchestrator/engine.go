@@ -36,7 +36,10 @@ type Engine struct {
 	Repo             string
 	PriorVerdicts    []adapter.Verdict
 	CurrentArtifact  string
-	MaxIterations    int
+	// CurrentStamp is the fresh quality stamp head/hash bound into protect
+	// policy decisions for the step currently under execution.
+	CurrentStamp  string
+	MaxIterations int
 }
 
 // StepResult is the output of one executed step.
@@ -52,7 +55,7 @@ type StepResult struct {
 
 // ExecuteStep executes one producer or review node.
 func (e Engine) ExecuteStep(ctx context.Context, runID runstore.RunID, node Node, iteration int) (StepResult, error) {
-	refs, decisions, err := e.decide(ctx, runID, node.Step, "")
+	refs, decisions, err := e.decide(ctx, runID, node.Step, e.CurrentStamp)
 	if err != nil {
 		return StepResult{}, err
 	}
@@ -292,6 +295,17 @@ func stepConsensusPolicy(step config.Consensus, fallback consensus.Policy) conse
 			MinReviewers: step.MinReviewers,
 			TieBreaker:   consensus.TieBreaker(step.TieBreaker),
 			Weights:      config.WeightsToFloat(step.Weights),
+		}
+		// Inherit unset fields from the manifest/engine default so a step that
+		// only sets mode cannot silently drop min_reviewers or tie-breakers.
+		if p.MinReviewers == 0 {
+			p.MinReviewers = fallback.MinReviewers
+		}
+		if p.TieBreaker == "" {
+			p.TieBreaker = fallback.TieBreaker
+		}
+		if len(p.Weights) == 0 {
+			p.Weights = fallback.Weights
 		}
 		if step.Mode == "weighted" {
 			p.Threshold = fallback.Threshold

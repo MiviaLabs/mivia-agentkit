@@ -67,6 +67,70 @@ func TestHookMalformedBenignStdinAllowsWithWarning(t *testing.T) {
 	}
 }
 
+func TestHookClaudePolicyErrorExit2(t *testing.T) {
+	// Force policy/audit path failure after a fresh stamp so Decide maps the
+	// provider error to Allow=false and Claude gets exit 2 (not bare exit 1).
+	repo := t.TempDir()
+	// Seed a valid stamp so we pass the stamp gate and hit policy.Record.
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatalf("mkdir .git: %v", err)
+	}
+	// Create a non-directory at .ai so audit write fails inside Noop.Record.
+	if err := os.WriteFile(filepath.Join(repo, ".ai"), []byte("not-a-dir"), 0o644); err != nil {
+		t.Fatalf("write .ai file: %v", err)
+	}
+	// Stamp must exist and be "fresh" enough — CheckStamp needs a real stamp.
+	// Use preflight via empty repo is hard without git; instead write a stamp
+	// JSON and rely on CheckStamp failure path being different. When stamp
+	// fails we already get exit 2. For policy error we need stamp OK.
+	// Initialize a minimal git repo and write a stamp through preflight.
+	run := exec.Command("git", "init", "-q")
+	run.Dir = repo
+	if out, err := run.CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+	for _, args := range [][]string{
+		{"config", "user.email", "test@example.invalid"},
+		{"config", "user.name", "Test"},
+		{"config", "commit.gpgsign", "false"},
+		{"commit", "-q", "--allow-empty", "-m", "init"},
+	} {
+		c := exec.Command("git", args...)
+		c.Dir = repo
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	// Remove the blocking .ai file, run preflight to write stamp, then re-block.
+	_ = os.Remove(filepath.Join(repo, ".ai"))
+	pre := exec.Command("go", "run", "./cmd/mivia-agent", "preflight", "--repo", repo, "--pipeline-preflight")
+	pre.Dir = "../.."
+	if out, err := pre.CombinedOutput(); err != nil {
+		t.Fatalf("preflight: %v\n%s", err, out)
+	}
+	if err := os.RemoveAll(filepath.Join(repo, ".ai")); err != nil {
+		t.Fatalf("remove .ai: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, ".ai"), []byte("not-a-dir"), 0o644); err != nil {
+		t.Fatalf("reblock .ai: %v", err)
+	}
+
+	_, stderr, err := runAgentHookInRepo(t, repo, "claude", "pre-tool-use", `{"tool":"bash","command":"git push"}`)
+	if err == nil {
+		t.Fatalf("hook claude policy error = nil; want exit 2")
+	}
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 2 {
+		t.Fatalf("hook claude error = %v (stderr=%q); want exit 2", err, stderr)
+	}
+	if !strings.Contains(stderr, "policy decision failed") && !strings.Contains(stderr, "audit") && !strings.Contains(stderr, "create audit") {
+		// Reason is printed via ClaudeExitError; accept any fail-closed deny reason.
+		if strings.TrimSpace(stderr) == "" {
+			t.Fatalf("stderr empty; want deny reason for policy failure")
+		}
+	}
+}
+
 func TestHookHonorsManifestGovernanceProvider(t *testing.T) {
 	repo := t.TempDir()
 	// Non-noop provider must be selected from the manifest; agt fails closed

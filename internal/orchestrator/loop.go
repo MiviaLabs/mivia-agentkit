@@ -75,13 +75,16 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 		var lastNode Node
 		for _, node := range nodes {
 			lastNode = node
+			e.CurrentStamp = ""
 			if _, ok := protectedKind(node.Step); ok {
 				if e.Stamp == nil {
 					return result("", iteration, ErrStaleStamp)
 				}
-				if _, err := e.Stamp(e.Repo); err != nil {
+				stampVal, err := e.Stamp(e.Repo)
+				if err != nil {
 					return result("", iteration, fmt.Errorf("%w: %v", ErrStaleStamp, err))
 				}
+				e.CurrentStamp = stampVal
 			}
 			e.PriorVerdicts = prior
 			e.CurrentArtifact = currentArtifact
@@ -97,13 +100,23 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 				prior = last.Verdicts
 			}
 		}
-		if last.Consensus && loop.ExitWhen == "review-pass" {
-			return result("pass", iteration, nil)
+		// Review gates only apply when the last node is a review step.
+		if len(lastNode.Step.Reviewers) > 0 {
+			if last.Consensus && loop.ExitWhen == "review-pass" {
+				return result("pass", iteration, nil)
+			}
+			if !last.Consensus {
+				failAction := stepOnFailValue(lastNode.Step.OnFail, "fail")
+				if failAction == "fail" {
+					return result("fail", iteration, errors.New("review gate failed"))
+				}
+			}
+			continue
 		}
-		if !last.Consensus {
-			failAction := stepOnFailValue(lastNode.Step.OnFail, "fail")
-			if failAction == "fail" {
-				return result("fail", iteration, errors.New("review gate failed"))
+		// Producer-final protected_action loops pass after a successful protect step.
+		if loop.ExitWhen == "protected_action" {
+			if _, ok := protectedKind(lastNode.Step); ok {
+				return result("pass", iteration, nil)
 			}
 		}
 	}

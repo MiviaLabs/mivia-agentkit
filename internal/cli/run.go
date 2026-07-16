@@ -83,6 +83,10 @@ func newRunCommand() *cobra.Command {
 				}
 				return err
 			}
+			// on_exhausted: warn returns outcome=warn with err=nil; --strict must still fail.
+			if result.Outcome == "warn" && strict {
+				return fmt.Errorf("strict mode rejects warn outcome")
+			}
 			return nil
 		},
 	}

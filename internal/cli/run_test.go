@@ -313,6 +313,29 @@ func TestRunStrictFailsOnFirstPassConsensusForProtectBound(t *testing.T) {
 	}
 }
 
+func TestRunStrictFailsWarnOutcome(t *testing.T) {
+	repo := t.TempDir()
+	mustWrite(t, filepath.Join(repo, ".ai/workflows/research.yaml"), "bound: iterations\nmax_iterations: 1\nsteps:\n- id: research\n  producer: codex\n  artifact: research.md\n- id: review\n  reviewers: [codex, claude]\n  artifact: research.md\n  on_fail: iterate\nexit_when: review-pass\non_exhausted: warn\n")
+	withRuntimeAdapters(t,
+		fakeCLIAdapter{name: "codex", headless: true, run: adapter.Result{Stdout: []byte("artifact")}, verdict: adapter.Verdict{Pass: false, Severity: "high", Notes: "no"}},
+		fakeCLIAdapter{name: "claude", headless: true, verdict: adapter.Verdict{Pass: false, Severity: "high", Notes: "no"}},
+	)
+
+	// Without --strict, warn outcome is success (exit 0).
+	cmd := newRunCommand()
+	cmd.SetArgs([]string{"--repo", repo, "--workflow", "research", "--max-iterations", "1"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("run without strict error = %v, want nil for warn outcome", err)
+	}
+
+	// With --strict, warn outcome must fail.
+	strictCmd := newRunCommand()
+	strictCmd.SetArgs([]string{"--repo", repo, "--workflow", "research", "--max-iterations", "1", "--strict"})
+	if err := strictCmd.Execute(); err == nil {
+		t.Fatalf("run --strict error = nil, want fail on warn outcome")
+	}
+}
+
 func repoWithResearchLoop(t *testing.T) string {
 	t.Helper()
 	repo := t.TempDir()

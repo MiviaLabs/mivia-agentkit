@@ -113,6 +113,22 @@ func TestLoopRequiresFreshStampBeforeProtectedStep(t *testing.T) {
 	}
 }
 
+func TestLoopPassesProtectedActionProducer(t *testing.T) {
+	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}})
+	e.Stamp = func(repo string) (string, error) { return "fresh-head", nil }
+	loop := config.Loop{
+		Bound: "iterations", MaxIterations: 1, ExitWhen: "protected_action", OnExhausted: "fail",
+		Steps: []config.Step{{ID: "protect", Producer: "codex", Approval: "protect:commit"}},
+	}
+	res, err := e.RunLoop(context.Background(), loop, nil)
+	if err != nil {
+		t.Fatalf("RunLoop error = %v", err)
+	}
+	if res.Outcome != "pass" || res.Iterations != 1 {
+		t.Fatalf("result = %#v, want pass in 1 iteration for protected_action producer", res)
+	}
+}
+
 func TestLoopHonorsMaxIterationsOverrideWithinManifestBound(t *testing.T) {
 	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}}, sequenceReviewer("claude", false))
 	e.MaxIterations = 2
