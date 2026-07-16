@@ -128,10 +128,14 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 	if loop.OnExhausted == "fail" {
 		return result("fail", max, errors.New("loop exhausted"))
 	}
-	if err := e.Store.AppendTrace(runID, runstore.TraceEvent{Kind: "loop.exhausted", Payload: map[string]any{"on_exhausted": loop.OnExhausted}}); err != nil {
-		return result("warn", max, fmt.Errorf("append exhaust trace: %w", err))
+	outcome := "warn"
+	if loop.OnExhausted == "proceed" {
+		outcome = "proceed"
 	}
-	return result("warn", max, nil)
+	if err := e.Store.AppendTrace(runID, runstore.TraceEvent{Kind: "loop.exhausted", Payload: map[string]any{"on_exhausted": loop.OnExhausted}}); err != nil {
+		return result(outcome, max, fmt.Errorf("append exhaust trace: %w", err))
+	}
+	return result(outcome, max, nil)
 }
 
 func stepOnFailValue(onFail, fallback string) string {

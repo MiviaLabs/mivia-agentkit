@@ -97,6 +97,17 @@ func TestLoopWarnsOnExhaustionWithOnExhaustedWarn(t *testing.T) {
 	AssertNoLeaks(t, e.Store.Dir(res.Trace))
 }
 
+func TestLoopProceedOnExhaustionDistinctFromWarn(t *testing.T) {
+	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}}, sequenceReviewer("claude", false))
+	res, err := e.RunLoop(context.Background(), testLoop(1, "iterate", "proceed"), nil)
+	if err != nil {
+		t.Fatalf("RunLoop error = %v", err)
+	}
+	if res.Outcome != "proceed" {
+		t.Fatalf("outcome = %q, want proceed (not warn)", res.Outcome)
+	}
+}
+
 func TestLoopRejectsBudgetBoundInMVP(t *testing.T) {
 	e := testEngine(t)
 	_, err := e.RunLoop(context.Background(), config.Loop{Bound: "budget", MaxIterations: 1}, nil)

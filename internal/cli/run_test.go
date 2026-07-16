@@ -396,6 +396,21 @@ func TestRunStrictFailsWarnOutcome(t *testing.T) {
 	}
 }
 
+func TestRunStrictAllowsProceedOutcome(t *testing.T) {
+	repo := t.TempDir()
+	mustWrite(t, filepath.Join(repo, ".ai/workflows/research.yaml"), "bound: iterations\nmax_iterations: 1\nsteps:\n- id: research\n  producer: codex\n  artifact: research.md\n- id: review\n  reviewers: [codex, claude]\n  artifact: research.md\n  on_fail: iterate\nexit_when: review-pass\non_exhausted: proceed\n")
+	withRuntimeAdapters(t,
+		fakeCLIAdapter{name: "codex", headless: true, run: adapter.Result{Stdout: []byte("artifact")}, verdict: adapter.Verdict{Pass: false, Severity: "high", Notes: "no"}},
+		fakeCLIAdapter{name: "claude", headless: true, verdict: adapter.Verdict{Pass: false, Severity: "high", Notes: "no"}},
+	)
+	// proceed is success-with-note, not warn; --strict must not reject it.
+	cmd := newRunCommand()
+	cmd.SetArgs([]string{"--repo", repo, "--workflow", "research", "--max-iterations", "1", "--strict"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("run --strict with proceed error = %v, want nil", err)
+	}
+}
+
 func repoWithResearchLoop(t *testing.T) string {
 	t.Helper()
 	repo := t.TempDir()
