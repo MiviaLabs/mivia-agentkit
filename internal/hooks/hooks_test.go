@@ -33,6 +33,48 @@ func TestIsProtectedDetectsDeploy(t *testing.T) {
 	}
 }
 
+func TestIsProtectedDetectsQuotedGitAndGhPaths(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload map[string]any
+		want    policy.ProtectedKind
+	}{
+		{
+			"quoted unix git path push",
+			map[string]any{"command": `"/usr/bin/git" push origin main`},
+			policy.ProtectedPush,
+		},
+		{
+			"quoted windows git.exe path with spaces",
+			map[string]any{"command": `"C:\Program Files\Git\cmd\git.exe" push origin`},
+			policy.ProtectedPush,
+		},
+		{
+			"quoted subcommand",
+			map[string]any{"command": `git "commit" -m x`},
+			policy.ProtectedCommit,
+		},
+		{
+			"single-quoted git and push",
+			map[string]any{"command": `'/usr/bin/git' 'push' origin`},
+			policy.ProtectedPush,
+		},
+		{
+			"quoted gh path pr",
+			map[string]any{"command": `"/usr/local/bin/gh" pr create`},
+			policy.ProtectedPullRequest,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := IsProtected(tc.payload)
+			if !ok || got != tc.want {
+				t.Fatalf("IsProtected() = %q, %v; want %q, true", got, ok, tc.want)
+			}
+		})
+	}
+}
+
 func TestIsProtectedDetectsGitWithGlobalFlags(t *testing.T) {
 	cases := []struct {
 		name    string

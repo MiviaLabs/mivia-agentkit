@@ -140,7 +140,7 @@ func IsProtected(raw map[string]any) (policy.ProtectedKind, bool) {
 // detectGitLikeProtected finds git/gh subcommands after global flags so forms
 // like `git -C repo push` and `git --no-pager commit` still gate.
 func detectGitLikeProtected(text string) (policy.ProtectedKind, bool) {
-	tokens := strings.Fields(text)
+	tokens := shellTokens(text)
 	for i := 0; i < len(tokens); i++ {
 		tool := normalizeExeBase(tokens[i])
 		switch tool {
@@ -171,6 +171,49 @@ func detectGitLikeProtected(text string) (policy.ProtectedKind, bool) {
 	return "", false
 }
 
+// shellTokens splits command text on spaces while keeping single- and
+// double-quoted segments intact (including paths with spaces).
+func shellTokens(text string) []string {
+	var out []string
+	var b strings.Builder
+	var quote rune // 0, '\'' or '"'
+	flush := func() {
+		if b.Len() == 0 {
+			return
+		}
+		out = append(out, b.String())
+		b.Reset()
+	}
+	for _, r := range text {
+		switch {
+		case quote != 0:
+			if r == quote {
+				quote = 0
+				continue
+			}
+			b.WriteRune(r)
+		case r == '\'' || r == '"':
+			quote = r
+		case r == ' ' || r == '\t' || r == '\n' || r == '\r':
+			flush()
+		default:
+			b.WriteRune(r)
+		}
+	}
+	flush()
+	return out
+}
+
+// stripQuotes removes one layer of matching single or double quotes.
+func stripQuotes(s string) string {
+	if len(s) >= 2 {
+		if (s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'') {
+			return s[1 : len(s)-1]
+		}
+	}
+	return s
+}
+
 // nextGitSubcommand skips git global options (including those that take an
 // argument) and returns the first positional subcommand token.
 func nextGitSubcommand(tokens []string) (string, bool) {
@@ -181,7 +224,7 @@ func nextGitSubcommand(tokens []string) (string, bool) {
 		"--list-cmds": {}, "-o": {},
 	}
 	for i := 0; i < len(tokens); i++ {
-		tok := tokens[i]
+		tok := stripQuotes(tokens[i])
 		if tok == "" {
 			continue
 		}
@@ -206,6 +249,7 @@ func nextGitSubcommand(tokens []string) (string, bool) {
 // nextSimpleSubcommand returns the first non-flag token (for gh-style CLIs).
 func nextSimpleSubcommand(tokens []string) (string, bool) {
 	for _, tok := range tokens {
+		tok = stripQuotes(tok)
 		if tok == "" || strings.HasPrefix(tok, "-") {
 			continue
 		}
@@ -250,10 +294,13 @@ func commandTexts(raw map[string]any) []string {
 	return out
 }
 
-// normalizeExeBase strips Windows executable suffixes and path prefixes so
-// git.exe / C:\Program Files\Git\cmd\git.cmd match the same patterns as git.
+// normalizeExeBase strips quotes, Windows executable suffixes, and path
+// prefixes so git.exe / "C:\Program Files\Git\cmd\git.cmd" match as git.
 func normalizeExeBase(name string) string {
-	base := filepath.Base(strings.TrimSpace(name))
+	clean := strings.TrimSpace(stripQuotes(name))
+	// Accept both slash styles so Windows paths tokenize correctly on Linux CI.
+	clean = strings.ReplaceAll(clean, `\`, "/")
+	base := filepath.Base(clean)
 	lower := strings.ToLower(base)
 	for _, ext := range []string{".exe", ".cmd", ".bat", ".com"} {
 		if strings.HasSuffix(lower, ext) {
