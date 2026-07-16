@@ -168,6 +168,32 @@ func TestProtectDoesNotRunAfterFailedReview(t *testing.T) {
 	}
 }
 
+func TestInvalidOnFailDoesNotRunProtect(t *testing.T) {
+	var protectRuns int
+	protect := scriptedAdapter{name: "protect", run: adapter.Result{Stdout: []byte("protected")}, runCalls: &protectRuns}
+	e := testEngine(t,
+		scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}},
+		sequenceReviewer("claude", false),
+		protect,
+	)
+	e.Stamp = func(repo string) (string, error) { return "fresh-head", nil }
+	loop := config.Loop{
+		Bound: "iterations", MaxIterations: 1, ExitWhen: "protected_action", OnExhausted: "fail",
+		Steps: []config.Step{
+			{ID: "produce", Producer: "codex"},
+			{ID: "review", Reviewers: []string{"claude"}, OnFail: "typo"},
+			{ID: "protect", Producer: "protect", Approval: "protect:commit"},
+		},
+	}
+	res, err := e.RunLoop(context.Background(), loop, nil)
+	if err == nil || res.Outcome != "fail" {
+		t.Fatalf("result=%#v err=%v, want fail closed on unknown on_fail", res, err)
+	}
+	if protectRuns != 0 {
+		t.Fatalf("protect runs = %d, want 0 for invalid on_fail", protectRuns)
+	}
+}
+
 func TestProtectedStepPreservesErrNoStamp(t *testing.T) {
 	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}})
 	e.Stamp = func(repo string) (string, error) { return "", preflight.ErrNoStamp }

@@ -115,12 +115,14 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 			if len(node.Step.Reviewers) > 0 && !last.Consensus {
 				failAction := stepOnFailValue(node.Step.OnFail, "fail")
 				switch failAction {
-				case "fail":
-					return result("fail", iteration, errors.New("review gate failed"))
 				case "iterate":
 					skipRemaining = true
+				case "proceed":
+					// Continue to subsequent nodes despite the failed review.
+				default:
+					// Unknown/empty-default "fail" and any typo: fail closed.
+					return result("fail", iteration, errors.New("review gate failed"))
 				}
-				// "proceed" continues to subsequent nodes despite the failed review.
 			}
 		}
 		if skipRemaining {

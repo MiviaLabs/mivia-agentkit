@@ -47,6 +47,14 @@ func TestValidateRejectsBadTimeout(t *testing.T) {
 	}
 }
 
+func TestLoopRejectsUnknownOnFail(t *testing.T) {
+	loop := validLoop()
+	loop.Steps[0].OnFail = "typo"
+	if err := loop.Validate(enabledAdapters()); err == nil || !strings.Contains(err.Error(), "on_fail") {
+		t.Fatalf("Validate() error = %v, want unknown on_fail rejection", err)
+	}
+}
+
 func TestLoopValidateRejectsUnknownAdapter(t *testing.T) {
 	loop := validLoop()
 	loop.Steps[0].Producer = "missing"

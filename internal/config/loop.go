@@ -92,6 +92,13 @@ func (l *Loop) Validate(enabledAdapters map[string]AdapterRole) error {
 				return fmt.Errorf("step %q timeout must be positive", step.ID)
 			}
 		}
+		if step.OnFail != "" {
+			switch step.OnFail {
+			case "fail", "iterate", "proceed":
+			default:
+				return fmt.Errorf("step %q unknown on_fail %q", step.ID, step.OnFail)
+			}
+		}
 		if step.Producer != "" {
 			role, ok := enabledAdapters[step.Producer]
 			if !ok {
