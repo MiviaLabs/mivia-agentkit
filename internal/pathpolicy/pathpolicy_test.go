@@ -54,3 +54,45 @@ func TestPathPolicyAbsRejectsAbsOutsideRepo(t *testing.T) {
 		t.Fatal("Abs() error = nil, want absolute outside rejection")
 	}
 }
+
+// TestPathPolicyAllowsSymlinkedRepoRootForExistingFile reproduces the
+// macOS/Windows CI failure where the repo root is only reachable through an
+// alias (a symlink such as macOS's /var -> /private/var, or an OS
+// short-name form) while an already-written file resolves to its canonical
+// path. Comparing an unresolved root against a resolved leaf made every
+// generated-artifact validation look like an escape.
+func TestPathPolicyAllowsSymlinkedRepoRootForExistingFile(t *testing.T) {
+	p := NewDefault()
+	real := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(real, "sub"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(real, "sub", "file.txt"), []byte("data"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	alias := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(real, alias); err != nil {
+		t.Fatalf("Symlink() error = %v", err)
+	}
+	if _, err := p.Abs(alias, filepath.Join("sub", "file.txt")); err != nil {
+		t.Fatalf("Abs() error = %v, want existing file under aliased root accepted", err)
+	}
+}
+
+// TestPathPolicyAllowsSymlinkedRepoRootForNotYetWrittenFile covers the
+// companion case: the leaf being validated does not exist yet (e.g. output
+// about to be written), so only the ancestor directories can be resolved.
+func TestPathPolicyAllowsSymlinkedRepoRootForNotYetWrittenFile(t *testing.T) {
+	p := NewDefault()
+	real := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(real, "sub"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	alias := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(real, alias); err != nil {
+		t.Fatalf("Symlink() error = %v", err)
+	}
+	if _, err := p.Abs(alias, filepath.Join("sub", "not-yet-written.txt")); err != nil {
+		t.Fatalf("Abs() error = %v, want not-yet-written path under aliased root accepted", err)
+	}
+}

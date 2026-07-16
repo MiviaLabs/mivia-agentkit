@@ -48,10 +48,7 @@ func (p Policy) Abs(repoRoot, rel string) (string, error) {
 		return "", fmt.Errorf("absolute repo root: %w", err)
 	}
 	candidate := filepath.Join(root, filepath.Clean(rel))
-	resolved, err := filepath.EvalSymlinks(candidate)
-	if err != nil {
-		resolved = candidate
-	}
+	resolved := resolveExistingPrefix(candidate)
 	if err := p.checkAbs(root, resolved); err != nil {
 		return "", err
 	}
@@ -61,15 +58,24 @@ func (p Policy) Abs(repoRoot, rel string) (string, error) {
 	return resolved, nil
 }
 
+// checkAbs verifies abs resolves to a location inside repoRoot. Both sides
+// are canonicalized identically before comparing: a path that exists may
+// reach repoRoot only through a symlink (macOS commonly aliases the temp
+// directory root, e.g. /var -> /private/var) or an OS short-name form
+// (Windows temp paths can surface as either the 8.3 alias, e.g. RUNNER~1,
+// or the long form). Comparing an unresolved root against a resolved leaf
+// (or vice versa) makes every path look like it escapes.
 func (p Policy) checkAbs(repoRoot, abs string) error {
 	root, err := filepath.Abs(repoRoot)
 	if err != nil {
 		return fmt.Errorf("absolute repo root: %w", err)
 	}
+	root = resolveExistingPrefix(root)
 	path, err := filepath.Abs(abs)
 	if err != nil {
 		return fmt.Errorf("absolute path: %w", err)
 	}
+	path = resolveExistingPrefix(path)
 	rel, err := filepath.Rel(root, path)
 	if err != nil {
 		return fmt.Errorf("relative path: %w", err)
@@ -78,6 +84,23 @@ func (p Policy) checkAbs(repoRoot, abs string) error {
 		return fmt.Errorf("path %q escapes repo root %q", abs, repoRoot)
 	}
 	return nil
+}
+
+// resolveExistingPrefix returns the canonical form of path, resolving
+// symlinks (and, on Windows, short-name aliases) through the longest
+// existing ancestor. Segments that do not exist yet — e.g. a file about to
+// be written — are preserved verbatim and rejoined onto the resolved
+// ancestor, so a not-yet-created leaf still compares consistently against
+// an already-resolved repo root.
+func resolveExistingPrefix(path string) string {
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+	dir := filepath.Dir(path)
+	if dir == path {
+		return path
+	}
+	return filepath.Join(resolveExistingPrefix(dir), filepath.Base(path))
 }
 
 func (p Policy) forbidden(rel string) bool {
