@@ -274,9 +274,9 @@ func isIgnoredPath(ignored map[string]struct{}, rel string) bool {
 	if _, ok := ignored[rel]; ok {
 		return true
 	}
-	prefix := strings.TrimSuffix(rel, "/") + "/"
 	for ignoredPath := range ignored {
-		if strings.HasPrefix(ignoredPath, prefix) {
+		prefix := strings.TrimSuffix(ignoredPath, "/") + "/"
+		if strings.HasPrefix(rel, prefix) {
 			return true
 		}
 	}

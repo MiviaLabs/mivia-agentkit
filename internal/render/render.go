@@ -11,6 +11,9 @@ import (
 	"strings"
 	"text/template"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"github.com/MiviaLabs/mivia-agentkit/internal/templates"
 	"github.com/MiviaLabs/mivia-agentkit/internal/version"
 )
@@ -109,7 +112,7 @@ func (r Renderer) RenderAll(plan RenderPlan, vars Vars) (map[string][]byte, erro
 
 func funcs() template.FuncMap {
 	return template.FuncMap{
-		"title": strings.Title,
+		"title": func(s string) string { return cases.Title(language.Und).String(s) },
 		"lower": strings.ToLower,
 		"join":  strings.Join,
 	}

@@ -38,6 +38,50 @@ func TestIsProtectedReturnsFalseForBenign(t *testing.T) {
 	}
 }
 
+func TestIsProtectedDetectsStructuredPayload(t *testing.T) {
+	// Keywords split across "program" and "args" fields must still be caught.
+	cases := []struct {
+		name    string
+		payload map[string]any
+		want    policy.ProtectedKind
+	}{
+		{
+			"git push split across program and args",
+			map[string]any{"tool": "bash", "program": "git", "args": []any{"push", "origin"}},
+			policy.ProtectedPush,
+		},
+		{
+			"git commit in tool_input.command",
+			map[string]any{"tool": "bash", "tool_input": map[string]any{"program": "git", "args": []any{"commit", "-m", "x"}}},
+			policy.ProtectedCommit,
+		},
+		{
+			"deploy in args array",
+			map[string]any{"program": "kubectl", "args": []any{"apply", "-f", "deploy.yaml"}},
+			policy.ProtectedDeploy,
+		},
+		{
+			"benign structured payload",
+			map[string]any{"program": "go", "args": []any{"test", "./..."}},
+			"",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := IsProtected(tc.payload)
+			if tc.want == "" {
+				if ok {
+					t.Fatalf("IsProtected() = %q, %v; want false", got, ok)
+				}
+				return
+			}
+			if !ok || got != tc.want {
+				t.Fatalf("IsProtected() = %q, %v; want %q, true", got, ok, tc.want)
+			}
+		})
+	}
+}
+
 func TestDecideAllowsBenign(t *testing.T) {
 	out, err := Decide(context.Background(), Payload{Raw: map[string]any{"command": "go test ./..."}}, stampOK{}, policy.Noop{AuditPath: tempAudit(t)})
 	if err != nil {

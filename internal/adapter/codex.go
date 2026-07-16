@@ -76,6 +76,12 @@ func (c Codex) Review(ctx context.Context, req Request) (Verdict, error) {
 
 // ValidateRequest rejects Codex request fields that cannot be passed to Codex CLI.
 func (c Codex) ValidateRequest(req Request) error {
+	if err := validateCodexConfigValue("approval", req.Approval); err != nil {
+		return err
+	}
+	if err := validateCodexConfigValue("effort", req.Effort); err != nil {
+		return err
+	}
 	if err := req.Validate(); err != nil {
 		return err
 	}
@@ -124,6 +130,15 @@ func validateCodexEffort(effort string) error {
 	default:
 		return fmt.Errorf("codex unsupported effort %q", effort)
 	}
+}
+
+// validateCodexConfigValue rejects values that could break out of --config
+// double-quoted strings and inject arbitrary CLI flags.
+func validateCodexConfigValue(field, value string) error {
+	if strings.Contains(value, `"`) || strings.Contains(value, `\`) {
+		return fmt.Errorf("codex %s contains unsafe characters: %q", field, value)
+	}
+	return nil
 }
 
 func sanitizedMeta(stdout []byte) map[string]string {

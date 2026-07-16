@@ -89,8 +89,13 @@ func Decide(ctx context.Context, p Payload, stamp StampChecker, pol policy.Provi
 }
 
 // IsProtected detects protected actions in raw hook payloads.
+// It checks the flattened concatenation, individual field values, and
+// adjacent field-value pairs so structured payloads (e.g.
+// {"program":"git","args":["push"]}) are caught even when keywords are
+// split across separate fields.
 func IsProtected(raw map[string]any) (policy.ProtectedKind, bool) {
 	text := strings.ToLower(flatten(raw))
+	fields := fieldValues(raw)
 	patterns := []struct {
 		kind policy.ProtectedKind
 		re   *regexp.Regexp
@@ -106,8 +111,48 @@ func IsProtected(raw map[string]any) (policy.ProtectedKind, bool) {
 		if pattern.re.MatchString(text) {
 			return pattern.kind, true
 		}
+		for _, field := range fields {
+			if pattern.re.MatchString(field) {
+				return pattern.kind, true
+			}
+		}
+	}
+	// Check adjacent field pairs: "git" in one field and "push" in the next
+	// won't be caught by single-field or flattened checks when separated
+	// by intermediate keys.
+	if len(fields) >= 2 {
+		for i := 0; i < len(fields)-1; i++ {
+			joined := fields[i] + " " + fields[i+1]
+			for _, pattern := range patterns {
+				if pattern.re.MatchString(joined) {
+					return pattern.kind, true
+				}
+			}
+		}
 	}
 	return "", false
+}
+
+// fieldValues extracts all string leaf values from a map recursively.
+func fieldValues(raw map[string]any) []string {
+	var out []string
+	var extract func(v any)
+	extract = func(v any) {
+		switch t := v.(type) {
+		case map[string]any:
+			for _, v := range t {
+				extract(v)
+			}
+		case []any:
+			for _, v := range t {
+				extract(v)
+			}
+		case string:
+			out = append(out, strings.ToLower(t))
+		}
+	}
+	extract(raw)
+	return out
 }
 
 // RawPayload decodes JSON stdin into a map.
