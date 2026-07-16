@@ -60,7 +60,7 @@ func main() {
 `, cfg.LogPath, cfg.Version, cfg.Stdout, cfg.Stdout, cfg.Stderr, cfg.Stderr, cfg.ExitCode)
 	mustWriteFile(t, filepath.Join(srcDir, "main.go"), program)
 	bin := filepath.Join(dir, cfg.Name+exeSuffix())
-	cmd := exec.Command("go", "build", "-o", bin, ".")
+	cmd := exec.Command("go", "build", "-buildvcs=false", "-o", bin, ".")
 	cmd.Dir = srcDir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("go build stub %s error = %v, output = %s", cfg.Name, err, out)
