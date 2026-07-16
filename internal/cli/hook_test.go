@@ -67,6 +67,43 @@ func TestHookMalformedBenignStdinAllowsWithWarning(t *testing.T) {
 	}
 }
 
+func TestHookClaudeGovernanceLoadFailureExit2(t *testing.T) {
+	repo := t.TempDir()
+	// Unavailable governance provider must not bare-exit 1 (Claude fail-open).
+	manifest := "version: \"1\"\nprofile: standard\ngovernance:\n  provider: agt\n"
+	if err := os.WriteFile(filepath.Join(repo, "mivia-agent.yaml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+	stdout, stderr, err := runAgentHookInRepo(t, repo, "claude", "pre-tool-use", `{"tool":"bash","command":"git push"}`)
+	if err == nil {
+		t.Fatalf("hook claude governance error = nil; want exit 2 (stdout=%q stderr=%q)", stdout, stderr)
+	}
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 2 {
+		t.Fatalf("hook claude error = %v (stdout=%q stderr=%q); want exit 2", err, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "permissionDecision") && !strings.Contains(stderr, "governance") && !strings.Contains(stderr, "agt") {
+		// Deny JSON on stdout or reason on stderr is acceptable for Claude exit 2.
+		if strings.TrimSpace(stdout+stderr) == "" {
+			t.Fatalf("empty deny output; want Claude fail-closed deny")
+		}
+	}
+}
+
+func TestHookClaudeOversizedPayloadExit2(t *testing.T) {
+	// Oversized stdin must fail closed with Claude exit 2, not bare exit 1.
+	oversize := strings.Repeat("a", 4<<20+8)
+	payload := `{"tool":"bash","command":"git push","pad":"` + oversize + `"}`
+	stdout, stderr, err := runAgentHook(t, "claude", "pre-tool-use", payload)
+	if err == nil {
+		t.Fatalf("hook claude oversize error = nil; want exit 2")
+	}
+	exit, ok := err.(*exec.ExitError)
+	if !ok || exit.ExitCode() != 2 {
+		t.Fatalf("hook claude oversize error = %v (stdout=%q stderr=%q); want exit 2", err, stdout, stderr)
+	}
+}
+
 func TestHookClaudePolicyErrorExit2(t *testing.T) {
 	// Force policy/audit path failure after a fresh stamp so Decide maps the
 	// provider error to Allow=false and Claude gets exit 2 (not bare exit 1).
@@ -140,19 +177,17 @@ func TestHookHonorsManifestGovernanceProvider(t *testing.T) {
 		t.Fatalf("write manifest: %v", err)
 	}
 	stdout, stderr, err := runAgentHookInRepo(t, repo, "codex", "pre-tool-use", `{"tool":"bash","command":"git push"}`)
-	if err == nil {
-		t.Fatalf("hook with agt provider error = nil; want fail-closed provider error (stdout=%q stderr=%q)", stdout, stderr)
+	if err != nil {
+		t.Fatalf("hook codex governance deny error = %v; want exit 0 with deny JSON", err)
 	}
-	combined := stdout + stderr + err.Error()
-	if !strings.Contains(combined, "agt") && !strings.Contains(combined, "governance") && !strings.Contains(combined, "not compiled") && !strings.Contains(combined, "unavailable") {
-		// Accept any explicit provider-construction failure; reject silent Noop stamp path.
-		if strings.Contains(combined, "quality stamp required") && !strings.Contains(combined, "agt") {
-			t.Fatalf("hook used stamp-only Noop path; want governance provider failure: %q", combined)
-		}
+	if !strings.Contains(stdout, `"permissionDecision": "deny"`) {
+		t.Fatalf("stdout = %s; want codex deny JSON", stdout)
 	}
-	// Hardcoding Noop would emit a codex deny JSON with stamp reason and exit 0.
-	if err == nil && strings.Contains(stdout, "quality stamp required") {
-		t.Fatalf("hook ignored manifest provider and fell back to Noop stamp gate")
+	if !strings.Contains(stdout, "governance") && !strings.Contains(stdout, "agt") {
+		t.Fatalf("stdout = %s; want governance/agt reason (not stamp-only Noop)", stdout)
+	}
+	if strings.Contains(stdout, "quality stamp required") && !strings.Contains(stdout, "agt") && !strings.Contains(stdout, "governance") {
+		t.Fatalf("hook used stamp-only Noop path; want governance provider failure: %q stderr=%q", stdout, stderr)
 	}
 }
 
