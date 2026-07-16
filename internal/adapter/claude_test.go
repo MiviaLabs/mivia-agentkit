@@ -32,6 +32,17 @@ func TestClaudeRunEnforcesNonInteractiveApproval(t *testing.T) {
 	}
 }
 
+func TestClaudeRejectsBypassPermissions(t *testing.T) {
+	r := claudeRunner([]byte("{}"), nil)
+	_, err := (Claude{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: "bypassPermissions"})
+	if err == nil || !strings.Contains(err.Error(), "bypassPermissions") {
+		t.Fatalf("Run() error = %v, want bypassPermissions rejection", err)
+	}
+	if len(r.Calls) != 0 {
+		t.Fatalf("runner calls = %d, want 0 when approval is rejected", len(r.Calls))
+	}
+}
+
 func TestClaudeRunMapsExitCode(t *testing.T) {
 	r := claudeRunner(nil, nil)
 	r.Scripts["claude"] = FakeResponse{Result: RunResult{ExitCode: 5}}

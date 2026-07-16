@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
@@ -189,8 +190,8 @@ func TestCrushAdapterRealSubprocessContract(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-	if string(result.Stdout) != "crush artifact\n" {
-		t.Fatalf("Run() stdout = %q, want artifact", result.Stdout)
+	if !strings.Contains(string(result.Stdout), `"type":"status"`) {
+		t.Fatalf("Run() stdout = %q, want sanitized status event", result.Stdout)
 	}
 	readLogContains(t, logPath, "run --quiet --cwd "+toolsDir+" --model ollama/qwen3:14b", "stdin:run")
 
@@ -254,7 +255,8 @@ func main() {
 		if strings.Contains(string(stdinData), "Return JSON only") {
 			fmt.Print("{\"pass\":true,\"severity\":\"low\",\"notes\":\"ok\"}\n")
 		} else {
-			fmt.Print("crush artifact\n")
+			// Structured event survives sanitizeProviderOutput; plain prose is redacted.
+			fmt.Print("{\"type\":\"status\",\"ok\":true}\n")
 		}
 		return
 	}

@@ -83,6 +83,35 @@ func TestAuditReportsWeakConsensusUnderStrict(t *testing.T) {
 	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")}), "consensus.weaker_than_profile_requires")
 }
 
+func TestStrictProtectApprovalPrefixFlagsWeakConsensus(t *testing.T) {
+	// protect:commit (not the literal "protected") must still set protectBound.
+	repo, home := freshRepo(t)
+	writeFile(t, filepath.Join(repo, "mivia-agent.yaml"), `version: "1"
+profile: strict
+adapters:
+  codex:
+    enabled: true
+    role: orchestrable
+governance:
+  provider: noop
+loops:
+  release:
+    bound: iterations
+    max_iterations: 1
+    exit_when: review-pass
+    steps:
+      - id: produce
+        producer: codex
+        approval: protect:commit
+      - id: review
+        reviewers: [codex]
+        consensus:
+          mode: first-pass
+          min_reviewers: 1
+`)
+	assertCode(t, Run(Context{Repo: repo, GlobalDir: filepath.Join(home, ".agents")}), "consensus.weaker_than_profile_requires")
+}
+
 func TestAuditReportsEditedManagedFileOutsideBlocks(t *testing.T) {
 	repo, home := freshRepo(t)
 	agents := filepath.Join(repo, "AGENTS.md")

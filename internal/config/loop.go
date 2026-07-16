@@ -2,7 +2,10 @@
 // Plan: WS-A. PRD: FR-4.2, FR-6.1.
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // Loop is a bounded workflow definition.
 type Loop struct {
@@ -78,6 +81,15 @@ func (l *Loop) Validate(enabledAdapters map[string]AdapterRole) error {
 				if !EffortAllowedFor(reviewer, step.Effort) {
 					return fmt.Errorf("step %q effort %q is not supported by reviewer %q", step.ID, step.Effort, reviewer)
 				}
+			}
+		}
+		if step.Timeout != "" {
+			d, err := time.ParseDuration(step.Timeout)
+			if err != nil {
+				return fmt.Errorf("step %q timeout %q is invalid: %w", step.ID, step.Timeout, err)
+			}
+			if d <= 0 {
+				return fmt.Errorf("step %q timeout must be positive", step.ID)
 			}
 		}
 		if step.Producer != "" {

@@ -117,11 +117,14 @@ func validateClaudeEffort(effort string) error {
 	}
 }
 
-// validateClaudeApproval rejects unknown Claude Code permission-mode values.
+// validateClaudeApproval rejects unknown or unsafe Claude Code permission-mode values.
+// bypassPermissions is never allowed: headless orchestration must stay gated.
 func validateClaudeApproval(approval string) error {
 	switch approval {
-	case "", "default", "plan", "never", "bypassPermissions":
+	case "", "default", "plan", "never":
 		return nil
+	case "bypassPermissions":
+		return fmt.Errorf("claude approval bypassPermissions is not allowed")
 	default:
 		return fmt.Errorf("claude unsupported approval %q", approval)
 	}

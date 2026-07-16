@@ -313,6 +313,66 @@ func TestRunStrictFailsOnFirstPassConsensusForProtectBound(t *testing.T) {
 	}
 }
 
+func TestRunStrictRejectsWeightedAndMinReviewersOne(t *testing.T) {
+	repo := t.TempDir()
+	mustWrite(t, filepath.Join(repo, "mivia-agent.yaml"), `version: "1"
+profile: strict
+adapters:
+  codex: {enabled: true, role: orchestrable}
+  claude: {enabled: true, role: orchestrable}
+routing:
+  consensus:
+    mode: majority
+    min_reviewers: 2
+loops:
+  protected:
+    bound: iterations
+    max_iterations: 1
+    exit_when: protected_action
+    steps:
+      - id: produce
+        producer: codex
+        approval: protect:commit
+      - id: review
+        reviewers: [codex, claude]
+        consensus:
+          mode: weighted
+          min_reviewers: 1
+`)
+	cmd := newRunCommand()
+	cmd.SetArgs([]string{"--repo", repo, "--workflow", "protected", "--dry-run"})
+	if err := cmd.Execute(); err == nil {
+		t.Fatalf("run dry-run error = nil, want strict protect weighted/min1 rejection")
+	}
+
+	// min_reviewers: 1 alone (majority) under strict protect must also fail.
+	mustWrite(t, filepath.Join(repo, "mivia-agent.yaml"), `version: "1"
+profile: strict
+adapters:
+  codex: {enabled: true, role: orchestrable}
+  claude: {enabled: true, role: orchestrable}
+loops:
+  protected:
+    bound: iterations
+    max_iterations: 1
+    exit_when: protected_action
+    steps:
+      - id: produce
+        producer: codex
+        approval: protect:commit
+      - id: review
+        reviewers: [codex]
+        consensus:
+          mode: majority
+          min_reviewers: 1
+`)
+	cmd2 := newRunCommand()
+	cmd2.SetArgs([]string{"--repo", repo, "--workflow", "protected", "--dry-run"})
+	if err := cmd2.Execute(); err == nil {
+		t.Fatalf("run dry-run error = nil, want min_reviewers < 2 rejection under strict protect")
+	}
+}
+
 func TestRunStrictFailsWarnOutcome(t *testing.T) {
 	repo := t.TempDir()
 	mustWrite(t, filepath.Join(repo, ".ai/workflows/research.yaml"), "bound: iterations\nmax_iterations: 1\nsteps:\n- id: research\n  producer: codex\n  artifact: research.md\n- id: review\n  reviewers: [codex, claude]\n  artifact: research.md\n  on_fail: iterate\nexit_when: review-pass\non_exhausted: warn\n")

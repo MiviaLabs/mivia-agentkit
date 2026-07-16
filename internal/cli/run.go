@@ -259,25 +259,41 @@ func validateRunLoop(manifest config.Manifest, loop config.Loop) error {
 	if loop.Bound == "budget" {
 		return orchestrator.ErrBudgetNotSupportedInMVP
 	}
-	if manifest.Profile != "strict" {
-		return nil
-	}
 	protectBound := loop.ExitWhen == "protected_action"
 	for _, step := range loop.Steps {
 		if strings.HasPrefix(step.Approval, "protect:") {
 			protectBound = true
 		}
 	}
-	if !protectBound {
-		return nil
-	}
+	// Enforce profile consensus constraints for review steps and protect-bound
+	// loops (including default/manifest consensus when step omits fields).
 	for _, step := range loop.Steps {
+		if len(step.Reviewers) == 0 && step.Consensus.Mode == "" && !protectBound {
+			continue
+		}
 		mode := step.Consensus.Mode
 		if mode == "" {
 			mode = manifest.Routing.Consensus.Mode
 		}
-		if mode == "first-pass" {
-			return fmt.Errorf("strict protected loops cannot use first-pass consensus")
+		min := step.Consensus.MinReviewers
+		if min == 0 {
+			min = manifest.Routing.Consensus.MinReviewers
+		}
+		tb := step.Consensus.TieBreaker
+		if tb == "" {
+			tb = manifest.Routing.Consensus.TieBreaker
+		}
+		p := consensus.Policy{
+			Mode:         consensus.Mode(mode),
+			MinReviewers: min,
+			TieBreaker:   consensus.TieBreaker(tb),
+			Weights:      config.WeightsToFloat(step.Consensus.Weights),
+		}
+		if len(p.Weights) == 0 {
+			p.Weights = config.WeightsToFloat(manifest.Routing.Consensus.Weights)
+		}
+		if err := consensus.ValidateForProfile(p, manifest.Profile, protectBound); err != nil {
+			return fmt.Errorf("loop consensus: %w", err)
 		}
 	}
 	return nil

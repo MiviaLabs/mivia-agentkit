@@ -41,7 +41,10 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 	if err != nil {
 		return LoopResult{Err: err}, err
 	}
-	runID := e.Store.NewRun()
+	runID, err := e.Store.NewRun()
+	if err != nil {
+		return LoopResult{Err: err}, err
+	}
 	runDir := e.Store.Dir(runID)
 	max := loop.MaxIterations
 	if max <= 0 {
@@ -80,9 +83,11 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 				if e.Stamp == nil {
 					return result("", iteration, ErrStaleStamp)
 				}
-				stampVal, err := e.Stamp(e.Repo)
-				if err != nil {
-					return result("", iteration, fmt.Errorf("%w: %v", ErrStaleStamp, err))
+				stampVal, stampErr := e.Stamp(e.Repo)
+				if stampErr != nil {
+					// Keep both the orchestrator sentinel and the underlying
+					// preflight error (e.g. ErrNoStamp) for errors.Is checks.
+					return result("", iteration, fmt.Errorf("%w: %w", ErrStaleStamp, stampErr))
 				}
 				e.CurrentStamp = stampVal
 			}
@@ -123,7 +128,9 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 	if loop.OnExhausted == "fail" {
 		return result("fail", max, errors.New("loop exhausted"))
 	}
-	_ = e.Store.AppendTrace(runID, runstore.TraceEvent{Kind: "loop.exhausted", Payload: map[string]any{"on_exhausted": loop.OnExhausted}})
+	if err := e.Store.AppendTrace(runID, runstore.TraceEvent{Kind: "loop.exhausted", Payload: map[string]any{"on_exhausted": loop.OnExhausted}}); err != nil {
+		return result("warn", max, fmt.Errorf("append exhaust trace: %w", err))
+	}
 	return result("warn", max, nil)
 }
 

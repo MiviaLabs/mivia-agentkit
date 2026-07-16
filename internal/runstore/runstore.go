@@ -40,15 +40,17 @@ func New(repo string) Store {
 	return Store{Root: filepath.Join(repo, ".ai", "runs")}
 }
 
-// NewRun creates and returns a new run ID.
-func (s Store) NewRun() RunID {
+// NewRun creates and returns a new run ID after ensuring the run directory exists.
+func (s Store) NewRun() (RunID, error) {
 	var b [4]byte
 	if _, err := rand.Read(b[:]); err != nil {
-		copy(b[:], "fail")
+		return "", fmt.Errorf("generate run id: %w", err)
 	}
 	id := RunID(time.Now().UTC().Format("20060102T150405Z") + "-" + hex.EncodeToString(b[:]))
-	_ = os.MkdirAll(s.Dir(id), 0o755)
-	return id
+	if err := os.MkdirAll(s.Dir(id), 0o755); err != nil {
+		return "", fmt.Errorf("create run dir: %w", err)
+	}
+	return id, nil
 }
 
 // Dir returns the absolute directory for id.
@@ -193,7 +195,9 @@ func marshalTrace(event TraceEvent) ([]byte, error) {
 	b.WriteString(`{"iteration":`)
 	b.WriteString(fmt.Sprint(event.Iteration))
 	b.WriteString(`,"kind":`)
-	writeJSON(&b, event.Kind)
+	if err := writeJSON(&b, event.Kind); err != nil {
+		return nil, err
+	}
 	b.WriteString(`,"payload":{`)
 	keys := make([]string, 0, len(event.Payload))
 	for k := range event.Payload {
@@ -204,19 +208,31 @@ func marshalTrace(event TraceEvent) ([]byte, error) {
 		if i > 0 {
 			b.WriteByte(',')
 		}
-		writeJSON(&b, k)
+		if err := writeJSON(&b, k); err != nil {
+			return nil, err
+		}
 		b.WriteByte(':')
-		writeJSON(&b, event.Payload[k])
+		if err := writeJSON(&b, event.Payload[k]); err != nil {
+			return nil, fmt.Errorf("marshal trace payload %q: %w", k, err)
+		}
 	}
 	b.WriteString(`},"step":`)
-	writeJSON(&b, event.Step)
+	if err := writeJSON(&b, event.Step); err != nil {
+		return nil, err
+	}
 	b.WriteString(`,"ts":`)
-	writeJSON(&b, event.TS)
+	if err := writeJSON(&b, event.TS); err != nil {
+		return nil, err
+	}
 	b.WriteByte('}')
 	return b.Bytes(), nil
 }
 
-func writeJSON(b *bytes.Buffer, v any) {
-	data, _ := json.Marshal(v)
+func writeJSON(b *bytes.Buffer, v any) error {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
 	b.Write(data)
+	return nil
 }

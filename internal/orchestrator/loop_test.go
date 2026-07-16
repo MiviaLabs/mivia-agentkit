@@ -11,6 +11,8 @@ import (
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
 	"github.com/MiviaLabs/mivia-agentkit/internal/config"
+	"github.com/MiviaLabs/mivia-agentkit/internal/preflight"
+	"github.com/MiviaLabs/mivia-agentkit/internal/runstore"
 )
 
 func TestLoopExitsWhenGatePasses(t *testing.T) {
@@ -126,6 +128,36 @@ func TestLoopPassesProtectedActionProducer(t *testing.T) {
 	}
 	if res.Outcome != "pass" || res.Iterations != 1 {
 		t.Fatalf("result = %#v, want pass in 1 iteration for protected_action producer", res)
+	}
+}
+
+func TestProtectedStepPreservesErrNoStamp(t *testing.T) {
+	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}})
+	e.Stamp = func(repo string) (string, error) { return "", preflight.ErrNoStamp }
+	loop := config.Loop{
+		Bound: "iterations", MaxIterations: 1, ExitWhen: "protected_action", OnExhausted: "fail",
+		Steps: []config.Step{{ID: "protect", Producer: "codex", Approval: "protect:commit"}},
+	}
+	_, err := e.RunLoop(context.Background(), loop, nil)
+	if !errors.Is(err, ErrStaleStamp) {
+		t.Fatalf("RunLoop error = %v, want ErrStaleStamp", err)
+	}
+	if !errors.Is(err, preflight.ErrNoStamp) {
+		t.Fatalf("RunLoop error = %v, want errors.Is preflight.ErrNoStamp", err)
+	}
+}
+
+func TestRunLoopExhaustTraceWriteFailureSurfaces(t *testing.T) {
+	// Store root under a file path so NewRun/AppendTrace cannot create dirs.
+	badRoot := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(badRoot, []byte("x"), 0o644); err != nil {
+		t.Fatalf("write bad root: %v", err)
+	}
+	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}}, sequenceReviewer("claude", false))
+	e.Store = runstore.Store{Root: filepath.Join(badRoot, "runs")}
+	_, err := e.RunLoop(context.Background(), testLoop(1, "iterate", "warn"), nil)
+	if err == nil {
+		t.Fatalf("RunLoop error = nil, want create run / exhaust-trace failure")
 	}
 }
 
