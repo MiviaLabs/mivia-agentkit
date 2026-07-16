@@ -33,6 +33,50 @@ func TestIsProtectedDetectsDeploy(t *testing.T) {
 	}
 }
 
+func TestIsProtectedDetectsGhWithGlobalFlags(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload map[string]any
+		want    policy.ProtectedKind
+	}{
+		{"gh -R repo pr", map[string]any{"command": "gh -R owner/repo pr create"}, policy.ProtectedPullRequest},
+		{"gh --repo pr", map[string]any{"command": "gh --repo owner/repo pr create"}, policy.ProtectedPullRequest},
+		{"gh -H host pr", map[string]any{"command": "gh -H github.example pr create"}, policy.ProtectedPullRequest},
+		{"gh -R attached pr", map[string]any{"command": "gh -Rowner/repo pr create"}, policy.ProtectedPullRequest},
+		{"gh -R release", map[string]any{"command": "gh -R owner/repo release create v1"}, policy.ProtectedRelease},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := IsProtected(tc.payload)
+			if !ok || got != tc.want {
+				t.Fatalf("IsProtected() = %q, %v; want %q, true", got, ok, tc.want)
+			}
+		})
+	}
+}
+
+func TestIsProtectedDetectsDeployWithGlobalFlags(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload map[string]any
+	}{
+		{"kubectl -n apply", map[string]any{"command": "kubectl -n prod apply -f m.yaml"}},
+		{"kubectl --namespace apply", map[string]any{"command": "kubectl --namespace prod apply -f m.yaml"}},
+		{"helm --namespace upgrade", map[string]any{"command": "helm --namespace prod upgrade myapp chart"}},
+		{"helm -n install", map[string]any{"command": "helm -n prod install myapp chart"}},
+		{"terraform -chdir= apply", map[string]any{"command": "terraform -chdir=infra apply"}},
+		{"terraform -chdir space apply", map[string]any{"command": "terraform -chdir infra apply"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := IsProtected(tc.payload)
+			if !ok || got != policy.ProtectedDeploy {
+				t.Fatalf("IsProtected() = %q, %v; want deploy, true", got, ok)
+			}
+		})
+	}
+}
+
 func TestIsProtectedDetectsQuotedGitAndGhPaths(t *testing.T) {
 	cases := []struct {
 		name    string

@@ -137,15 +137,16 @@ func IsProtected(raw map[string]any) (policy.ProtectedKind, bool) {
 	return "", false
 }
 
-// detectGitLikeProtected finds git/gh subcommands after global flags so forms
-// like `git -C repo push` and `git --no-pager commit` still gate.
+// detectGitLikeProtected finds git/gh/deploy-tool subcommands after global
+// flags so forms like `git -C repo push`, `gh -R o/r pr create`, and
+// `kubectl -n prod apply` still gate.
 func detectGitLikeProtected(text string) (policy.ProtectedKind, bool) {
 	tokens := shellTokens(text)
 	for i := 0; i < len(tokens); i++ {
 		tool := normalizeExeBase(tokens[i])
 		switch tool {
 		case "git":
-			sub, ok := nextGitSubcommand(tokens[i+1:])
+			sub, ok := nextSubcommand(tokens[i+1:], gitTakesArg)
 			if !ok {
 				continue
 			}
@@ -156,7 +157,7 @@ func detectGitLikeProtected(text string) (policy.ProtectedKind, bool) {
 				return policy.ProtectedPush, true
 			}
 		case "gh":
-			sub, ok := nextSimpleSubcommand(tokens[i+1:])
+			sub, ok := nextSubcommand(tokens[i+1:], ghTakesArg)
 			if !ok {
 				continue
 			}
@@ -166,9 +167,59 @@ func detectGitLikeProtected(text string) (policy.ProtectedKind, bool) {
 			case "release":
 				return policy.ProtectedRelease, true
 			}
+		case "kubectl", "helm", "terraform":
+			sub, ok := nextSubcommand(tokens[i+1:], deployTakesArg[tool])
+			if !ok {
+				continue
+			}
+			switch tool {
+			case "kubectl":
+				if sub == "apply" {
+					return policy.ProtectedDeploy, true
+				}
+			case "helm":
+				if sub == "upgrade" || sub == "install" || sub == "apply" {
+					return policy.ProtectedDeploy, true
+				}
+			case "terraform":
+				if sub == "apply" {
+					return policy.ProtectedDeploy, true
+				}
+			}
 		}
 	}
 	return "", false
+}
+
+// Flag maps use lowercase keys because commandTexts lowercases input.
+// gitTakesArg lists git global options that consume a following argument.
+var gitTakesArg = map[string]struct{}{
+	"-c": {}, "--git-dir": {}, "--work-tree": {},
+	"--namespace": {}, "--config-env": {}, "--super-prefix": {},
+	"--list-cmds": {}, "-o": {}, "--exec-path": {}, "--attr-source": {},
+}
+
+// ghTakesArg lists common gh global options that consume a following argument.
+var ghTakesArg = map[string]struct{}{
+	"-r": {}, "--repo": {}, "-h": {}, "--hostname": {},
+}
+
+// deployTakesArg maps deploy CLIs to global options that take a following arg.
+var deployTakesArg = map[string]map[string]struct{}{
+	"kubectl": {
+		"-n": {}, "--namespace": {}, "-c": {}, "--cluster": {},
+		"--context": {}, "-s": {}, "--server": {}, "--kubeconfig": {},
+		"--user": {}, "-u": {}, "--as": {}, "--as-group": {},
+		"--request-timeout": {}, "--token": {}, "--cache-dir": {},
+	},
+	"helm": {
+		"-n": {}, "--namespace": {}, "--kube-context": {}, "--kubeconfig": {},
+		"--registry-config": {}, "--repository-config": {}, "--repository-cache": {},
+		"-f": {}, "--values": {}, "--set": {}, "--set-string": {}, "--set-file": {},
+	},
+	"terraform": {
+		"-chdir": {}, // also supports -chdir=path attached form
+	},
 }
 
 // shellTokens splits command text on spaces while keeping single- and
@@ -214,17 +265,9 @@ func stripQuotes(s string) string {
 	return s
 }
 
-// nextGitSubcommand skips git global options (including those that take an
-// argument) and returns the first positional subcommand token.
-func nextGitSubcommand(tokens []string) (string, bool) {
-	// Global options that consume a following argument. Keep in sync with
-	// `git help git` / porcelain globals so subcommand detection is not
-	// confused by space-separated flag values.
-	takesArg := map[string]struct{}{
-		"-C": {}, "-c": {}, "--git-dir": {}, "--work-tree": {},
-		"--namespace": {}, "--config-env": {}, "--super-prefix": {},
-		"--list-cmds": {}, "-o": {}, "--exec-path": {}, "--attr-source": {},
-	}
+// nextSubcommand skips global options (including those that take an argument)
+// and returns the first positional subcommand token.
+func nextSubcommand(tokens []string, takesArg map[string]struct{}) (string, bool) {
 	for i := 0; i < len(tokens); i++ {
 		tok := stripQuotes(tokens[i])
 		if tok == "" {
@@ -233,29 +276,22 @@ func nextGitSubcommand(tokens []string) (string, bool) {
 		if !strings.HasPrefix(tok, "-") {
 			return strings.ToLower(tok), true
 		}
-		// --flag=value forms carry their own argument.
+		// --flag=value and -Rowner/repo attached forms carry their own argument.
 		if strings.Contains(tok, "=") {
 			continue
 		}
-		// -c key=value can appear as two tokens when split on spaces only when
-		// written as `-c key=value`; Fields keeps key=value as one token after -c.
+		// Short attached form: -Rowner/repo (flag letter + non-empty value).
+		if len(tok) > 2 && tok[0] == '-' && tok[1] != '-' {
+			letter := tok[:2]
+			if _, ok := takesArg[letter]; ok {
+				continue
+			}
+		}
 		if _, ok := takesArg[tok]; ok {
-			i++ // skip argument
+			i++ // skip following argument token
 			continue
 		}
 		// Bare global flags: --no-pager, --bare, -p, etc.
-	}
-	return "", false
-}
-
-// nextSimpleSubcommand returns the first non-flag token (for gh-style CLIs).
-func nextSimpleSubcommand(tokens []string) (string, bool) {
-	for _, tok := range tokens {
-		tok = stripQuotes(tok)
-		if tok == "" || strings.HasPrefix(tok, "-") {
-			continue
-		}
-		return strings.ToLower(tok), true
 	}
 	return "", false
 }
