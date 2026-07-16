@@ -18,7 +18,7 @@ func TestImportPlanDoesNotWriteByDefault(t *testing.T) {
 	writeFile(t, filepath.Join(repo, "CLAUDE.md"), "legacy\n")
 	cmd := exec.Command("go", "run", "./cmd/mivia-agent", "import", "--repo", repo)
 	cmd.Dir = filepath.Join("..", "..")
-	cmd.Env = append(os.Environ(), "HOME="+t.TempDir())
+	cmd.Env = append(os.Environ(), "HOME="+t.TempDir(), "GOFLAGS="+strings.TrimSpace(os.Getenv("GOFLAGS")+" -modcacherw"))
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("go run import error = %v, output = %s", err, out)
 	}

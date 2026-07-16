@@ -57,6 +57,19 @@ func TestParseStampRejectsMissingHead(t *testing.T) {
 	}
 }
 
+func TestParseStampToleratesUnknownFields(t *testing.T) {
+	// Repo-local quality gates (e.g. a Python preflight) may write extra
+	// evidence fields; stamps must stay readable across schema drift.
+	data := []byte(`{"head":"abc","diff_sha256":"def","changed_files":[],"execution_evidence":[{"command_id":"x"}],"pipeline_preflight":{"ok":true}}`)
+	parsed, err := ParseStamp(data)
+	if err != nil {
+		t.Fatalf("ParseStamp() error = %v, want unknown fields tolerated", err)
+	}
+	if parsed.Head != "abc" || parsed.DiffSHA256 != "def" {
+		t.Fatalf("parsed head/diff got %q/%q want abc/def", parsed.Head, parsed.DiffSHA256)
+	}
+}
+
 func TestParseStampRejectsMalformedJSON(t *testing.T) {
 	_, err := ParseStamp([]byte(`{"head":`))
 	if err == nil {

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	cliint "github.com/MiviaLabs/mivia-agentkit/internal/cli"
+	"github.com/MiviaLabs/mivia-agentkit/internal/version"
 )
 
 func TestInitDoctorAuditPreflightFlow(t *testing.T) {
@@ -88,7 +89,7 @@ func TestUpdatePreservesUserContentOutsideManagedRegions(t *testing.T) {
 	mustWriteFile(t, agentsPath, withUserText)
 
 	manifestPath := filepath.Join(env.repo, "mivia-agent.yaml")
-	manifest := strings.Replace(readFile(t, manifestPath), "template_version: dev", "template_version: v0.0.1", 1)
+	manifest := strings.Replace(readFile(t, manifestPath), "template_version: "+version.Version, "template_version: v0.0.1", 1)
 	mustWriteFile(t, manifestPath, manifest)
 
 	updateResult := env.run(t, "update", "--repo", env.repo, "--write")

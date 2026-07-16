@@ -109,60 +109,58 @@ var protectedPatterns = func() []struct {
 }()
 
 // IsProtected detects protected actions in raw hook payloads.
-// It checks the flattened concatenation, individual field values, and
-// all field-value pairs so structured payloads (e.g.
-// {"program":"git","args":["push"]}) are caught even when keywords are
-// split across separate fields.
+// Only executable content is inspected: values of command-carrying keys
+// ("command", "cmd"), structured program+args payloads (e.g.
+// {"program":"git","args":["push"]}), and unparseable payloads captured
+// under "malformed" (fail closed when we cannot tell what would run).
+// Prose fields — descriptions, file contents, agent prompts, assistant
+// messages — are deliberately excluded so *mentioning* a protected action
+// never trips the gate; the action itself is still caught when its tool
+// call executes.
 func IsProtected(raw map[string]any) (policy.ProtectedKind, bool) {
-	text := strings.ToLower(flatten(raw))
-	fields := fieldValues(raw)
-	for _, pattern := range protectedPatterns {
-		if pattern.re.MatchString(text) {
-			return pattern.kind, true
-		}
-		for _, field := range fields {
-			if pattern.re.MatchString(field) {
+	for _, text := range commandTexts(raw) {
+		for _, pattern := range protectedPatterns {
+			if pattern.re.MatchString(text) {
 				return pattern.kind, true
-			}
-		}
-	}
-	// Check all field pairs: "git" in one field and "push" in another
-	// won't be caught by single-field checks when they are not adjacent in
-	// the extraction order. Check both join orderings per pair so detection
-	// is independent of Go's nondeterministic map iteration order.
-	for i := 0; i < len(fields); i++ {
-		for j := i + 1; j < len(fields); j++ {
-			for _, joined := range []string{fields[i] + " " + fields[j], fields[j] + " " + fields[i]} {
-				for _, pattern := range protectedPatterns {
-					if pattern.re.MatchString(joined) {
-						return pattern.kind, true
-					}
-				}
 			}
 		}
 	}
 	return "", false
 }
 
-// fieldValues extracts all string leaf values from a map recursively.
-func fieldValues(raw map[string]any) []string {
+// commandTexts extracts the strings that could actually execute from a
+// raw hook payload, recursing through nested maps and lists.
+func commandTexts(raw map[string]any) []string {
 	var out []string
-	var extract func(v any)
-	extract = func(v any) {
+	var walk func(v any)
+	walk = func(v any) {
 		switch t := v.(type) {
 		case map[string]any:
-			for _, v := range t {
-				extract(v)
+			for key, val := range t {
+				switch strings.ToLower(key) {
+				case "command", "cmd", "malformed":
+					out = append(out, strings.ToLower(flatten(val)))
+				}
+			}
+			if prog, ok := t["program"].(string); ok {
+				parts := []string{prog}
+				if args, ok := t["args"].([]any); ok {
+					for _, a := range args {
+						parts = append(parts, flatten(a))
+					}
+				}
+				out = append(out, strings.ToLower(strings.Join(parts, " ")))
+			}
+			for _, val := range t {
+				walk(val)
 			}
 		case []any:
-			for _, v := range t {
-				extract(v)
+			for _, item := range t {
+				walk(item)
 			}
-		case string:
-			out = append(out, strings.ToLower(t))
 		}
 	}
-	extract(raw)
+	walk(raw)
 	return out
 }
 
