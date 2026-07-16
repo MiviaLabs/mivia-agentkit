@@ -217,11 +217,13 @@ func stripQuotes(s string) string {
 // nextGitSubcommand skips git global options (including those that take an
 // argument) and returns the first positional subcommand token.
 func nextGitSubcommand(tokens []string) (string, bool) {
-	// Global options that consume a following argument.
+	// Global options that consume a following argument. Keep in sync with
+	// `git help git` / porcelain globals so subcommand detection is not
+	// confused by space-separated flag values.
 	takesArg := map[string]struct{}{
 		"-C": {}, "-c": {}, "--git-dir": {}, "--work-tree": {},
 		"--namespace": {}, "--config-env": {}, "--super-prefix": {},
-		"--list-cmds": {}, "-o": {},
+		"--list-cmds": {}, "-o": {}, "--exec-path": {}, "--attr-source": {},
 	}
 	for i := 0; i < len(tokens); i++ {
 		tok := stripQuotes(tokens[i])

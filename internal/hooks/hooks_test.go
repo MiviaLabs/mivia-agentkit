@@ -106,6 +106,16 @@ func TestIsProtectedDetectsGitWithGlobalFlags(t *testing.T) {
 			map[string]any{"command": "git --git-dir=.git push"},
 			policy.ProtectedPush,
 		},
+		{
+			"git --exec-path space form push",
+			map[string]any{"command": "git --exec-path /usr/lib/git-core push origin"},
+			policy.ProtectedPush,
+		},
+		{
+			"git --attr-source space form commit",
+			map[string]any{"command": "git --attr-source HEAD commit -m x"},
+			policy.ProtectedCommit,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
