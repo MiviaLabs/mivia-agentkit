@@ -25,28 +25,29 @@ type StampChecker func(repo string) (string, error)
 
 // Engine executes resolved loop nodes.
 type Engine struct {
-	Adapters          *adapter.Registry
-	Stamp             StampChecker
-	Policy            policy.Provider
-	Store             runstore.Store
-	AdapterDefaults   map[string]config.AdapterConfig
-	ConsensusDefaults config.Consensus
-	Clock             func() time.Time
-	PromptBuilder     PromptBuilder
-	Repo              string
-	PriorVerdicts     []adapter.Verdict
-	CurrentArtifact   string
-	MaxIterations     int
+	Adapters         *adapter.Registry
+	Stamp            StampChecker
+	Policy           policy.Provider
+	Store            runstore.Store
+	AdapterDefaults  map[string]config.AdapterConfig
+	DefaultConsensus consensus.Policy
+	Clock            func() time.Time
+	PromptBuilder    PromptBuilder
+	Repo             string
+	PriorVerdicts    []adapter.Verdict
+	CurrentArtifact  string
+	MaxIterations    int
 }
 
 // StepResult is the output of one executed step.
 type StepResult struct {
-	Artifact        string
-	Result          adapter.Result
-	Verdicts        []adapter.Verdict
-	Consensus       bool
-	DecisionRefs    []string
-	PolicyDecisions []policy.Decision
+	Artifact         string
+	Result           adapter.Result
+	Verdicts         []adapter.Verdict
+	Consensus        bool
+	ConsensusOutcome consensus.Outcome
+	DecisionRefs     []string
+	PolicyDecisions  []policy.Decision
 }
 
 // ExecuteStep executes one producer or review node.
@@ -162,36 +163,20 @@ func (e Engine) executeReview(ctx context.Context, runID runstore.RunID, node No
 			return StepResult{}, err
 		}
 	}
-	outcome, err := consensus.Evaluate(consensusPolicy(node.Step.Consensus, e.ConsensusDefaults), verdicts)
+	policy := stepConsensusPolicy(node.Step.Consensus, e.DefaultConsensus)
+	outcome, err := consensus.Evaluate(policy, verdicts)
 	if err != nil {
+		return StepResult{}, fmt.Errorf("consensus: %w", err)
+	}
+	if err := e.appendTrace(runID, "step.consensus", node.Step.ID, iteration, map[string]any{
+		"pass":   outcome.Pass,
+		"reason": outcome.Reason,
+		"mode":   string(policy.Mode),
+		"tied":   outcome.Tied,
+	}); err != nil {
 		return StepResult{}, err
 	}
-	pass := outcome.Pass
-	if err := e.appendTrace(runID, "step.consensus", node.Step.ID, iteration, map[string]any{"pass": pass}); err != nil {
-		return StepResult{}, err
-	}
-	return StepResult{Verdicts: verdicts, Consensus: pass}, nil
-}
-
-func consensusPolicy(step, defaults config.Consensus) consensus.Policy {
-	resolved := defaults
-	if step.Mode != "" {
-		resolved.Mode = step.Mode
-	}
-	if step.MinReviewers != 0 {
-		resolved.MinReviewers = step.MinReviewers
-	}
-	if step.TieBreaker != "" {
-		resolved.TieBreaker = step.TieBreaker
-	}
-	if step.Weights != nil {
-		resolved.Weights = step.Weights
-	}
-	weights := make(map[string]float64, len(resolved.Weights))
-	for name, weight := range resolved.Weights {
-		weights[name] = float64(weight)
-	}
-	return consensus.Policy{Mode: consensus.Mode(resolved.Mode), MinReviewers: resolved.MinReviewers, Weights: weights, TieBreaker: consensus.TieBreaker(resolved.TieBreaker)}
+	return StepResult{Verdicts: verdicts, Consensus: outcome.Pass, ConsensusOutcome: outcome}, nil
 }
 
 func validateAdapterRequest(a adapter.Adapter, req adapter.Request) error {
@@ -242,7 +227,10 @@ func stepTimeout(step config.Step) time.Duration {
 	if step.Timeout == "" {
 		return 5 * time.Minute
 	}
-	d, _ := time.ParseDuration(step.Timeout)
+	d, err := time.ParseDuration(step.Timeout)
+	if err != nil {
+		return 5 * time.Minute
+	}
 	return d
 }
 
@@ -292,6 +280,22 @@ func copyParams(src map[string]string) map[string]string {
 		dst[key] = value
 	}
 	return dst
+}
+
+func stepConsensusPolicy(step config.Consensus, fallback consensus.Policy) consensus.Policy {
+	if step.Mode != "" {
+		p := consensus.Policy{
+			Mode:         consensus.Mode(step.Mode),
+			MinReviewers: step.MinReviewers,
+			TieBreaker:   consensus.TieBreaker(step.TieBreaker),
+			Weights:      config.WeightsToFloat(step.Weights),
+		}
+		if step.Mode == "weighted" {
+			p.Threshold = fallback.Threshold
+		}
+		return p
+	}
+	return fallback
 }
 
 func protectedKind(step config.Step) (policy.ProtectedKind, bool) {

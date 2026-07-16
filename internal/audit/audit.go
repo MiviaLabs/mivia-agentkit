@@ -16,9 +16,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var walkDir = filepath.WalkDir
-var readOSFile = os.ReadFile
-
 // Context carries read-only audit inputs.
 type Context struct {
 	Repo      string
@@ -177,7 +174,7 @@ func weakLoops(ctx Context) []report.Finding {
 	}
 	enabled := 0
 	for _, adapter := range parsed.Adapters {
-		if adapter.Enabled && adapter.Role == "orchestrable" {
+		if adapter.Enabled && adapter.Role == string(config.AdapterRoleOrchestrable) {
 			enabled++
 		}
 	}
@@ -232,28 +229,24 @@ func globalRuleConflict(ctx Context) []report.Finding {
 	return findings
 }
 
-func readMarkdownBlocksChecked(root string) ([][]byte, error) {
+func readMarkdownBlocks(root string) [][]byte {
 	var blocks [][]byte
-	err := walkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() || filepath.Ext(path) != ".md" {
+	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || filepath.Ext(path) != ".md" {
 			return nil
 		}
-		data, err := readOSFile(path)
-		if err != nil {
-			return err
-		}
-		for _, block := range strings.Split(string(data), "\n\n") {
-			trimmed := strings.TrimSpace(block)
-			if len(trimmed) >= 80 {
-				blocks = append(blocks, []byte(trimmed))
+		data, err := os.ReadFile(path)
+		if err == nil {
+			for _, block := range strings.Split(string(data), "\n\n") {
+				trimmed := strings.TrimSpace(block)
+				if len(trimmed) >= 80 {
+					blocks = append(blocks, []byte(trimmed))
+				}
 			}
 		}
 		return nil
 	})
-	return blocks, err
+	return blocks
 }
 
 func extractHTMLOrHashManaged(data []byte) (pre, managed, post []byte, ok bool) {

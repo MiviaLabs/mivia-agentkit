@@ -130,6 +130,28 @@ func TestCodexRunRejectsUnsupportedParams(t *testing.T) {
 	}
 }
 
+func TestCodexRunRejectsApprovalWithQuote(t *testing.T) {
+	r := codexRunner([]byte("{}"), nil)
+	_, err := (Codex{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: `never" --sandbox "none`})
+	if err == nil || !strings.Contains(err.Error(), "unsafe characters") {
+		t.Fatalf("Run() error = %v, want unsafe characters rejection", err)
+	}
+	if len(r.Calls) != 0 {
+		t.Fatalf("runner calls = %d, want 0 before injection reaches CLI", len(r.Calls))
+	}
+}
+
+func TestCodexRunRejectsEffortWithQuote(t *testing.T) {
+	r := codexRunner([]byte("{}"), nil)
+	_, err := (Codex{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: "never", Effort: `high" --model "evil`})
+	if err == nil || !strings.Contains(err.Error(), "unsafe characters") {
+		t.Fatalf("Run() error = %v, want unsafe characters rejection", err)
+	}
+	if len(r.Calls) != 0 {
+		t.Fatalf("runner calls = %d, want 0 before injection reaches CLI", len(r.Calls))
+	}
+}
+
 func TestCodexRunDropsPromptAndCompletionFromMeta(t *testing.T) {
 	out := []byte(`{"model_id":"m","total_tokens":12,"prompt":"raw","completion":"raw"}`)
 	got, err := (Codex{Runner: codexRunner(out, nil)}).Run(context.Background(), Request{Prompt: "x", Approval: "never"})

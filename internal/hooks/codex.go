@@ -11,10 +11,10 @@ import (
 
 // EmitCodex writes the current Codex hook JSON shape to stdout.
 //
-// Re-verified 2026-07-10 against OpenAI Codex hooks docs: PreToolUse denies
-// use hookSpecificOutput.permissionDecision=deny, while PermissionRequest has
-// no decision output and therefore receives only systemMessage. UserPromptSubmit
-// injects hookSpecificOutput.additionalContext and Stop can return decision=block.
+// Re-verified 2026-07-05 against OpenAI Codex hooks docs: PreToolUse denies
+// use hookSpecificOutput.permissionDecision=deny, PermissionRequest denies use
+// hookSpecificOutput.decision.behavior=deny, UserPromptSubmit injects
+// hookSpecificOutput.additionalContext, and Stop can return decision=block.
 func EmitCodex(ctx context.Context, event Event, payload Payload, out Outcome) error {
 	_ = ctx
 	_ = payload
@@ -46,7 +46,13 @@ func codexDocument(event Event, out Outcome) map[string]any {
 	switch event {
 	case EventPermissionRequest:
 		return map[string]any{
-			"systemMessage": reason,
+			"hookSpecificOutput": map[string]any{
+				"decision": map[string]any{
+					"behavior": "deny",
+					"message":  reason,
+				},
+				"hookEventName": "PermissionRequest",
+			},
 		}
 	case EventStop:
 		return map[string]any{

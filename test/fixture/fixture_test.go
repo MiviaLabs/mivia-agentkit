@@ -46,7 +46,7 @@ func TestGeneratedFixtureDoctorPasses(t *testing.T) {
 		"preflight",
 		"--repo", env.repo,
 		"--contract-row", "fixture",
-		"--focused-verifier", "fixture",
+		"--focused-verifier", "go test ./test/fixture/... -count=1",
 		"--mutation-proof", "fixture expected file set mismatch fails",
 		"--json",
 	)
@@ -147,15 +147,6 @@ func newFixtureEnv(t *testing.T) fixtureEnv {
 		"--adapter", "copilot",
 		"--write",
 	)
-	manifestPath := filepath.Join(repo, "mivia-agent.yaml")
-	manifest, err := os.ReadFile(manifestPath)
-	if err != nil {
-		t.Fatalf("ReadFile(manifest) error = %v", err)
-	}
-	manifest = append(manifest, []byte("\nquality:\n  required_verifiers: [fixture]\n  verifiers:\n    fixture:\n      command: [true]\n")...)
-	if err := os.WriteFile(manifestPath, manifest, 0o600); err != nil {
-		t.Fatalf("WriteFile(manifest) error = %v", err)
-	}
 
 	return fixtureEnv{
 		binary:        binary,

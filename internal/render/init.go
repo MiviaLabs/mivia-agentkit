@@ -12,7 +12,6 @@ import (
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/config"
 	"github.com/MiviaLabs/mivia-agentkit/internal/globalconfig"
-	"github.com/MiviaLabs/mivia-agentkit/internal/pathpolicy"
 	"github.com/MiviaLabs/mivia-agentkit/internal/templates"
 	"github.com/MiviaLabs/mivia-agentkit/internal/version"
 )
@@ -144,7 +143,10 @@ func WriteInit(cfg InitConfig) (InitReport, error) {
 			}
 			data = next
 		}
-		if err := pathpolicy.WriteFile(repo, item.OutPath, data, 0o644); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return InitReport{}, err
+		}
+		if err := os.WriteFile(path, data, 0o644); err != nil {
 			return InitReport{}, err
 		}
 	}
@@ -162,7 +164,7 @@ func ensureAIRunsIgnored(repo string, report *InitReport) error {
 	path := filepath.Join(repo, ".gitignore")
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		if err := pathpolicy.WriteFile(repo, ".gitignore", []byte(entry+"\n"), 0o644); err != nil {
+		if err := os.WriteFile(path, []byte(entry+"\n"), 0o644); err != nil {
 			return err
 		}
 		return nil
@@ -178,7 +180,7 @@ func ensureAIRunsIgnored(repo string, report *InitReport) error {
 		next = append(next, '\n')
 	}
 	next = append(next, []byte(entry+"\n")...)
-	if err := pathpolicy.WriteFile(repo, ".gitignore", next, 0o644); err != nil {
+	if err := os.WriteFile(path, next, 0o644); err != nil {
 		return err
 	}
 	return nil

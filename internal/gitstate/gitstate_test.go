@@ -24,7 +24,22 @@ func TestDetectRootFindsGitDir(t *testing.T) {
 }
 
 func TestDetectRootErrorsOutsideRepo(t *testing.T) {
-	if _, err := DetectRoot(t.TempDir()); err == nil {
+	// t.TempDir() may sit under a directory with a stray .git (e.g.
+	// /tmp/.git), causing DetectRoot to walk up and succeed spuriously.
+	// Use /var/tmp as a known-clean base on typical systems.
+	base := "/var/tmp"
+	if _, err := os.Stat(base); err != nil {
+		t.Skipf("clean temp base %q unavailable", base)
+	}
+	if _, err := os.Stat(filepath.Join(base, ".git")); err == nil {
+		t.Skipf("clean temp base %q has a .git; skipping to avoid false negative", base)
+	}
+	clean, err := os.MkdirTemp(base, "gitstate-test-")
+	if err != nil {
+		t.Fatalf("MkdirTemp: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(clean) })
+	if _, err := DetectRoot(clean); err == nil {
 		t.Fatal("DetectRoot() error = nil, want error")
 	}
 }
@@ -64,6 +79,7 @@ func TestInitRepoDisablesGlobalSigning(t *testing.T) {
 	git(t, repo, "commit", "-m", "initial")
 }
 
+// initRepo creates a temporary Git repository with commit signing disabled.
 func initRepo(t *testing.T) string {
 	t.Helper()
 	repo := t.TempDir()

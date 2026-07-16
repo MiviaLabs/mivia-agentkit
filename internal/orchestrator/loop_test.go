@@ -7,12 +7,10 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
 	"github.com/MiviaLabs/mivia-agentkit/internal/config"
-	"github.com/MiviaLabs/mivia-agentkit/internal/runstore"
 )
 
 func TestLoopExitsWhenGatePasses(t *testing.T) {
@@ -132,36 +130,6 @@ func TestLoopHonorsMaxIterationsOverrideWithinManifestBound(t *testing.T) {
 	}
 }
 
-func TestLoopDoesNotCreateRunForInvalidOverride(t *testing.T) {
-	e := testEngine(t)
-	e.MaxIterations = 2
-	loop := testLoop(1, "iterate", "warn")
-	if _, err := e.RunLoop(context.Background(), loop, nil); !errors.Is(err, ErrMaxIterationsExceeded) {
-		t.Fatalf("RunLoop() error = %v, want ErrMaxIterationsExceeded", err)
-	}
-	runs, err := os.ReadDir(e.Store.Root)
-	if err != nil && !os.IsNotExist(err) {
-		t.Fatalf("ReadDir() error = %v", err)
-	}
-	if len(runs) != 0 {
-		t.Fatalf("run directories = %d, want none", len(runs))
-	}
-}
-
-func TestLoopPropagatesTerminalTraceFailure(t *testing.T) {
-	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}}, sequenceReviewer("claude", false))
-	e.Store.AppendTraceFunc = func(_ runstore.RunID, event runstore.TraceEvent) error {
-		if event.Kind == "loop.exhausted" {
-			return errors.New("disk full")
-		}
-		return nil
-	}
-	_, err := e.RunLoop(context.Background(), testLoop(1, "iterate", "warn"), nil)
-	if err == nil || !strings.Contains(err.Error(), "disk full") {
-		t.Fatalf("RunLoop() error = %v, want terminal trace failure", err)
-	}
-}
-
 func testLoop(max int, onFail, exhausted string) config.Loop {
 	return config.Loop{Bound: "iterations", MaxIterations: max, ExitWhen: "review-pass", OnExhausted: exhausted, Steps: []config.Step{{ID: "produce", Producer: "codex"}, {ID: "review", Reviewers: []string{"claude"}, OnFail: onFail}}}
 }
@@ -176,8 +144,8 @@ type sequenceAdapter struct {
 	calls    int
 }
 
-func (s *sequenceAdapter) Name() string       { return s.name }
-func (s *sequenceAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (s *sequenceAdapter) Name() string             { return s.name }
+func (s *sequenceAdapter) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 func (s *sequenceAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: s.name, HeadlessCapable: true}, nil
 }
@@ -199,8 +167,8 @@ type sequenceProducerAdapter struct {
 	calls   int
 }
 
-func (s *sequenceProducerAdapter) Name() string       { return s.name }
-func (s *sequenceProducerAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (s *sequenceProducerAdapter) Name() string             { return s.name }
+func (s *sequenceProducerAdapter) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 func (s *sequenceProducerAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: s.name, HeadlessCapable: true}, nil
 }

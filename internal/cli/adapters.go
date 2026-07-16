@@ -23,7 +23,7 @@ type adapterStatus struct {
 }
 
 var runtimeAdapters = func() []adapter.Adapter {
-	return []adapter.Adapter{adapter.Codex{}, adapter.Claude{}, adapter.Antigravity{}, adapter.Crush{}}
+	return []adapter.Adapter{adapter.Codex{}, adapter.Claude{}, adapter.Antigravity{}, adapter.Crush{}, adapter.Zai{}}
 }
 
 func newAdaptersCommand() *cobra.Command {
@@ -70,12 +70,12 @@ func detectAdapterStatuses(ctx context.Context, manifest config.Manifest, requir
 		installed := err == nil
 		cfg := manifest.Adapters[a.Name()]
 		seen[a.Name()] = struct{}{}
-		role := string(a.Role())
+		role := a.Role()
 		if cfg.Role != "" {
-			role = string(cfg.Role)
+			role = cfg.Role
 		}
-		approved := installed && d.HeadlessCapable && role == string(config.AdapterRoleOrchestrable)
-		statuses = append(statuses, adapterStatus{Name: a.Name(), Installed: installed, Version: d.Version, Headless: d.HeadlessCapable, Role: role, ApprovedForRun: approved})
+		approved := installed && d.HeadlessCapable && role == config.AdapterRoleOrchestrable
+		statuses = append(statuses, adapterStatus{Name: a.Name(), Installed: installed, Version: d.Version, Headless: d.HeadlessCapable, Role: string(role), ApprovedForRun: approved})
 		if shouldBlockAdapter(a.Name(), cfg, required) && !approved {
 			blocked = append(blocked, a.Name())
 		}

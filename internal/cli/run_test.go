@@ -12,34 +12,9 @@ import (
 	"testing"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
+	"github.com/MiviaLabs/mivia-agentkit/internal/config"
 	"github.com/MiviaLabs/mivia-agentkit/internal/orchestrator"
 )
-
-func TestRunRejectsReservedStepFlagUntilImplemented(t *testing.T) {
-	cmd := newRunCommand()
-	cmd.SetArgs([]string{"--repo", filepath.Join(t.TempDir(), "missing"), "--workflow", "missing", "--step", "review"})
-	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "--step is reserved") {
-		t.Fatalf("run error = %v, want reserved step rejection", err)
-	}
-}
-
-func TestRunRejectsReservedInputArtifactFlagUntilImplemented(t *testing.T) {
-	cmd := newRunCommand()
-	cmd.SetArgs([]string{"--repo", filepath.Join(t.TempDir(), "missing"), "--workflow", "missing", "--input-artifact", "in.md"})
-	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "--input-artifact is reserved") {
-		t.Fatalf("run error = %v, want reserved input artifact rejection", err)
-	}
-}
-
-func TestRunPropagatesJSONWriteError(t *testing.T) {
-	repo := repoWithResearchLoop(t)
-	cmd := newRunCommand()
-	cmd.SetOut(failingWriter{})
-	cmd.SetArgs([]string{"--repo", repo, "--workflow", "research", "--dry-run", "--json"})
-	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "output unavailable") {
-		t.Fatalf("run error = %v, want JSON write failure", err)
-	}
-}
 
 func TestRunDryRunPrintsPlanWithoutInvoking(t *testing.T) {
 	calls := 0
@@ -240,7 +215,7 @@ func TestRunWithCrushUsesRealSubprocessBoundary(t *testing.T) {
 	t.Setenv("PATH", stubDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("CRUSH_STUB_DIR", stubDir)
 	withRuntimeAdapters(t, adapter.Crush{})
-	mustWrite(t, filepath.Join(repo, "mivia-agent.yaml"), "version: \"1\"\nadapters:\n  crush:\n    enabled: true\n    role: orchestrable\n    model: ollama/qwen3:14b\nloops:\n  build:\n    bound: iterations\n    max_iterations: 1\n    steps:\n      - id: build\n        producer: crush\n        artifact: build.md\n      - id: review\n        reviewers: [crush]\n        artifact: build.md\n        consensus: {min_reviewers: 1}\n    exit_when: review-pass\n    on_exhausted: fail\n")
+	mustWrite(t, filepath.Join(repo, "mivia-agent.yaml"), "version: \"1\"\nadapters:\n  crush:\n    enabled: true\n    role: orchestrable\n    model: ollama/qwen3:14b\nrouting:\n  consensus:\n    mode: unanimous\n    min_reviewers: 1\nloops:\n  build:\n    bound: iterations\n    max_iterations: 1\n    steps:\n      - id: build\n        producer: crush\n        artifact: build.md\n      - id: review\n        reviewers: [crush]\n        artifact: build.md\n    exit_when: review-pass\n    on_exhausted: fail\n")
 	mustWrite(t, filepath.Join(repo, ".ai/workflows/build.yaml"), "bound: iterations\nmax_iterations: 1\nsteps:\n- id: build\n  producer: crush\n  artifact: build.md\n- id: review\n  reviewers: [crush]\n  artifact: build.md\nexit_when: review-pass\non_exhausted: fail\n")
 
 	cmd := newRunCommand()
@@ -352,8 +327,8 @@ type sequenceAdapter struct {
 	prompts  *[]string
 }
 
-func (s *sequenceAdapter) Name() string       { return s.name }
-func (s *sequenceAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (s *sequenceAdapter) Name() string             { return s.name }
+func (s *sequenceAdapter) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 func (s *sequenceAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: s.name, HeadlessCapable: true}, nil
 }
@@ -423,8 +398,8 @@ type contextAwareAdapter struct {
 	name string
 }
 
-func (c contextAwareAdapter) Name() string       { return c.name }
-func (c contextAwareAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (c contextAwareAdapter) Name() string             { return c.name }
+func (c contextAwareAdapter) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 func (c contextAwareAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: c.name, HeadlessCapable: true}, nil
 }

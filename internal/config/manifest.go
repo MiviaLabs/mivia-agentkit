@@ -6,8 +6,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"regexp"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -71,15 +69,21 @@ type Consensus struct {
 	MinReviewers int            `yaml:"min_reviewers"`
 }
 
-// Quality configures quality checks.
-type Quality struct {
-	RequiredVerifiers []string            `yaml:"required_verifiers"`
-	Verifiers         map[string]Verifier `yaml:"verifiers"`
+// WeightsToFloat converts integer weights to float64 for consensus.Policy.
+func WeightsToFloat(in map[string]int) map[string]float64 {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]float64, len(in))
+	for k, v := range in {
+		out[k] = float64(v)
+	}
+	return out
 }
 
-// Verifier declares one trusted, local, argv-only quality command.
-type Verifier struct {
-	Command []string `yaml:"command"`
+// Quality configures quality checks.
+type Quality struct {
+	RequiredVerifiers []string `yaml:"required_verifiers"`
 }
 
 // Paths configures path allow and deny lists.
@@ -185,20 +189,13 @@ func (m *Manifest) Validate() error {
 		if err := validateEffort(fmt.Sprintf("adapter %q", name), adapter.Effort); err != nil {
 			return err
 		}
-	}
-	for id, verifier := range m.Quality.Verifiers {
-		if !verifierID.MatchString(id) || len(verifier.Command) == 0 || verifier.Command[0] == "" {
-			return fmt.Errorf("quality verifier %q must have a valid id and command", id)
-		}
-	}
-	for _, id := range m.Quality.RequiredVerifiers {
-		if _, ok := m.Quality.Verifiers[id]; !ok {
-			return fmt.Errorf("required quality verifier %q is not declared", id)
+		if !EffortAllowedFor(name, adapter.Effort) {
+			return fmt.Errorf("adapter %q effort %q is not supported by this adapter", name, adapter.Effort)
 		}
 	}
 
-	if err := validateConsensus("routing", m.Routing.Consensus); err != nil {
-		return err
+	if m.Routing.Consensus.Mode != "" && !validConsensusMode(m.Routing.Consensus.Mode) {
+		return fmt.Errorf("unknown consensus mode %q", m.Routing.Consensus.Mode)
 	}
 
 	enabled := map[string]AdapterRole{}
@@ -217,32 +214,10 @@ func (m *Manifest) Validate() error {
 		if err := loop.Validate(enabled); err != nil {
 			return fmt.Errorf("loop %q: %w", name, err)
 		}
-		for _, step := range loop.Steps {
-			if err := validateConsensus(fmt.Sprintf("loop %q step %q", name, step.ID), step.Consensus); err != nil {
-				return err
-			}
-		}
 		m.Loops[name] = loop
 	}
 	return nil
 }
-
-func validateConsensus(scope string, consensus Consensus) error {
-	if consensus.Mode != "" && !validConsensusMode(consensus.Mode) {
-		return fmt.Errorf("%s has unknown consensus mode %q", scope, consensus.Mode)
-	}
-	if consensus.MinReviewers < 0 {
-		return fmt.Errorf("%s consensus min_reviewers must not be negative", scope)
-	}
-	for adapter, weight := range consensus.Weights {
-		if strings.TrimSpace(adapter) == "" || weight <= 0 {
-			return fmt.Errorf("%s consensus weight for %q must be positive", scope, adapter)
-		}
-	}
-	return nil
-}
-
-var verifierID = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
 
 func validConsensusMode(mode string) bool {
 	switch mode {
@@ -271,4 +246,34 @@ func validateEffort(scope string, effort string) error {
 		return fmt.Errorf("%s has %s", scope, err)
 	}
 	return nil
+}
+
+// AdapterEffortAllowed lists the effort values each adapter accepts at config time.
+// This is the SSOT cross-referenced by config-time validation; adapter runtime
+// validators remain as defense-in-depth.
+var AdapterEffortAllowed = map[string]map[string]struct{}{
+	"codex":       setOf("", "minimal", "low", "medium", "high", "xhigh"),
+	"claude":      setOf("", "low", "medium", "high", "xhigh", "max"),
+	"crush":       setOf(""),
+	"antigravity": setOf(""),
+	"copilot":     setOf(""),
+}
+
+func setOf(vals ...string) map[string]struct{} {
+	m := make(map[string]struct{}, len(vals))
+	for _, v := range vals {
+		m[v] = struct{}{}
+	}
+	return m
+}
+
+// EffortAllowedFor reports whether the named adapter accepts the given effort
+// value. Unknown adapters return true (defer to runtime validation).
+func EffortAllowedFor(adapter, effort string) bool {
+	allowed, ok := AdapterEffortAllowed[adapter]
+	if !ok {
+		return true
+	}
+	_, ok = allowed[effort]
+	return ok
 }

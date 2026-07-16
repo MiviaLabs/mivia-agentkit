@@ -6,8 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/pathpolicy"
@@ -61,47 +61,49 @@ func (n Noop) Record(ctx context.Context, event Event) error {
 	if path == "" {
 		path = filepath.FromSlash(".ai/audit.jsonl")
 	}
-	repo, relative, err := checkedAuditPath(path)
+	checked, err := checkedAuditPath(path)
 	if err != nil {
 		return err
 	}
+	path = checked
 	if event.When == "" {
 		event.When = time.Now().UTC().Format(time.RFC3339)
 	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("create audit dir: %w", err)
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return fmt.Errorf("open audit log: %w", err)
+	}
+	defer file.Close()
 	line, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("marshal audit event: %w", err)
 	}
-	if err := pathpolicy.AppendFile(repo, relative, append(line, '\n'), 0o644); err != nil {
+	if _, err := file.Write(append(line, '\n')); err != nil {
 		return fmt.Errorf("write audit event: %w", err)
 	}
 	return nil
 }
 
-func checkedAuditPath(path string) (string, string, error) {
+func checkedAuditPath(path string) (string, error) {
 	clean := filepath.Clean(path)
+	if filepath.Base(clean) != "audit.jsonl" || filepath.Base(filepath.Dir(clean)) != ".ai" {
+		return "", fmt.Errorf("audit path %q must stay under .ai/audit.jsonl", path)
+	}
 	if filepath.IsAbs(clean) {
-		for parent := filepath.Dir(clean); parent != filepath.Dir(parent); parent = filepath.Dir(parent) {
-			if filepath.Base(parent) != ".ai" {
-				continue
-			}
-			repo := filepath.Dir(parent)
-			rel, err := filepath.Rel(repo, clean)
-			if err != nil || rel == ".ai" || !strings.HasPrefix(filepath.ToSlash(rel), ".ai/") {
-				break
-			}
-			if err := pathpolicy.NewDefault().Check(repo, rel); err != nil {
-				return "", "", fmt.Errorf("audit path: %w", err)
-			}
-			return repo, rel, nil
+		repo := filepath.Dir(filepath.Dir(clean))
+		if err := pathpolicy.NewDefault().Check(repo, filepath.Join(".ai", "audit.jsonl")); err != nil {
+			return "", fmt.Errorf("audit path: %w", err)
 		}
-		return "", "", fmt.Errorf("audit path %q must stay under .ai", path)
+		return clean, nil
 	}
 	if err := pathpolicy.NewDefault().Check(".", clean); err != nil {
-		return "", "", fmt.Errorf("audit path: %w", err)
+		return "", fmt.Errorf("audit path: %w", err)
 	}
-	if clean == ".ai" || !strings.HasPrefix(filepath.ToSlash(clean), ".ai/") {
-		return "", "", fmt.Errorf("audit path %q must stay under .ai", path)
+	if filepath.ToSlash(clean) != ".ai/audit.jsonl" {
+		return "", fmt.Errorf("audit path %q must stay under .ai/audit.jsonl", path)
 	}
-	return ".", clean, nil
+	return clean, nil
 }

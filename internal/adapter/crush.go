@@ -12,6 +12,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/MiviaLabs/mivia-agentkit/internal/config"
 )
 
 // ErrNotHeadlessCapable indicates an adapter cannot run non-interactively.
@@ -26,7 +28,7 @@ type Crush struct {
 func (Crush) Name() string { return "crush" }
 
 // Role returns the adapter role.
-func (Crush) Role() Role { return RoleOrchestrable }
+func (Crush) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 
 // Detect checks for a Crush CLI binary and verifies run help before approving headless use.
 func (c Crush) Detect(ctx context.Context) (Detection, error) {
@@ -103,9 +105,6 @@ func (c Crush) runner() Runner {
 }
 
 func (c Crush) runRaw(ctx context.Context, req Request) (RunResult, error) {
-	if err := c.ValidateRequest(req); err != nil {
-		return RunResult{}, err
-	}
 	args := []string{"crush", "run", "--quiet", "--cwd", req.Workdir}
 	if req.Model != "" {
 		args = append(args, "--model", req.Model)

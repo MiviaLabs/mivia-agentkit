@@ -2,7 +2,10 @@
 // Plan: WS5. PRD: FR-7.1, FR-8.1, FR-8.2, FR-8.3.
 package hooks
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestClaudePreToolUseDenyShape(t *testing.T) {
 	got := mustJSON(t, claudeDocument(EventPreToolUse, "blocked"))
@@ -10,14 +13,16 @@ func TestClaudePreToolUseDenyShape(t *testing.T) {
 	if got != want {
 		t.Fatalf("claude deny shape:\ngot  %s\nwant %s", got, want)
 	}
-	if err := EmitClaude(t.Context(), EventPreToolUse, Payload{}, Outcome{Allow: false, Reason: "blocked"}); err != nil {
-		t.Fatalf("EmitClaude() error = %#v; want structured denial", err)
+	err := EmitClaude(t.Context(), EventPreToolUse, Payload{}, Outcome{Allow: false, Reason: "blocked"})
+	var exit ClaudeExitError
+	if !errors.As(err, &exit) || exit.Code != 2 {
+		t.Fatalf("EmitClaude() error = %#v; want ClaudeExitError code 2", err)
 	}
 }
 
 func TestClaudeStopBlocksDoneWithoutStamp(t *testing.T) {
 	got := mustJSON(t, claudeDocument(EventStop, "stamp required"))
-	want := "{\n  \"decision\": \"block\",\n  \"reason\": \"stamp required\"\n}"
+	want := "{\n  \"continue\": false,\n  \"stopReason\": \"stamp required\"\n}"
 	if got != want {
 		t.Fatalf("claude stop shape:\ngot  %s\nwant %s", got, want)
 	}

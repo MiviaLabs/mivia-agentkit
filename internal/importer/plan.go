@@ -142,7 +142,10 @@ func (p Plan) Apply(repo string, force bool) (Report, error) {
 		} else if !os.IsNotExist(err) {
 			return report, err
 		}
-		if err := pathpolicy.WriteFile(repo, item.OutPath, data, 0o644); err != nil {
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return report, err
+		}
+		if err := os.WriteFile(target, data, 0o644); err != nil {
 			return report, err
 		}
 		report.Written = append(report.Written, item.OutPath)
@@ -169,7 +172,10 @@ func (p Plan) Apply(repo string, force bool) (Report, error) {
 		} else if !os.IsNotExist(err) {
 			return report, err
 		}
-		if err := pathpolicy.WriteFile(repo, action.Path, data, 0o644); err != nil {
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return report, err
+		}
+		if err := os.WriteFile(target, data, 0o644); err != nil {
 			return report, err
 		}
 		report.Written = append(report.Written, action.Path)
@@ -231,6 +237,7 @@ func bootstrapFiles(repo string, manifest config.Manifest) (render.RenderPlan, m
 			{Name: "adversarial-test-review", Path: ".ai/skills/adversarial-test-review/SKILL.md", Source: "project"},
 			{Name: "airtight-feature-delivery", Path: ".ai/skills/airtight-feature-delivery/SKILL.md", Source: "project"},
 			{Name: "deep-bug-audit", Path: ".ai/skills/deep-bug-audit/SKILL.md", Source: "project"},
+			{Name: "mivia-agent-workflows", Path: ".ai/skills/mivia-agent-workflows/SKILL.md", Source: "project"},
 			{Name: "test-coverage-audit", Path: ".ai/skills/test-coverage-audit/SKILL.md", Source: "project"},
 		},
 	})

@@ -31,14 +31,6 @@ func TestCodexStopBlocksDoneWithoutStamp(t *testing.T) {
 	}
 }
 
-func TestCodexPermissionRequestUsesSupportedMessageShape(t *testing.T) {
-	got := mustJSON(t, codexDocument(EventPermissionRequest, Outcome{Allow: false, Reason: "stamp required"}))
-	want := "{\n  \"systemMessage\": \"stamp required\"\n}"
-	if got != want {
-		t.Fatalf("codex permission shape:\ngot  %s\nwant %s", got, want)
-	}
-}
-
 func TestCodexEmitStableOrder(t *testing.T) {
 	first := mustJSON(t, codexDocument(EventPermissionRequest, Outcome{Allow: false, Reason: "blocked"}))
 	second := mustJSON(t, codexDocument(EventPermissionRequest, Outcome{Allow: false, Reason: "blocked"}))

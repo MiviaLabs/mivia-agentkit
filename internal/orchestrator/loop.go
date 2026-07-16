@@ -21,10 +21,12 @@ var (
 
 // LoopResult summarizes a loop run.
 type LoopResult struct {
-	Outcome    string
-	Iterations int
-	Trace      runstore.RunID
-	Err        error
+	Outcome    string         `json:"Outcome"`
+	Iterations int            `json:"Iterations"`
+	Trace      runstore.RunID `json:"Trace"`
+	RunDir     string         `json:"RunDir"`
+	Artifacts  []string       `json:"Artifacts,omitempty"`
+	Err        error          `json:"Err,omitempty"`
 }
 
 // RunLoop executes a bounded workflow loop.
@@ -39,69 +41,82 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 	if err != nil {
 		return LoopResult{Err: err}, err
 	}
+	runID := e.Store.NewRun()
+	runDir := e.Store.Dir(runID)
 	max := loop.MaxIterations
 	if max <= 0 {
 		max = 1
 	}
 	if e.MaxIterations > 0 {
 		if e.MaxIterations > max {
-			return LoopResult{Err: ErrMaxIterationsExceeded}, ErrMaxIterationsExceeded
+			return LoopResult{Trace: runID, RunDir: runDir, Err: ErrMaxIterationsExceeded}, ErrMaxIterationsExceeded
 		}
 		max = e.MaxIterations
 	}
-	runID, err := e.Store.NewRun()
-	if err != nil {
-		return LoopResult{Err: err}, err
-	}
 	var prior []adapter.Verdict
 	var currentArtifact string
+	seenArtifacts := map[string]struct{}{}
+	var artifacts []string
+	trackArtifact := func(path string) {
+		if path == "" {
+			return
+		}
+		if _, ok := seenArtifacts[path]; ok {
+			return
+		}
+		seenArtifacts[path] = struct{}{}
+		artifacts = append(artifacts, path)
+	}
+	result := func(outcome string, iteration int, err error) (LoopResult, error) {
+		return LoopResult{Outcome: outcome, Iterations: iteration, Trace: runID, RunDir: runDir, Artifacts: artifacts, Err: err}, err
+	}
 	for iteration := 1; iteration <= max; iteration++ {
 		var last StepResult
+		var lastNode Node
 		for _, node := range nodes {
+			lastNode = node
 			if _, ok := protectedKind(node.Step); ok {
 				if e.Stamp == nil {
-					return LoopResult{Iterations: iteration, Trace: runID, Err: ErrStaleStamp}, ErrStaleStamp
+					return result("", iteration, ErrStaleStamp)
 				}
 				if _, err := e.Stamp(e.Repo); err != nil {
-					return LoopResult{Iterations: iteration, Trace: runID, Err: ErrStaleStamp}, fmt.Errorf("%w: %v", ErrStaleStamp, err)
+					return result("", iteration, fmt.Errorf("%w: %v", ErrStaleStamp, err))
 				}
 			}
 			e.PriorVerdicts = prior
 			e.CurrentArtifact = currentArtifact
 			last, err = e.ExecuteStep(ctx, runID, node, iteration)
 			if err != nil {
-				return LoopResult{Iterations: iteration, Trace: runID, Err: err}, err
+				return result("", iteration, err)
 			}
 			if last.Artifact != "" {
 				currentArtifact = last.Artifact
+				trackArtifact(last.Artifact)
 			}
 			if len(last.Verdicts) > 0 {
 				prior = last.Verdicts
 			}
 		}
 		if last.Consensus && loop.ExitWhen == "review-pass" {
-			return LoopResult{Outcome: "pass", Iterations: iteration, Trace: runID}, nil
+			return result("pass", iteration, nil)
 		}
-		if !last.Consensus && loopOnFail(loop) == "fail" {
-			err := errors.New("review gate failed")
-			return LoopResult{Outcome: "fail", Iterations: iteration, Trace: runID, Err: err}, err
+		if !last.Consensus {
+			failAction := stepOnFailValue(lastNode.Step.OnFail, "fail")
+			if failAction == "fail" {
+				return result("fail", iteration, errors.New("review gate failed"))
+			}
 		}
 	}
 	if loop.OnExhausted == "fail" {
-		err := errors.New("loop exhausted")
-		return LoopResult{Outcome: "fail", Iterations: max, Trace: runID, Err: err}, err
+		return result("fail", max, errors.New("loop exhausted"))
 	}
-	if err := e.Store.AppendTrace(runID, runstore.TraceEvent{Kind: "loop.exhausted", Payload: map[string]any{"on_exhausted": loop.OnExhausted}}); err != nil {
-		return LoopResult{Iterations: max, Trace: runID, Err: err}, err
-	}
-	return LoopResult{Outcome: "warn", Iterations: max, Trace: runID}, nil
+	_ = e.Store.AppendTrace(runID, runstore.TraceEvent{Kind: "loop.exhausted", Payload: map[string]any{"on_exhausted": loop.OnExhausted}})
+	return result("warn", max, nil)
 }
 
-func loopOnFail(loop config.Loop) string {
-	for _, step := range loop.Steps {
-		if step.OnFail != "" {
-			return step.OnFail
-		}
+func stepOnFailValue(onFail, fallback string) string {
+	if onFail != "" {
+		return onFail
 	}
-	return "iterate"
+	return fallback
 }

@@ -94,6 +94,14 @@ This repo includes Codex-only workflows for its own maintenance:
 | `roadmap-implementation-review-loop` | Codex `high` | Codex `xhigh` | `roadmap-review.md` |
 | `desktop-workflow-docs-loop` | Codex `medium` | Codex `high` | `desktop-workflow-docs.md` |
 
+ZAI/GLM-5-Turbo smoke workflows (all use `model: glm-5-turbo`, no thinking):
+
+| Workflow | Purpose | Writes? |
+| --- | --- | --- |
+| `zai-smoke-research` | Read-only research + review | no |
+| `zai-smoke-review` | Review-only of an existing artifact | no |
+| `zai-smoke-patch` | Write a patch (`approval: commit`) + review | yes |
+
 ## Current Capabilities
 
 Implemented command surface:
@@ -117,6 +125,18 @@ Current adapter behavior:
 - `antigravity`: orchestrable via the `agy` binary.
 - `copilot`: guidance-only template surface, not an orchestrated runtime adapter.
 - `crush`: orchestrable when `crush run --help` confirms noninteractive `run` support.
+- `zai`: orchestrable. Drives the [`@guizmo-ai/zai-cli`](https://www.npmjs.com/package/@guizmo-ai/zai-cli) (binary `zai`) against Z.ai GLM models in headless mode (`zai -p`). Verified models: `glm-5.2` and `glm-5-turbo`. `zai` has no approval or reasoning-effort flag, so those request fields are rejected; the only supported override param is `model`. Auth via `ZAI_API_KEY` or `zai config`. See [docs/examples/zai-glm-examples.md](docs/examples/zai-glm-examples.md).
+
+### Supported agent CLIs
+
+| CLI | Binary | Adapter | Role | Headless mode |
+| --- | --- | --- | --- | --- |
+| Codex | `codex` | `codex` | orchestrable | `codex exec --json` |
+| Claude Code | `claude` | `claude` | orchestrable | `claude -p --output-format json` |
+| Antigravity | `agy` | `antigravity` | orchestrable | `agy` noninteractive run |
+| Crush | `crush` | `crush` | orchestrable | `crush run --quiet` (stdin prompt) |
+| ZAI (Z.ai GLM) | `zai` | `zai` | orchestrable | `zai -m <model> -p <prompt> --no-color` |
+| GitHub Copilot | — | `copilot` | guidance | not an orchestrated runtime |
 
 Some flags already exist on the CLI but are not fully wired yet:
 
@@ -256,6 +276,8 @@ make help
 
 - [User guide](docs/user-guide.md) - current command surface, flags, behavior notes, and examples
 - [Configuration examples](docs/config-examples.md) - working manifest and workflow examples, including Codex plus Crush/Qwen loops
+- [Examples index](docs/examples/README.md) - when to write vs. read-only, and runnable starting points
+- [ZAI/GLM examples](docs/examples/zai-glm-examples.md) - install, auth, and write/review/research loops for the `zai` adapter
 - [Loop authoring](docs/loop-authoring.md) - workflow shape, consensus, artifact paths, and practical checks
 - [Desktop agent workflows](docs/desktop-agent-workflows.md) - how Codex, Claude, and generic agent desktops should use skills and hooks to invoke `mivia-agent`
 - [Mivia workflow skill](.ai/skills/mivia-agent-workflows/SKILL.md) - repo skill with copy-paste desktop prompts and runtime proof rules

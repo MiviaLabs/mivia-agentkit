@@ -6,6 +6,8 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"github.com/MiviaLabs/mivia-agentkit/internal/config"
 )
 
 func TestRegistryLookupByName(t *testing.T) {
@@ -66,7 +68,9 @@ type namedAdapter struct {
 }
 
 func (n namedAdapter) Name() string { return n.name }
-func (n namedAdapter) Role() Role   { return RoleOrchestrable }
+func (n namedAdapter) Role() config.AdapterRole {
+	return config.AdapterRoleOrchestrable
+}
 func (n namedAdapter) Detect(ctx context.Context) (Detection, error) {
 	return Detection{Name: n.name, HeadlessCapable: true}, nil
 }

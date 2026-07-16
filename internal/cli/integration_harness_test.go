@@ -45,7 +45,7 @@ func main() {
 		t.Fatalf("WriteFile(%s) error = %v", src, err)
 	}
 	bin := filepath.Join(dir, "fixture"+binarySuffix())
-	build := exec.Command("go", "build", "-o", bin, src)
+	build := exec.Command("go", "build", "-buildvcs=false", "-o", bin, src)
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("go build error = %v, output = %s", err, out)
 	}

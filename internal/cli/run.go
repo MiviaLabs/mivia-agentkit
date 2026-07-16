@@ -13,6 +13,7 @@ import (
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
 	"github.com/MiviaLabs/mivia-agentkit/internal/config"
+	"github.com/MiviaLabs/mivia-agentkit/internal/consensus"
 	"github.com/MiviaLabs/mivia-agentkit/internal/orchestrator"
 	"github.com/MiviaLabs/mivia-agentkit/internal/policy"
 	"github.com/MiviaLabs/mivia-agentkit/internal/preflight"
@@ -22,7 +23,7 @@ import (
 )
 
 func newRunCommand() *cobra.Command {
-	var repo, workflow, step, inputArtifact string
+	var repo, workflow string
 	var maxIterations int
 	var dryRun, jsonOut, strict bool
 	var vars []string
@@ -30,12 +31,6 @@ func newRunCommand() *cobra.Command {
 		Use:   "run",
 		Short: "Run a bounded agent workflow",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if cmd.Flags().Changed("step") {
-				return fmt.Errorf("--step is reserved and not implemented")
-			}
-			if cmd.Flags().Changed("input-artifact") {
-				return fmt.Errorf("--input-artifact is reserved and not implemented")
-			}
 			templateVars, err := parseTemplateVars(vars)
 			if err != nil {
 				return err
@@ -61,7 +56,7 @@ func newRunCommand() *cobra.Command {
 				return err
 			}
 			builder := PromptBuilder{Repo: absRepoPath(repo), Vars: templateVars}
-			engine := orchestrator.Engine{Adapters: reg, Policy: prov, Store: runstore.New(absRepoPath(repo)), AdapterDefaults: manifest.Adapters, ConsensusDefaults: manifest.Routing.Consensus, Repo: absRepoPath(repo), MaxIterations: maxIterations, Stamp: func(repo string) (string, error) {
+			engine := orchestrator.Engine{Adapters: reg, Policy: prov, Store: runstore.New(absRepoPath(repo)), AdapterDefaults: manifest.Adapters, DefaultConsensus: consensus.Policy{Mode: consensus.Mode(manifest.Routing.Consensus.Mode), MinReviewers: manifest.Routing.Consensus.MinReviewers, TieBreaker: consensus.TieBreaker(manifest.Routing.Consensus.TieBreaker), Weights: config.WeightsToFloat(manifest.Routing.Consensus.Weights)}, Repo: absRepoPath(repo), MaxIterations: maxIterations, Stamp: func(repo string) (string, error) {
 				stamp, err := preflight.CheckStamp(repo)
 				return stamp.Head, err
 			}}
@@ -75,12 +70,11 @@ func newRunCommand() *cobra.Command {
 				return builder.Producer(step, prior)
 			})
 			if jsonOut {
-				if encodeErr := json.NewEncoder(cmd.OutOrStdout()).Encode(result); encodeErr != nil {
-					return encodeErr
-				}
+				_ = json.NewEncoder(cmd.OutOrStdout()).Encode(result)
 			} else {
-				if _, writeErr := fmt.Fprintf(cmd.OutOrStdout(), "outcome=%s iterations=%d trace=%s\n", result.Outcome, result.Iterations, result.Trace); writeErr != nil {
-					return writeErr
+				fmt.Fprintf(cmd.OutOrStdout(), "outcome=%s iterations=%d trace=%s run_dir=%s\n", result.Outcome, result.Iterations, result.Trace, result.RunDir)
+				for _, a := range result.Artifacts {
+					fmt.Fprintf(cmd.OutOrStdout(), "artifact=%s\n", a)
 				}
 			}
 			if err != nil {
@@ -98,8 +92,8 @@ func newRunCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "preview plan")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit JSON")
 	cmd.Flags().BoolVar(&strict, "strict", false, "fail warn-only outcomes")
-	cmd.Flags().StringVar(&step, "step", "", "specific step (reserved)")
-	cmd.Flags().StringVar(&inputArtifact, "input-artifact", "", "input artifact (reserved)")
+	cmd.Flags().String("step", "", "specific step")
+	cmd.Flags().String("input-artifact", "", "input artifact")
 	cmd.Flags().StringArrayVar(&vars, "var", nil, "template variable as key=value")
 	return cmd
 }

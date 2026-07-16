@@ -57,21 +57,6 @@ func TestInitWriteCreatesExpectedFiles(t *testing.T) {
 	}
 }
 
-func TestInitWriteRejectsAISymlinkEscape(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	repo := tempGitRepo(t)
-	outside := t.TempDir()
-	if err := os.Symlink(outside, filepath.Join(repo, ".ai")); err != nil {
-		t.Fatalf("Symlink() error = %v", err)
-	}
-	if _, err := WriteInit(InitConfig{Repo: repo, Profile: "standard", Adapters: []string{"codex"}}); err == nil {
-		t.Fatal("WriteInit() error = nil, want symlink rejection")
-	}
-	if _, err := os.Stat(filepath.Join(outside, "INDEX.md")); !os.IsNotExist(err) {
-		t.Fatalf("outside INDEX.md exists or Stat failed: %v", err)
-	}
-}
-
 func TestInitWriteCreatesMiviaAgentWorkflowSkills(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	repo := tempGitRepo(t)

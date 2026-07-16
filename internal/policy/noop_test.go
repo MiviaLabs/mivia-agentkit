@@ -44,17 +44,6 @@ func TestNoopRecordsToAuditLog(t *testing.T) {
 	}
 }
 
-func TestNoopRecordsToConfiguredAuditLogUnderAI(t *testing.T) {
-	path := filepath.Join(t.TempDir(), ".ai", "governance", "hook.jsonl")
-	provider := Noop{AuditPath: path}
-	if err := provider.Record(context.Background(), Event{Kind: "test"}); err != nil {
-		t.Fatalf("Record() error = %v", err)
-	}
-	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("configured audit log: %v", err)
-	}
-}
-
 func TestNoopDecideAppendsDecisionEvent(t *testing.T) {
 	path := filepath.Join(t.TempDir(), ".ai", "audit.jsonl")
 	provider := Noop{AuditPath: path}
@@ -80,20 +69,5 @@ func TestNoopAuditPathStaysUnderAI(t *testing.T) {
 	err := provider.Record(context.Background(), Event{Kind: "test"})
 	if err == nil {
 		t.Fatalf("Record() error = nil, want audit path rejection")
-	}
-}
-
-func TestNoopRejectsAISymlinkEscape(t *testing.T) {
-	repo := t.TempDir()
-	outside := t.TempDir()
-	if err := os.Symlink(outside, filepath.Join(repo, ".ai")); err != nil {
-		t.Fatalf("Symlink() error = %v", err)
-	}
-	provider := Noop{AuditPath: filepath.Join(repo, ".ai", "audit.jsonl")}
-	if err := provider.Record(context.Background(), Event{Kind: "test"}); err == nil {
-		t.Fatal("Record() error = nil, want symlink rejection")
-	}
-	if _, err := os.Stat(filepath.Join(outside, "audit.jsonl")); !os.IsNotExist(err) {
-		t.Fatalf("outside audit log exists or Stat failed: %v", err)
 	}
 }

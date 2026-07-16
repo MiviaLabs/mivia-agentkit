@@ -72,10 +72,15 @@ adapters:
 }
 
 func TestManifestAcceptsDocumentedEffortVariants(t *testing.T) {
+	// This test exercises the cross-adapter documented effort set
+	// (ValidateEffortValue), not any single adapter's allow-list. An unknown
+	// adapter name defers per-adapter validation to runtime, so the manifest
+	// accepts every documented value here. Per-adapter restrictions are
+	// covered by TestManifestRejectsEffort* and TestManifestAcceptsSupportedEffortPerAdapter.
 	for _, effort := range []string{"none", "minimal", "low", "medium", "high", "xhigh", "max"} {
 		t.Run(effort, func(t *testing.T) {
 			m := Defaults()
-			m.Adapters["codex"] = AdapterConfig{
+			m.Adapters["custom-adapter"] = AdapterConfig{
 				Enabled: true,
 				Role:    AdapterRoleOrchestrable,
 				Effort:  effort,
@@ -169,13 +174,63 @@ func TestManifestRejectsUnknownConsensusMode(t *testing.T) {
 	}
 }
 
-func TestManifestRejectsInvalidConsensusWeights(t *testing.T) {
-	for _, weights := range []map[string]int{{"codex": 0}, {"codex": -1}, {"": 1}} {
-		t.Run("invalid", func(t *testing.T) {
+func TestManifestRejectsEffortUnsupportedByAdapter(t *testing.T) {
+	m := Defaults()
+	m.Adapters["codex"] = AdapterConfig{
+		Enabled: true,
+		Role:    AdapterRoleOrchestrable,
+		Effort:  "none",
+	}
+	if err := m.Validate(); err == nil || !strings.Contains(err.Error(), "codex") {
+		t.Fatalf("Validate() error = %v, want rejection mentioning codex", err)
+	}
+}
+
+func TestManifestRejectsEffortUnsupportedByClaude(t *testing.T) {
+	m := Defaults()
+	m.Adapters["claude"] = AdapterConfig{
+		Enabled: true,
+		Role:    AdapterRoleOrchestrable,
+		Effort:  "minimal",
+	}
+	if err := m.Validate(); err == nil || !strings.Contains(err.Error(), "claude") {
+		t.Fatalf("Validate() error = %v, want rejection mentioning claude", err)
+	}
+}
+
+func TestManifestRejectsEffortForCrush(t *testing.T) {
+	m := Defaults()
+	m.Adapters["crush"] = AdapterConfig{
+		Enabled: true,
+		Role:    AdapterRoleGuidance,
+		Effort:  "low",
+	}
+	if err := m.Validate(); err == nil || !strings.Contains(err.Error(), "crush") {
+		t.Fatalf("Validate() error = %v, want rejection mentioning crush", err)
+	}
+}
+
+func TestManifestAcceptsSupportedEffortPerAdapter(t *testing.T) {
+	tests := []struct {
+		name    string
+		adapter string
+		effort  string
+	}{
+		{name: "codex/xhigh", adapter: "codex", effort: "xhigh"},
+		{name: "claude/max", adapter: "claude", effort: "max"},
+		{name: "claude/empty", adapter: "claude", effort: ""},
+		{name: "crush/empty", adapter: "crush", effort: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			m := Defaults()
-			m.Routing.Consensus.Weights = weights
-			if err := m.Validate(); err == nil || !strings.Contains(err.Error(), "weight") {
-				t.Fatalf("Validate() error = %v, want invalid weight rejection", err)
+			m.Adapters[tt.adapter] = AdapterConfig{
+				Enabled: true,
+				Role:    AdapterRoleOrchestrable,
+				Effort:  tt.effort,
+			}
+			if err := m.Validate(); err != nil {
+				t.Fatalf("Validate() error = %v, want nil for %s effort %q", err, tt.adapter, tt.effort)
 			}
 		})
 	}

@@ -5,7 +5,6 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -25,10 +24,6 @@ func newReviewCommand() *cobra.Command {
 		Use:   "review",
 		Short: "Run one-off consensus review",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			parsedWeights, err := parseWeights(weights)
-			if err != nil {
-				return err
-			}
 			artifactPath = resolveArtifactPath(absRepoPath(repo), artifactPath)
 			if _, err := os.Stat(artifactPath); err != nil {
 				return fmt.Errorf("artifact must exist: %w", err)
@@ -71,22 +66,15 @@ func newReviewCommand() *cobra.Command {
 				v.Adapter = name
 				verdicts = append(verdicts, v)
 			}
-			policy := consensus.Policy{Mode: consensus.Mode(defaultString(mode, manifest.Routing.Consensus.Mode)), MinReviewers: defaultInt(minReviewers, manifest.Routing.Consensus.MinReviewers), Weights: manifestWeights(manifest.Routing.Consensus.Weights), TieBreaker: consensus.TieBreaker(defaultString(tieBreaker, manifest.Routing.Consensus.TieBreaker))}
-			if parsedWeights != nil {
-				policy.Weights = parsedWeights
-			}
+			policy := consensus.Policy{Mode: consensus.Mode(defaultString(mode, manifest.Routing.Consensus.Mode)), MinReviewers: defaultInt(minReviewers, manifest.Routing.Consensus.MinReviewers), Weights: parseWeights(weights), TieBreaker: consensus.TieBreaker(defaultString(tieBreaker, manifest.Routing.Consensus.TieBreaker))}
 			outcome, err := consensus.Evaluate(policy, verdicts)
 			if err != nil {
 				return err
 			}
 			if jsonOut {
-				if err := json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]any{"verdicts": verdicts, "outcome": outcome}); err != nil {
-					return err
-				}
+				_ = json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]any{"verdicts": verdicts, "outcome": outcome})
 			} else {
-				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "pass=%t reason=%s\n", outcome.Pass, outcome.Reason); err != nil {
-					return err
-				}
+				fmt.Fprintf(cmd.OutOrStdout(), "pass=%t reason=%s\n", outcome.Pass, outcome.Reason)
 			}
 			if !outcome.Pass {
 				return fmt.Errorf("review failed: %s", outcome.Reason)
@@ -123,38 +111,22 @@ func splitCSV(raw string) []string {
 	return out
 }
 
-func parseWeights(raw string) (map[string]float64, error) {
+func parseWeights(raw string) map[string]float64 {
 	out := map[string]float64{}
 	for _, part := range splitCSV(raw) {
 		k, v, ok := strings.Cut(part, "=")
-		if !ok || strings.TrimSpace(k) == "" || strings.TrimSpace(v) == "" {
-			return nil, fmt.Errorf("invalid --weights %q: expected adapter=positive-number", part)
+		if !ok {
+			continue
 		}
-		f, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
-		if err != nil || math.IsNaN(f) || math.IsInf(f, 0) || f <= 0 {
-			return nil, fmt.Errorf("invalid --weights %q: expected adapter=positive-number", part)
+		f, err := strconv.ParseFloat(v, 64)
+		if err == nil {
+			out[k] = f
 		}
-		name := strings.TrimSpace(k)
-		if _, exists := out[name]; exists {
-			return nil, fmt.Errorf("invalid --weights: duplicate adapter %q", name)
-		}
-		out[name] = f
 	}
 	if len(out) == 0 {
-		return nil, nil
-	}
-	return out, nil
-}
-
-func manifestWeights(src map[string]int) map[string]float64 {
-	if len(src) == 0 {
 		return nil
 	}
-	dst := make(map[string]float64, len(src))
-	for name, weight := range src {
-		dst[name] = float64(weight)
-	}
-	return dst
+	return out
 }
 
 func defaultString(v, fallback string) string {

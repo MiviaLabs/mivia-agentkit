@@ -1,0 +1,28 @@
+version: 1
+name: zai-smoke-research
+description: >
+  ZAI/GLM-5-Turbo smoke workflow. Read-only research producer with ZAI/GLM-5-Turbo
+  review. Use this to verify the zai adapter works end-to-end without writing repo
+  files. Model is glm-5-turbo (fast/cheap tier); zai does not auto-enable thinking
+  for this model.
+bound: iterations
+max_iterations: 2
+steps:
+  - id: research
+    producer: zai
+    model: glm-5-turbo
+    artifact: zai-smoke-research.md
+    max_turns: 8
+    timeout: 5m
+  - id: review
+    reviewers:
+      - zai
+    model: glm-5-turbo
+    artifact: zai-smoke-research.md
+    consensus:
+      mode: majority
+      tie_breaker: strict
+      min_reviewers: 1
+    on_fail: iterate
+exit_when: review-pass
+on_exhausted: warn

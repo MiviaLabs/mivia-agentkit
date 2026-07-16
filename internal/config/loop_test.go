@@ -59,26 +59,6 @@ func TestLoopValidateRejectsNonPositiveMaxIterations(t *testing.T) {
 	}
 }
 
-func TestLoopRejectsMalformedTimeout(t *testing.T) {
-	loop := validLoop()
-	loop.Steps[0].Timeout = "50mss"
-	if err := loop.Validate(enabledAdapters()); err == nil || !strings.Contains(err.Error(), "timeout") {
-		t.Fatalf("Validate() error = %v, want malformed timeout rejection", err)
-	}
-}
-
-func TestLoopRejectsNonPositiveTimeout(t *testing.T) {
-	for _, timeout := range []string{"0s", "-1s"} {
-		t.Run(timeout, func(t *testing.T) {
-			loop := validLoop()
-			loop.Steps[0].Timeout = timeout
-			if err := loop.Validate(enabledAdapters()); err == nil || !strings.Contains(err.Error(), "positive") {
-				t.Fatalf("Validate() error = %v, want non-positive timeout rejection", err)
-			}
-		})
-	}
-}
-
 func TestLoopValidateRejectsDuplicateStepIDs(t *testing.T) {
 	loop := validLoop()
 	loop.Steps = append(loop.Steps, Step{ID: "produce", Producer: "claude"})
@@ -115,5 +95,35 @@ func enabledAdapters() map[string]AdapterRole {
 		"codex":   AdapterRoleOrchestrable,
 		"claude":  AdapterRoleOrchestrable,
 		"copilot": AdapterRoleGuidance,
+	}
+}
+
+func TestLoopRejectsStepEffortUnsupportedByProducer(t *testing.T) {
+	loop := validLoop()
+	loop.Steps[0].Producer = "codex"
+	loop.Steps[0].Effort = "none"
+	if err := loop.Validate(enabledAdapters()); err == nil || !strings.Contains(err.Error(), "not supported by producer") {
+		t.Fatalf("Validate() error = %v, want producer effort rejection", err)
+	}
+}
+
+func TestLoopRejectsStepEffortUnsupportedByReviewer(t *testing.T) {
+	loop := validLoop()
+	loop.Steps[0].Producer = ""
+	loop.Steps[0].Reviewers = []string{"crush"}
+	loop.Steps[0].Effort = "high"
+	enabled := enabledAdapters()
+	enabled["crush"] = AdapterRoleOrchestrable
+	if err := loop.Validate(enabled); err == nil || !strings.Contains(err.Error(), "not supported by reviewer") {
+		t.Fatalf("Validate() error = %v, want reviewer effort rejection", err)
+	}
+}
+
+func TestLoopAcceptsCompatibleStepEffort(t *testing.T) {
+	loop := validLoop()
+	loop.Steps[0].Producer = "claude"
+	loop.Steps[0].Effort = "max"
+	if err := loop.Validate(enabledAdapters()); err != nil {
+		t.Fatalf("Validate() error = %v, want nil for compatible producer effort", err)
 	}
 }

@@ -1,10 +1,6 @@
 package gitstate
 
-import (
-	"crypto/sha256"
-	"encoding/hex"
-	"testing"
-)
+import "testing"
 
 func TestChangedFilesDetectsModifiedStagedUntracked(t *testing.T) {
 	repo := initRepo(t)
@@ -46,7 +42,6 @@ func TestChangedFilesHandlesRenames(t *testing.T) {
 
 func TestDiffHashStableForIdenticalContent(t *testing.T) {
 	repo := initRepo(t)
-	git(t, repo, "commit", "--allow-empty", "-m", "initial")
 	writeFile(t, repo, "file.txt", "hello\n")
 	first, err := DiffHash(repo, []string{"file.txt"})
 	if err != nil {
@@ -63,7 +58,6 @@ func TestDiffHashStableForIdenticalContent(t *testing.T) {
 
 func TestDiffHashChangesWhenFileChanges(t *testing.T) {
 	repo := initRepo(t)
-	git(t, repo, "commit", "--allow-empty", "-m", "initial")
 	writeFile(t, repo, "file.txt", "one\n")
 	first, err := DiffHash(repo, []string{"file.txt"})
 	if err != nil {
@@ -99,59 +93,13 @@ func TestDiffHashChangesWhenStatusChanges(t *testing.T) {
 	}
 }
 
-func TestDiffHashMatchesQualityGateContract(t *testing.T) {
-	repo := initRepo(t)
-	writeFile(t, repo, "file.txt", "old\n")
-	git(t, repo, "add", "file.txt")
-	git(t, repo, "commit", "-m", "initial")
-	writeFile(t, repo, "file.txt", "changed\n")
-	writeFile(t, repo, "untracked.txt", "new\n")
-	head, err := Head(repo)
-	if err != nil {
-		t.Fatalf("Head() error = %v, want nil", err)
-	}
-
-	got, err := DiffHash(repo, []string{"untracked.txt", "file.txt"})
-	if err != nil {
-		t.Fatalf("DiffHash() error = %v, want nil", err)
-	}
-	digest := sha256.New()
-	digest.Write([]byte("head:" + head + "\n"))
-	for _, entry := range []struct {
-		status  string
-		path    string
-		content string
-	}{
-		{status: " M", path: "file.txt", content: "changed\n"},
-		{status: "??", path: "untracked.txt", content: "new\n"},
-	} {
-		digest.Write([]byte(entry.status))
-		digest.Write([]byte{0})
-		digest.Write([]byte(entry.path))
-		digest.Write([]byte{0})
-		digest.Write([]byte(entry.content))
-		digest.Write([]byte{0})
-	}
-	want := hex.EncodeToString(digest.Sum(nil))
-	if got != want {
-		t.Fatalf("DiffHash() = %q, want quality-gate contract hash %q", got, want)
-	}
-}
-
 func TestDiffHashEmpty(t *testing.T) {
 	repo := initRepo(t)
-	git(t, repo, "commit", "--allow-empty", "-m", "initial")
-	head, err := Head(repo)
-	if err != nil {
-		t.Fatalf("Head() error = %v, want nil", err)
-	}
 	got, err := DiffHash(repo, nil)
 	if err != nil {
 		t.Fatalf("DiffHash() error = %v, want nil", err)
 	}
-	digest := sha256.New()
-	digest.Write([]byte("head:" + head + "\n"))
-	want := hex.EncodeToString(digest.Sum(nil))
+	want := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 	if got != want {
 		t.Fatalf("DiffHash(nil) = %q, want %q", got, want)
 	}

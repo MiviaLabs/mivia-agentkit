@@ -51,33 +51,3 @@ func Head(repo string) (string, error) {
 	}
 	return strings.TrimSpace(string(out)), nil
 }
-
-// IndexTree returns the tree object currently staged in the Git index.
-func IndexTree(repo string) (string, error) {
-	return gitOutput(repo, "write-tree")
-}
-
-// CommitTree returns the tree object for commit.
-func CommitTree(repo, commit string) (string, error) {
-	return gitOutput(repo, "rev-parse", commit+"^{tree}")
-}
-
-// CommitParent returns commit's first parent. It rejects root commits because
-// they cannot be promotions of a pre-existing HEAD subject.
-func CommitParent(repo, commit string) (string, error) {
-	return gitOutput(repo, "rev-parse", commit+"^")
-}
-
-// ResolveRef returns the commit ID named by a local ref or revision expression.
-func ResolveRef(repo, ref string) (string, error) {
-	return gitOutput(repo, "rev-parse", "--verify", ref+"^{commit}")
-}
-
-func gitOutput(repo string, args ...string) (string, error) {
-	cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
-	out, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
-	}
-	return strings.TrimSpace(string(out)), nil
-}

@@ -177,8 +177,7 @@ def test_stop_blocks_planning_without_plan_artifact(state_file: Path) -> None:
         },
         state_file=state_file,
     )
-    if proc.stdout.strip() or proc.stderr.strip():
-        raise AssertionError(f"optional plan artifact should not block: stdout={proc.stdout!r} stderr={proc.stderr!r}")
+    assert_continue(proc, "PlanArtifact")
 
 
 def test_stop_blocks_implementer_without_plan_artifact(state_file: Path) -> None:
@@ -202,8 +201,7 @@ def test_stop_blocks_implementer_without_plan_artifact(state_file: Path) -> None
         },
         state_file=state_file,
     )
-    if proc.stdout.strip() or proc.stderr.strip():
-        raise AssertionError(f"optional plan artifact should not block: stdout={proc.stdout!r} stderr={proc.stderr!r}")
+    assert_continue(proc, "PlanArtifact")
 
 
 def test_stop_allows_valid_planning_report(state_file: Path) -> None:

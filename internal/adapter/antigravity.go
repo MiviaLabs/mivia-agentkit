@@ -13,6 +13,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/MiviaLabs/mivia-agentkit/internal/config"
 )
 
 // Antigravity adapts Google's current Antigravity CLI.
@@ -24,7 +26,7 @@ type Antigravity struct {
 func (Antigravity) Name() string { return "antigravity" }
 
 // Role returns the adapter role.
-func (Antigravity) Role() Role { return RoleOrchestrable }
+func (Antigravity) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 
 // Detect checks for an Antigravity CLI binary through the configured runner.
 func (g Antigravity) Detect(ctx context.Context) (Detection, error) {

@@ -1,0 +1,29 @@
+version: 1
+name: zai-smoke-patch
+description: >
+  ZAI/GLM-5-Turbo smoke workflow. WRITE workflow: producer generates a patch
+  artifact with approval: commit (a protected action — mivia-agent gates it
+  behind a fresh quality stamp), then ZAI/GLM-5-Turbo reviews it. Use this to
+  verify the write path. Model is glm-5-turbo, no thinking.
+bound: iterations
+max_iterations: 2
+steps:
+  - id: patch
+    producer: zai
+    model: glm-5-turbo
+    artifact: zai-smoke-patch.md
+    approval: commit
+    max_turns: 12
+    timeout: 10m
+  - id: review
+    reviewers:
+      - zai
+    model: glm-5-turbo
+    artifact: zai-smoke-patch.md
+    consensus:
+      mode: majority
+      tie_breaker: strict
+      min_reviewers: 1
+    on_fail: iterate
+exit_when: review-pass
+on_exhausted: fail

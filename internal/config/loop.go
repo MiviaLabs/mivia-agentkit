@@ -2,10 +2,7 @@
 // Plan: WS-A. PRD: FR-4.2, FR-6.1.
 package config
 
-import (
-	"fmt"
-	"time"
-)
+import "fmt"
 
 // Loop is a bounded workflow definition.
 type Loop struct {
@@ -36,6 +33,11 @@ type Step struct {
 func (l *Loop) Validate(enabledAdapters map[string]AdapterRole) error {
 	if l == nil {
 		return fmt.Errorf("loop is nil")
+	}
+	switch l.Bound {
+	case "iterations", "budget":
+	default:
+		return fmt.Errorf("unknown bound %q", l.Bound)
 	}
 	if l.MaxIterations <= 0 {
 		return fmt.Errorf("max_iterations must be positive")
@@ -68,13 +70,14 @@ func (l *Loop) Validate(enabledAdapters map[string]AdapterRole) error {
 		if err := validateEffort(fmt.Sprintf("step %q", step.ID), step.Effort); err != nil {
 			return err
 		}
-		if step.Timeout != "" {
-			duration, err := time.ParseDuration(step.Timeout)
-			if err != nil {
-				return fmt.Errorf("step %q timeout: %w", step.ID, err)
+		if step.Effort != "" {
+			if step.Producer != "" && !EffortAllowedFor(step.Producer, step.Effort) {
+				return fmt.Errorf("step %q effort %q is not supported by producer %q", step.ID, step.Effort, step.Producer)
 			}
-			if duration <= 0 {
-				return fmt.Errorf("step %q timeout must be positive", step.ID)
+			for _, reviewer := range step.Reviewers {
+				if !EffortAllowedFor(reviewer, step.Effort) {
+					return fmt.Errorf("step %q effort %q is not supported by reviewer %q", step.ID, step.Effort, reviewer)
+				}
 			}
 		}
 		if step.Producer != "" {

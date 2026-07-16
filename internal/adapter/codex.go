@@ -16,6 +16,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/MiviaLabs/mivia-agentkit/internal/config"
 )
 
 // Codex adapts the Codex CLI.
@@ -27,7 +29,7 @@ type Codex struct {
 func (Codex) Name() string { return "codex" }
 
 // Role returns the adapter role.
-func (Codex) Role() Role { return RoleOrchestrable }
+func (Codex) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 
 // Detect checks for a Codex CLI binary through the configured runner.
 func (c Codex) Detect(ctx context.Context) (Detection, error) {
@@ -76,6 +78,12 @@ func (c Codex) Review(ctx context.Context, req Request) (Verdict, error) {
 
 // ValidateRequest rejects Codex request fields that cannot be passed to Codex CLI.
 func (c Codex) ValidateRequest(req Request) error {
+	if err := validateCodexConfigValue("approval", req.Approval); err != nil {
+		return err
+	}
+	if err := validateCodexConfigValue("effort", req.Effort); err != nil {
+		return err
+	}
 	if err := req.Validate(); err != nil {
 		return err
 	}
@@ -93,9 +101,6 @@ func (c Codex) runner() Runner {
 }
 
 func (c Codex) runRaw(ctx context.Context, req Request) (RunResult, error) {
-	if err := c.ValidateRequest(req); err != nil {
-		return RunResult{}, err
-	}
 	args := []string{"codex", "exec", "--sandbox", "workspace-write", "--config", `approval_policy="` + req.Approval + `"`, "--json"}
 	if req.Model != "" {
 		args = append(args, "--model", req.Model)
@@ -124,6 +129,15 @@ func validateCodexEffort(effort string) error {
 	default:
 		return fmt.Errorf("codex unsupported effort %q", effort)
 	}
+}
+
+// validateCodexConfigValue rejects values that could break out of --config
+// double-quoted strings and inject arbitrary CLI flags.
+func validateCodexConfigValue(field, value string) error {
+	if strings.Contains(value, `"`) || strings.Contains(value, `\`) {
+		return fmt.Errorf("codex %s contains unsafe characters: %q", field, value)
+	}
+	return nil
 }
 
 func sanitizedMeta(stdout []byte) map[string]string {

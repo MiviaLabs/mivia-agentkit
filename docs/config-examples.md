@@ -281,6 +281,7 @@ defaults:
 - Effort values are adapter-specific at runtime: Codex supports `minimal`, `low`, `medium`, `high`, and `xhigh`; Claude supports `low`, `medium`, `high`, `xhigh`, and `max`.
 - Crush supports `model` and rejects unsupported `effort` until a tested effort mapping exists. Crush provider setup belongs in Crush/Ollama configuration, not in `adapters.crush.params`.
 - Antigravity has no documented runtime mapping for `model`, `effort`, or `params`, so those fields are rejected before `agy` runs.
+- `zai` (Z.ai GLM via `@guizmo-ai/zai-cli`) accepts `model` (defaults to `glm-5.2`; `glm-5-turbo` also verified) and rejects `effort`. Approval must be `never`. See [examples/zai-glm-examples.md](examples/zai-glm-examples.md) for install, auth, and write/review/research loops.
 - `run --dry-run --json` reports a per-step `runtime` list so you can inspect the resolved adapter, model, and effort before execution.
 - Supported profiles are `starter`, `standard`, and `strict`.
 - Workflow `bound: budget` is not supported in MVP.

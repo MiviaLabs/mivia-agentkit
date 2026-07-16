@@ -15,7 +15,7 @@ import (
 
 // ChangedFiles returns tracked modified, staged, and untracked files.
 func ChangedFiles(repo string) ([]string, error) {
-	out, err := exec.Command("git", "-C", repo, "status", "--porcelain=v1", "--untracked-files=all", "-z").Output()
+	out, err := exec.Command("git", "-C", repo, "status", "--porcelain=v1", "-z").Output()
 	if err != nil {
 		return nil, fmt.Errorf("git status: %w", err)
 	}
@@ -49,53 +49,30 @@ func DiffHash(repo string, files []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	head, err := Head(repo)
-	if err != nil {
-		return "", err
-	}
-	entries := make([]statusEntry, 0, len(files))
-	for _, file := range files {
-		path := filepath.ToSlash(file)
-		status := statuses[path]
+	sorted := append([]string(nil), files...)
+	sort.Strings(sorted)
+	h := sha256.New()
+	for _, file := range sorted {
+		status := statuses[filepath.ToSlash(file)]
 		if status == "" {
 			status = "??"
 		}
-		entries = append(entries, statusEntry{Path: path, Status: status})
-	}
-	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].Path != entries[j].Path {
-			return entries[i].Path < entries[j].Path
-		}
-		return entries[i].Status < entries[j].Status
-	})
-	h := sha256.New()
-	h.Write([]byte("head:" + head + "\n"))
-	for _, entry := range entries {
-		content, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(entry.Path)))
+		content, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(file)))
 		if err != nil && !os.IsNotExist(err) {
-			return "", fmt.Errorf("read %s: %w", entry.Path, err)
+			return "", fmt.Errorf("read %s: %w", file, err)
 		}
-		h.Write([]byte(entry.Status))
+		h.Write([]byte(file))
 		h.Write([]byte{0})
-		h.Write([]byte(entry.Path))
+		h.Write([]byte(status))
 		h.Write([]byte{0})
-		if os.IsNotExist(err) {
-			h.Write([]byte("<missing>"))
-		} else {
-			h.Write(content)
-		}
+		h.Write(content)
 		h.Write([]byte{0})
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-type statusEntry struct {
-	Path   string
-	Status string
-}
-
 func fileStatuses(repo string) (map[string]string, error) {
-	out, err := exec.Command("git", "-C", repo, "status", "--porcelain=v1", "--untracked-files=all", "-z").Output()
+	out, err := exec.Command("git", "-C", repo, "status", "--porcelain=v1", "-z").Output()
 	if err != nil {
 		return nil, fmt.Errorf("git status: %w", err)
 	}
