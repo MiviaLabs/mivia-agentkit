@@ -112,6 +112,9 @@ func buildBinary(moduleRoot, ldflags string) (string, error) {
 	args = append(args, "./cmd/mivia-agent")
 	cmd := exec.Command("go", args...)
 	cmd.Dir = moduleRoot
+	// Tests isolate HOME to a t.TempDir(); a module cache written there is
+	// read-only and breaks TempDir cleanup unless the cache stays writable.
+	cmd.Env = append(os.Environ(), "GOFLAGS="+strings.TrimSpace(os.Getenv("GOFLAGS")+" -modcacherw"))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("go build %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(out)))

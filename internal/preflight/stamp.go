@@ -88,10 +88,11 @@ func (s Stamp) Marshal() ([]byte, error) {
 }
 
 // ParseStamp decodes a stamp and rejects malformed or incomplete content.
+// Unknown fields are tolerated so stamps written by newer or sibling tools
+// (e.g. a repo-local quality gate adding evidence fields) stay readable.
 func ParseStamp(b []byte) (Stamp, error) {
 	var s Stamp
 	dec := json.NewDecoder(bytes.NewReader(b))
-	dec.DisallowUnknownFields()
 	if err := dec.Decode(&s); err != nil {
 		return Stamp{}, fmt.Errorf("parse stamp: %w", err)
 	}

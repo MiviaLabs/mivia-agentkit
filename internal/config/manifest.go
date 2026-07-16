@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/MiviaLabs/mivia-agentkit/internal/version"
 	"gopkg.in/yaml.v3"
 )
 
@@ -115,7 +116,7 @@ func Defaults() Manifest {
 	return Manifest{
 		Version:         "1",
 		Profile:         "standard",
-		TemplateVersion: "dev",
+		TemplateVersion: version.Version,
 		Adapters: map[string]AdapterConfig{
 			"codex":       {Enabled: true, Role: AdapterRoleOrchestrable},
 			"claude":      {Enabled: true, Role: AdapterRoleOrchestrable},

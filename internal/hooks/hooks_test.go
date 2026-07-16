@@ -66,8 +66,33 @@ func TestIsProtectedDetectsStructuredPayload(t *testing.T) {
 			"",
 		},
 		{
-			"git push split across non-adjacent sibling keys (map order independent)",
+			"keywords split across non-command sibling keys are prose, not execution",
 			map[string]any{"a": "git", "b": "irrelevant", "c": "push"},
+			"",
+		},
+		{
+			"command value as argv list",
+			map[string]any{"tool_input": map[string]any{"command": []any{"git", "push", "origin"}}},
+			policy.ProtectedPush,
+		},
+		{
+			"file content mentioning protected action is not protected",
+			map[string]any{"tool": "Write", "tool_input": map[string]any{"file_path": "plan.md", "content": "then run git commit -m 'x' and git push"}},
+			"",
+		},
+		{
+			"assistant prose in stop payload is not protected",
+			map[string]any{"last_assistant_message": "next step is git commit and git push", "stop_hook_active": "false"},
+			"",
+		},
+		{
+			"agent prompt mentioning protected action is not protected",
+			map[string]any{"tool": "Task", "tool_input": map[string]any{"prompt": "afterwards git push the branch and open a pull request"}},
+			"",
+		},
+		{
+			"malformed payload text still scanned fail-closed",
+			map[string]any{"malformed": "{\"command\": \"git push origin\""},
 			policy.ProtectedPush,
 		},
 	}

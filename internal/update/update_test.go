@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/render"
+	"github.com/MiviaLabs/mivia-agentkit/internal/version"
 )
 
 func TestUpdateChangesManagedBlockOnly(t *testing.T) {
@@ -124,11 +125,11 @@ func freshRepo(t *testing.T) string {
 	return repo
 }
 
-func bumpTemplateVersion(t *testing.T, repo, version string) {
+func bumpTemplateVersion(t *testing.T, repo, next string) {
 	t.Helper()
 	path := filepath.Join(repo, "mivia-agent.yaml")
 	data := readFile(t, path)
-	data = strings.Replace(data, "template_version: dev", "template_version: "+version, 1)
+	data = strings.Replace(data, "template_version: "+version.Version, "template_version: "+next, 1)
 	writeFile(t, path, data)
 }
 
