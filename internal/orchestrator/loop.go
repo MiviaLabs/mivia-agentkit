@@ -54,7 +54,9 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 	var currentArtifact string
 	for iteration := 1; iteration <= max; iteration++ {
 		var last StepResult
+		var lastNode Node
 		for _, node := range nodes {
+			lastNode = node
 			if _, ok := protectedKind(node.Step); ok {
 				if e.Stamp == nil {
 					return LoopResult{Iterations: iteration, Trace: runID, Err: ErrStaleStamp}, ErrStaleStamp
@@ -80,7 +82,7 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 			return LoopResult{Outcome: "pass", Iterations: iteration, Trace: runID}, nil
 		}
 		if !last.Consensus {
-			failAction := stepOnFail(loop.Steps, "fail")
+			failAction := stepOnFailValue(lastNode.Step.OnFail, "fail")
 			if failAction == "fail" {
 				err := errors.New("review gate failed")
 				return LoopResult{Outcome: "fail", Iterations: iteration, Trace: runID, Err: err}, err
@@ -95,20 +97,9 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 	return LoopResult{Outcome: "warn", Iterations: max, Trace: runID}, nil
 }
 
-func stepOnFail(steps []config.Step, fallback string) string {
-	for _, step := range steps {
-		if step.OnFail != "" {
-			return step.OnFail
-		}
+func stepOnFailValue(onFail, fallback string) string {
+	if onFail != "" {
+		return onFail
 	}
 	return fallback
-}
-
-func loopOnFail(loop config.Loop) string {
-	for _, step := range loop.Steps {
-		if step.OnFail != "" {
-			return step.OnFail
-		}
-	}
-	return "iterate"
 }

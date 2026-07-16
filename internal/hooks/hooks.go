@@ -88,26 +88,35 @@ func Decide(ctx context.Context, p Payload, stamp StampChecker, pol policy.Provi
 	return Outcome{Allow: true, Kind: kind}, nil
 }
 
-// IsProtected detects protected actions in raw hook payloads.
-// It checks the flattened concatenation, individual field values, and
-// adjacent field-value pairs so structured payloads (e.g.
-// {"program":"git","args":["push"]}) are caught even when keywords are
-// split across separate fields.
-func IsProtected(raw map[string]any) (policy.ProtectedKind, bool) {
-	text := strings.ToLower(flatten(raw))
-	fields := fieldValues(raw)
-	patterns := []struct {
+// protectedPatterns are compiled once and checked against flattened payloads,
+// individual field values, and all field-value pairs.
+var protectedPatterns = func() []struct {
+	kind policy.ProtectedKind
+	re   *regexp.Regexp
+} {
+	p := []struct {
 		kind policy.ProtectedKind
 		re   *regexp.Regexp
 	}{
 		{policy.ProtectedCommit, regexp.MustCompile(`\bgit\s+commit\b`)},
 		{policy.ProtectedPush, regexp.MustCompile(`\bgit\s+push\b`)},
 		{policy.ProtectedPullRequest, regexp.MustCompile(`\bgh\s+pr\b|\bpull[-_ ]request\b|\bcreate[-_ ]pr\b`)},
-		{policy.ProtectedRelease, regexp.MustCompile(`\bgh\s+release\b|\brelease\b`)},
+		{policy.ProtectedRelease, regexp.MustCompile(`\bgh\s+release\b`)},
 		{policy.ProtectedDeploy, regexp.MustCompile(`\bdeploy\b|\bkubectl\s+apply\b|\bterraform\s+apply\b`)},
 		{policy.ProtectedLiveSmoke, regexp.MustCompile(`\blive[-_ ]smoke\b|\bsmoke\s+live\b`)},
 	}
-	for _, pattern := range patterns {
+	return p
+}()
+
+// IsProtected detects protected actions in raw hook payloads.
+// It checks the flattened concatenation, individual field values, and
+// all field-value pairs so structured payloads (e.g.
+// {"program":"git","args":["push"]}) are caught even when keywords are
+// split across separate fields.
+func IsProtected(raw map[string]any) (policy.ProtectedKind, bool) {
+	text := strings.ToLower(flatten(raw))
+	fields := fieldValues(raw)
+	for _, pattern := range protectedPatterns {
 		if pattern.re.MatchString(text) {
 			return pattern.kind, true
 		}
@@ -124,7 +133,7 @@ func IsProtected(raw map[string]any) (policy.ProtectedKind, bool) {
 	for i := 0; i < len(fields); i++ {
 		for j := i + 1; j < len(fields); j++ {
 			joined := fields[i] + " " + fields[j]
-			for _, pattern := range patterns {
+			for _, pattern := range protectedPatterns {
 				if pattern.re.MatchString(joined) {
 					return pattern.kind, true
 				}

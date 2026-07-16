@@ -237,6 +237,7 @@ func bootstrapFiles(repo string, manifest config.Manifest) (render.RenderPlan, m
 			{Name: "adversarial-test-review", Path: ".ai/skills/adversarial-test-review/SKILL.md", Source: "project"},
 			{Name: "airtight-feature-delivery", Path: ".ai/skills/airtight-feature-delivery/SKILL.md", Source: "project"},
 			{Name: "deep-bug-audit", Path: ".ai/skills/deep-bug-audit/SKILL.md", Source: "project"},
+			{Name: "mivia-agent-workflows", Path: ".ai/skills/mivia-agent-workflows/SKILL.md", Source: "project"},
 			{Name: "test-coverage-audit", Path: ".ai/skills/test-coverage-audit/SKILL.md", Source: "project"},
 		},
 	})

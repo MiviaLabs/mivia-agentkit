@@ -35,7 +35,7 @@ func (l *Loop) Validate(enabledAdapters map[string]AdapterRole) error {
 		return fmt.Errorf("loop is nil")
 	}
 	switch l.Bound {
-	case "", "iterations", "budget":
+	case "iterations", "budget":
 	default:
 		return fmt.Errorf("unknown bound %q", l.Bound)
 	}

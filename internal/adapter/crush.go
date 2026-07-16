@@ -103,9 +103,6 @@ func (c Crush) runner() Runner {
 }
 
 func (c Crush) runRaw(ctx context.Context, req Request) (RunResult, error) {
-	if err := c.ValidateRequest(req); err != nil {
-		return RunResult{}, err
-	}
 	args := []string{"crush", "run", "--quiet", "--cwd", req.Workdir}
 	if req.Model != "" {
 		args = append(args, "--model", req.Model)
