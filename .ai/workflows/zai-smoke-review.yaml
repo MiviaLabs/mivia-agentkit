@@ -1,0 +1,24 @@
+version: 1
+name: zai-smoke-review
+description: >
+  ZAI/GLM-5-Turbo smoke workflow. Read-only review of an existing artifact — no
+  producer step, no file writes. Use this to verify the review/consensus path in
+  isolation. Requires an existing artifact at the named path (pass via --input-artifact
+  or place it under .ai/runs/<run-id>/review/iter-001/). Model is glm-5-turbo, no
+  thinking.
+bound: iterations
+max_iterations: 1
+steps:
+  - id: review
+    reviewers:
+      - zai
+    model: glm-5-turbo
+    artifact: zai-smoke-input.md
+    max_turns: 4
+    consensus:
+      mode: majority
+      tie_breaker: strict
+      min_reviewers: 1
+    on_fail: warn
+exit_when: review-pass
+on_exhausted: warn
