@@ -12,6 +12,7 @@ import (
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
 	"github.com/MiviaLabs/mivia-agentkit/internal/config"
+	"github.com/MiviaLabs/mivia-agentkit/internal/consensus"
 	"github.com/MiviaLabs/mivia-agentkit/internal/policy"
 	"github.com/MiviaLabs/mivia-agentkit/internal/runstore"
 )
@@ -24,27 +25,29 @@ type StampChecker func(repo string) (string, error)
 
 // Engine executes resolved loop nodes.
 type Engine struct {
-	Adapters        *adapter.Registry
-	Stamp           StampChecker
-	Policy          policy.Provider
-	Store           runstore.Store
-	AdapterDefaults map[string]config.AdapterConfig
-	Clock           func() time.Time
-	PromptBuilder   PromptBuilder
-	Repo            string
-	PriorVerdicts   []adapter.Verdict
-	CurrentArtifact string
-	MaxIterations   int
+	Adapters         *adapter.Registry
+	Stamp            StampChecker
+	Policy           policy.Provider
+	Store            runstore.Store
+	AdapterDefaults  map[string]config.AdapterConfig
+	DefaultConsensus consensus.Policy
+	Clock            func() time.Time
+	PromptBuilder    PromptBuilder
+	Repo             string
+	PriorVerdicts    []adapter.Verdict
+	CurrentArtifact  string
+	MaxIterations    int
 }
 
 // StepResult is the output of one executed step.
 type StepResult struct {
-	Artifact        string
-	Result          adapter.Result
-	Verdicts        []adapter.Verdict
-	Consensus       bool
-	DecisionRefs    []string
-	PolicyDecisions []policy.Decision
+	Artifact         string
+	Result           adapter.Result
+	Verdicts         []adapter.Verdict
+	Consensus        bool
+	ConsensusOutcome consensus.Outcome
+	DecisionRefs     []string
+	PolicyDecisions  []policy.Decision
 }
 
 // ExecuteStep executes one producer or review node.
@@ -160,11 +163,20 @@ func (e Engine) executeReview(ctx context.Context, runID runstore.RunID, node No
 			return StepResult{}, err
 		}
 	}
-	pass := consensusPass(verdicts)
-	if err := e.appendTrace(runID, "step.consensus", node.Step.ID, iteration, map[string]any{"pass": pass}); err != nil {
+	policy := stepConsensusPolicy(node.Step.Consensus, e.DefaultConsensus)
+	outcome, err := consensus.Evaluate(policy, verdicts)
+	if err != nil {
+		return StepResult{}, fmt.Errorf("consensus: %w", err)
+	}
+	if err := e.appendTrace(runID, "step.consensus", node.Step.ID, iteration, map[string]any{
+		"pass":   outcome.Pass,
+		"reason": outcome.Reason,
+		"mode":   string(policy.Mode),
+		"tied":   outcome.Tied,
+	}); err != nil {
 		return StepResult{}, err
 	}
-	return StepResult{Verdicts: verdicts, Consensus: pass}, nil
+	return StepResult{Verdicts: verdicts, Consensus: outcome.Pass, ConsensusOutcome: outcome}, nil
 }
 
 func validateAdapterRequest(a adapter.Adapter, req adapter.Request) error {
@@ -270,16 +282,20 @@ func copyParams(src map[string]string) map[string]string {
 	return dst
 }
 
-func consensusPass(verdicts []adapter.Verdict) bool {
-	if len(verdicts) == 0 {
-		return false
-	}
-	for _, v := range verdicts {
-		if !v.Pass {
-			return false
+func stepConsensusPolicy(step config.Consensus, fallback consensus.Policy) consensus.Policy {
+	if step.Mode != "" {
+		p := consensus.Policy{
+			Mode:         consensus.Mode(step.Mode),
+			MinReviewers: step.MinReviewers,
+			TieBreaker:   consensus.TieBreaker(step.TieBreaker),
+			Weights:      config.WeightsToFloat(step.Weights),
 		}
+		if step.Mode == "weighted" {
+			p.Threshold = fallback.Threshold
+		}
+		return p
 	}
-	return true
+	return fallback
 }
 
 func protectedKind(step config.Step) (policy.ProtectedKind, bool) {

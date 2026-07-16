@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
+	"github.com/MiviaLabs/mivia-agentkit/internal/config"
 	"github.com/MiviaLabs/mivia-agentkit/internal/orchestrator"
 )
 
@@ -214,7 +215,7 @@ func TestRunWithCrushUsesRealSubprocessBoundary(t *testing.T) {
 	t.Setenv("PATH", stubDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("CRUSH_STUB_DIR", stubDir)
 	withRuntimeAdapters(t, adapter.Crush{})
-	mustWrite(t, filepath.Join(repo, "mivia-agent.yaml"), "version: \"1\"\nadapters:\n  crush:\n    enabled: true\n    role: orchestrable\n    model: ollama/qwen3:14b\nloops:\n  build:\n    bound: iterations\n    max_iterations: 1\n    steps:\n      - id: build\n        producer: crush\n        artifact: build.md\n      - id: review\n        reviewers: [crush]\n        artifact: build.md\n    exit_when: review-pass\n    on_exhausted: fail\n")
+	mustWrite(t, filepath.Join(repo, "mivia-agent.yaml"), "version: \"1\"\nadapters:\n  crush:\n    enabled: true\n    role: orchestrable\n    model: ollama/qwen3:14b\nrouting:\n  consensus:\n    mode: unanimous\n    min_reviewers: 1\nloops:\n  build:\n    bound: iterations\n    max_iterations: 1\n    steps:\n      - id: build\n        producer: crush\n        artifact: build.md\n      - id: review\n        reviewers: [crush]\n        artifact: build.md\n    exit_when: review-pass\n    on_exhausted: fail\n")
 	mustWrite(t, filepath.Join(repo, ".ai/workflows/build.yaml"), "bound: iterations\nmax_iterations: 1\nsteps:\n- id: build\n  producer: crush\n  artifact: build.md\n- id: review\n  reviewers: [crush]\n  artifact: build.md\nexit_when: review-pass\non_exhausted: fail\n")
 
 	cmd := newRunCommand()
@@ -326,8 +327,8 @@ type sequenceAdapter struct {
 	prompts  *[]string
 }
 
-func (s *sequenceAdapter) Name() string       { return s.name }
-func (s *sequenceAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (s *sequenceAdapter) Name() string             { return s.name }
+func (s *sequenceAdapter) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 func (s *sequenceAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: s.name, HeadlessCapable: true}, nil
 }
@@ -397,8 +398,8 @@ type contextAwareAdapter struct {
 	name string
 }
 
-func (c contextAwareAdapter) Name() string       { return c.name }
-func (c contextAwareAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (c contextAwareAdapter) Name() string             { return c.name }
+func (c contextAwareAdapter) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 func (c contextAwareAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: c.name, HeadlessCapable: true}, nil
 }

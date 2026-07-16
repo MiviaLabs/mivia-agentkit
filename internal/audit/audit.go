@@ -174,7 +174,7 @@ func weakLoops(ctx Context) []report.Finding {
 	}
 	enabled := 0
 	for _, adapter := range parsed.Adapters {
-		if adapter.Enabled && adapter.Role == "orchestrable" {
+		if adapter.Enabled && adapter.Role == string(config.AdapterRoleOrchestrable) {
 			enabled++
 		}
 	}

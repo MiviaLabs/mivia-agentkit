@@ -12,6 +12,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/MiviaLabs/mivia-agentkit/internal/config"
 )
 
 // Claude adapts the Claude Code CLI.
@@ -23,7 +25,7 @@ type Claude struct {
 func (Claude) Name() string { return "claude" }
 
 // Role returns the adapter role.
-func (Claude) Role() Role { return RoleOrchestrable }
+func (Claude) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 
 // Detect checks for a Claude CLI binary through the configured runner.
 func (c Claude) Detect(ctx context.Context) (Detection, error) {

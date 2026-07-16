@@ -70,6 +70,16 @@ func (l *Loop) Validate(enabledAdapters map[string]AdapterRole) error {
 		if err := validateEffort(fmt.Sprintf("step %q", step.ID), step.Effort); err != nil {
 			return err
 		}
+		if step.Effort != "" {
+			if step.Producer != "" && !EffortAllowedFor(step.Producer, step.Effort) {
+				return fmt.Errorf("step %q effort %q is not supported by producer %q", step.ID, step.Effort, step.Producer)
+			}
+			for _, reviewer := range step.Reviewers {
+				if !EffortAllowedFor(reviewer, step.Effort) {
+					return fmt.Errorf("step %q effort %q is not supported by reviewer %q", step.ID, step.Effort, reviewer)
+				}
+			}
+		}
 		if step.Producer != "" {
 			role, ok := enabledAdapters[step.Producer]
 			if !ok {

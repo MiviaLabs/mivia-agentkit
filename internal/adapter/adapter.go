@@ -11,16 +11,6 @@ import (
 	"github.com/MiviaLabs/mivia-agentkit/internal/config"
 )
 
-// Role identifies how an adapter can participate in workflows.
-type Role string
-
-const (
-	// RoleOrchestrable adapters can run headlessly.
-	RoleOrchestrable Role = "orchestrable"
-	// RoleGuidance adapters contribute repository instructions only.
-	RoleGuidance Role = "guidance"
-)
-
 // Request is one headless adapter invocation.
 type Request struct {
 	Prompt      string
@@ -74,7 +64,7 @@ type Verdict struct {
 // Adapter runs an agent CLI through a bounded runner.
 type Adapter interface {
 	Name() string
-	Role() Role
+	Role() config.AdapterRole
 	Detect(context.Context) (Detection, error)
 	Run(context.Context, Request) (Result, error)
 	Review(context.Context, Request) (Verdict, error)

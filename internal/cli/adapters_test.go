@@ -83,8 +83,8 @@ type fakeCLIAdapter struct {
 var fakeAdapterMu sync.Mutex
 
 func (f fakeCLIAdapter) Name() string { return f.name }
-func (f fakeCLIAdapter) Role() adapter.Role {
-	return adapter.RoleOrchestrable
+func (f fakeCLIAdapter) Role() config.AdapterRole {
+	return config.AdapterRoleOrchestrable
 }
 func (f fakeCLIAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: f.name, Version: "fake-1", HeadlessCapable: f.headless}, nil

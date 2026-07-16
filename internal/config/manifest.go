@@ -69,6 +69,18 @@ type Consensus struct {
 	MinReviewers int            `yaml:"min_reviewers"`
 }
 
+// WeightsToFloat converts integer weights to float64 for consensus.Policy.
+func WeightsToFloat(in map[string]int) map[string]float64 {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]float64, len(in))
+	for k, v := range in {
+		out[k] = float64(v)
+	}
+	return out
+}
+
 // Quality configures quality checks.
 type Quality struct {
 	RequiredVerifiers []string `yaml:"required_verifiers"`
@@ -177,6 +189,9 @@ func (m *Manifest) Validate() error {
 		if err := validateEffort(fmt.Sprintf("adapter %q", name), adapter.Effort); err != nil {
 			return err
 		}
+		if !EffortAllowedFor(name, adapter.Effort) {
+			return fmt.Errorf("adapter %q effort %q is not supported by this adapter", name, adapter.Effort)
+		}
 	}
 
 	if m.Routing.Consensus.Mode != "" && !validConsensusMode(m.Routing.Consensus.Mode) {
@@ -231,4 +246,34 @@ func validateEffort(scope string, effort string) error {
 		return fmt.Errorf("%s has %s", scope, err)
 	}
 	return nil
+}
+
+// AdapterEffortAllowed lists the effort values each adapter accepts at config time.
+// This is the SSOT cross-referenced by config-time validation; adapter runtime
+// validators remain as defense-in-depth.
+var AdapterEffortAllowed = map[string]map[string]struct{}{
+	"codex":       setOf("", "minimal", "low", "medium", "high", "xhigh"),
+	"claude":      setOf("", "low", "medium", "high", "xhigh", "max"),
+	"crush":       setOf(""),
+	"antigravity": setOf(""),
+	"copilot":     setOf(""),
+}
+
+func setOf(vals ...string) map[string]struct{} {
+	m := make(map[string]struct{}, len(vals))
+	for _, v := range vals {
+		m[v] = struct{}{}
+	}
+	return m
+}
+
+// EffortAllowedFor reports whether the named adapter accepts the given effort
+// value. Unknown adapters return true (defer to runtime validation).
+func EffortAllowedFor(adapter, effort string) bool {
+	allowed, ok := AdapterEffortAllowed[adapter]
+	if !ok {
+		return true
+	}
+	_, ok = allowed[effort]
+	return ok
 }

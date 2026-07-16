@@ -16,6 +16,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/MiviaLabs/mivia-agentkit/internal/config"
 )
 
 // Codex adapts the Codex CLI.
@@ -27,7 +29,7 @@ type Codex struct {
 func (Codex) Name() string { return "codex" }
 
 // Role returns the adapter role.
-func (Codex) Role() Role { return RoleOrchestrable }
+func (Codex) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 
 // Detect checks for a Codex CLI binary through the configured runner.
 func (c Codex) Detect(ctx context.Context) (Detection, error) {

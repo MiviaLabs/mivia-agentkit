@@ -97,3 +97,33 @@ func enabledAdapters() map[string]AdapterRole {
 		"copilot": AdapterRoleGuidance,
 	}
 }
+
+func TestLoopRejectsStepEffortUnsupportedByProducer(t *testing.T) {
+	loop := validLoop()
+	loop.Steps[0].Producer = "codex"
+	loop.Steps[0].Effort = "none"
+	if err := loop.Validate(enabledAdapters()); err == nil || !strings.Contains(err.Error(), "not supported by producer") {
+		t.Fatalf("Validate() error = %v, want producer effort rejection", err)
+	}
+}
+
+func TestLoopRejectsStepEffortUnsupportedByReviewer(t *testing.T) {
+	loop := validLoop()
+	loop.Steps[0].Producer = ""
+	loop.Steps[0].Reviewers = []string{"crush"}
+	loop.Steps[0].Effort = "high"
+	enabled := enabledAdapters()
+	enabled["crush"] = AdapterRoleOrchestrable
+	if err := loop.Validate(enabled); err == nil || !strings.Contains(err.Error(), "not supported by reviewer") {
+		t.Fatalf("Validate() error = %v, want reviewer effort rejection", err)
+	}
+}
+
+func TestLoopAcceptsCompatibleStepEffort(t *testing.T) {
+	loop := validLoop()
+	loop.Steps[0].Producer = "claude"
+	loop.Steps[0].Effort = "max"
+	if err := loop.Validate(enabledAdapters()); err != nil {
+		t.Fatalf("Validate() error = %v, want nil for compatible producer effort", err)
+	}
+}

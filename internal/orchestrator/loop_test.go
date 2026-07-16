@@ -144,8 +144,8 @@ type sequenceAdapter struct {
 	calls    int
 }
 
-func (s *sequenceAdapter) Name() string       { return s.name }
-func (s *sequenceAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (s *sequenceAdapter) Name() string             { return s.name }
+func (s *sequenceAdapter) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 func (s *sequenceAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: s.name, HeadlessCapable: true}, nil
 }
@@ -167,8 +167,8 @@ type sequenceProducerAdapter struct {
 	calls   int
 }
 
-func (s *sequenceProducerAdapter) Name() string       { return s.name }
-func (s *sequenceProducerAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (s *sequenceProducerAdapter) Name() string             { return s.name }
+func (s *sequenceProducerAdapter) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 func (s *sequenceProducerAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: s.name, HeadlessCapable: true}, nil
 }

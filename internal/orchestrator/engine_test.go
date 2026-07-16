@@ -13,6 +13,7 @@ import (
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
 	"github.com/MiviaLabs/mivia-agentkit/internal/config"
+	"github.com/MiviaLabs/mivia-agentkit/internal/consensus"
 	"github.com/MiviaLabs/mivia-agentkit/internal/policy"
 	"github.com/MiviaLabs/mivia-agentkit/internal/runstore"
 )
@@ -246,6 +247,81 @@ func TestExecuteStepRecordsPolicyDecisionRef(t *testing.T) {
 	}
 }
 
+func TestExecuteReviewUsesConsensusPolicy(t *testing.T) {
+	// 3 reviewers: 2 pass, 1 fail. Majority consensus passes; the old
+	// unanimity implementation returned false here, so this is the key
+	// mutation proof that step.Consensus is honored.
+	e := testEngine(t,
+		scriptedAdapter{name: "a", verdict: adapter.Verdict{Pass: true}},
+		scriptedAdapter{name: "b", verdict: adapter.Verdict{Pass: true}},
+		scriptedAdapter{name: "c", verdict: adapter.Verdict{Pass: false}},
+	)
+	step := config.Step{ID: "review", Reviewers: []string{"a", "b", "c"}, Consensus: config.Consensus{Mode: "majority"}}
+	res, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: step}, 1)
+	if err != nil {
+		t.Fatalf("ExecuteStep error = %v", err)
+	}
+	if !res.Consensus {
+		t.Fatalf("Consensus = false, want true (majority of 2/3 pass)")
+	}
+	if !res.ConsensusOutcome.Pass {
+		t.Fatalf("ConsensusOutcome.Pass = false, want true")
+	}
+}
+
+func TestExecuteReviewUnanimousFailsOnDissent(t *testing.T) {
+	e := testEngine(t,
+		scriptedAdapter{name: "a", verdict: adapter.Verdict{Pass: true}},
+		scriptedAdapter{name: "b", verdict: adapter.Verdict{Pass: true}},
+		scriptedAdapter{name: "c", verdict: adapter.Verdict{Pass: false}},
+	)
+	step := config.Step{ID: "review", Reviewers: []string{"a", "b", "c"}, Consensus: config.Consensus{Mode: "unanimous"}}
+	res, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: step}, 1)
+	if err != nil {
+		t.Fatalf("ExecuteStep error = %v", err)
+	}
+	if res.Consensus {
+		t.Fatalf("Consensus = true, want false (unanimous fails on dissent)")
+	}
+}
+
+func TestExecuteReviewFirstPassPassesOnAny(t *testing.T) {
+	e := testEngine(t,
+		scriptedAdapter{name: "a", verdict: adapter.Verdict{Pass: true}},
+		scriptedAdapter{name: "b", verdict: adapter.Verdict{Pass: false}},
+	)
+	step := config.Step{ID: "review", Reviewers: []string{"a", "b"}, Consensus: config.Consensus{Mode: "first-pass"}}
+	res, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: step}, 1)
+	if err != nil {
+		t.Fatalf("ExecuteStep error = %v", err)
+	}
+	if !res.Consensus {
+		t.Fatalf("Consensus = false, want true (first-pass passes when any reviewer passes)")
+	}
+}
+
+func TestExecuteReviewUsesDefaultConsensusWhenStepOmits(t *testing.T) {
+	// Step omits Consensus entirely; engine DefaultConsensus (majority)
+	// should apply. 2/3 pass -> majority passes.
+	e := testEngine(t,
+		scriptedAdapter{name: "a", verdict: adapter.Verdict{Pass: true}},
+		scriptedAdapter{name: "b", verdict: adapter.Verdict{Pass: true}},
+		scriptedAdapter{name: "c", verdict: adapter.Verdict{Pass: false}},
+	)
+	e.DefaultConsensus = consensus.Policy{Mode: consensus.Majority}
+	step := config.Step{ID: "review", Reviewers: []string{"a", "b", "c"}}
+	res, err := e.ExecuteStep(context.Background(), e.Store.NewRun(), Node{Step: step}, 1)
+	if err != nil {
+		t.Fatalf("ExecuteStep error = %v", err)
+	}
+	if !res.Consensus {
+		t.Fatalf("Consensus = false, want true (default majority should apply)")
+	}
+	if res.ConsensusOutcome.Pass != res.Consensus {
+		t.Fatalf("ConsensusOutcome.Pass = %v, want %v", res.ConsensusOutcome.Pass, res.Consensus)
+	}
+}
+
 func testEngine(t *testing.T, adapters ...adapter.Adapter) Engine {
 	t.Helper()
 	reg, err := adapter.NewRegistry(adapters...)
@@ -265,8 +341,8 @@ type scriptedAdapter struct {
 	reviewCalls *int
 }
 
-func (s scriptedAdapter) Name() string       { return s.name }
-func (s scriptedAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (s scriptedAdapter) Name() string             { return s.name }
+func (s scriptedAdapter) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 func (s scriptedAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: s.name, HeadlessCapable: true}, nil
 }
@@ -296,8 +372,8 @@ type artifactOutAdapter struct {
 	artifactOut string
 }
 
-func (a *artifactOutAdapter) Name() string       { return a.name }
-func (a *artifactOutAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (a *artifactOutAdapter) Name() string             { return a.name }
+func (a *artifactOutAdapter) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 func (a *artifactOutAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: a.name, HeadlessCapable: true}, nil
 }
@@ -318,8 +394,8 @@ type promptRecorderAdapter struct {
 	prompt  string
 }
 
-func (p *promptRecorderAdapter) Name() string       { return p.name }
-func (p *promptRecorderAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (p *promptRecorderAdapter) Name() string             { return p.name }
+func (p *promptRecorderAdapter) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 func (p *promptRecorderAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: p.name, HeadlessCapable: true}, nil
 }
@@ -339,8 +415,8 @@ type requestRecorderAdapter struct {
 	reviewReq adapter.Request
 }
 
-func (r *requestRecorderAdapter) Name() string       { return r.name }
-func (r *requestRecorderAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (r *requestRecorderAdapter) Name() string             { return r.name }
+func (r *requestRecorderAdapter) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 func (r *requestRecorderAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: r.name, HeadlessCapable: true}, nil
 }
@@ -361,8 +437,8 @@ type validatingReviewAdapter struct {
 	reviewCalls *int
 }
 
-func (v *validatingReviewAdapter) Name() string       { return v.name }
-func (v *validatingReviewAdapter) Role() adapter.Role { return adapter.RoleOrchestrable }
+func (v *validatingReviewAdapter) Name() string             { return v.name }
+func (v *validatingReviewAdapter) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 func (v *validatingReviewAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: v.name, HeadlessCapable: true}, nil
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
 	"github.com/MiviaLabs/mivia-agentkit/internal/config"
+	"github.com/MiviaLabs/mivia-agentkit/internal/consensus"
 	"github.com/MiviaLabs/mivia-agentkit/internal/orchestrator"
 	"github.com/MiviaLabs/mivia-agentkit/internal/policy"
 	"github.com/MiviaLabs/mivia-agentkit/internal/preflight"
@@ -55,7 +56,7 @@ func newRunCommand() *cobra.Command {
 				return err
 			}
 			builder := PromptBuilder{Repo: absRepoPath(repo), Vars: templateVars}
-			engine := orchestrator.Engine{Adapters: reg, Policy: prov, Store: runstore.New(absRepoPath(repo)), AdapterDefaults: manifest.Adapters, Repo: absRepoPath(repo), MaxIterations: maxIterations, Stamp: func(repo string) (string, error) {
+			engine := orchestrator.Engine{Adapters: reg, Policy: prov, Store: runstore.New(absRepoPath(repo)), AdapterDefaults: manifest.Adapters, DefaultConsensus: consensus.Policy{Mode: consensus.Mode(manifest.Routing.Consensus.Mode), MinReviewers: manifest.Routing.Consensus.MinReviewers, TieBreaker: consensus.TieBreaker(manifest.Routing.Consensus.TieBreaker), Weights: config.WeightsToFloat(manifest.Routing.Consensus.Weights)}, Repo: absRepoPath(repo), MaxIterations: maxIterations, Stamp: func(repo string) (string, error) {
 				stamp, err := preflight.CheckStamp(repo)
 				return stamp.Head, err
 			}}
