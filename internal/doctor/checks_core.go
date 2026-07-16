@@ -337,6 +337,10 @@ func checkGlobalRuleConflict(ctx *Context) []report.Finding {
 }
 
 func validSkillFrontmatter(data []byte) bool {
+	// Normalize CRLF to LF: files checked out with git's core.autocrlf
+	// (the GitHub Actions Windows runner default) carry \r\n line endings,
+	// which would otherwise miss the \n-only delimiter match below.
+	data = bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
 	if !bytes.HasPrefix(data, []byte("---\n")) {
 		return false
 	}

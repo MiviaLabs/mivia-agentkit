@@ -68,7 +68,7 @@ func TestHookMalformedBenignStdinAllowsWithWarning(t *testing.T) {
 
 func runAgentHook(t *testing.T, adapter, event, input string) (string, string, error) {
 	t.Helper()
-	bin := filepath.Join(t.TempDir(), "mivia-agent")
+	bin := filepath.Join(t.TempDir(), "mivia-agent"+binarySuffix())
 	build := exec.Command("go", "build", "-o", bin, "./cmd/mivia-agent")
 	build.Dir = "../.."
 	if out, err := build.CombinedOutput(); err != nil {
