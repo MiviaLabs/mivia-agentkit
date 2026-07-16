@@ -18,6 +18,8 @@ vendor/
 # Local tool state
 .claude/settings.local.json
 .semgrep-cache/
+.zai/
+.zcode/
 
 # Secrets and local environment
 .env
