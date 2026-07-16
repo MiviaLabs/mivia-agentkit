@@ -270,8 +270,11 @@ func isIgnoredPath(ignored map[string]struct{}, rel string) bool {
 	if len(ignored) == 0 {
 		return false
 	}
-	rel = filepath.ToSlash(rel)
+	rel = strings.TrimSuffix(filepath.ToSlash(rel), "/")
 	if _, ok := ignored[rel]; ok {
+		return true
+	}
+	if _, ok := ignored[rel+"/"]; ok {
 		return true
 	}
 	for ignoredPath := range ignored {

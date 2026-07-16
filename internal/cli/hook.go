@@ -40,11 +40,11 @@ func newHookAdapterCommand(adapter string, repo *string) *cobra.Command {
 }
 
 func runHook(ctx context.Context, r io.Reader, adapter, event, repo string) error {
-	data, err := io.ReadAll(io.LimitReader(r, 4<<20)) // 4MB max
+	data, err := io.ReadAll(io.LimitReader(r, 4<<20+1)) // 4MB max
 	if err != nil {
 		return fmt.Errorf("read hook stdin: %w", err)
 	}
-	if len(data) >= 4<<20 {
+	if len(data) > 4<<20 {
 		return fmt.Errorf("hook payload exceeds 4MB limit")
 	}
 	raw, parseErr := hooks.RawPayload(data)

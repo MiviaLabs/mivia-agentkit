@@ -34,6 +34,11 @@ func (l *Loop) Validate(enabledAdapters map[string]AdapterRole) error {
 	if l == nil {
 		return fmt.Errorf("loop is nil")
 	}
+	switch l.Bound {
+	case "", "iterations", "budget":
+	default:
+		return fmt.Errorf("unknown bound %q", l.Bound)
+	}
 	if l.MaxIterations <= 0 {
 		return fmt.Errorf("max_iterations must be positive")
 	}

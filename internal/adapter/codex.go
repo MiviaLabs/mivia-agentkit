@@ -99,9 +99,6 @@ func (c Codex) runner() Runner {
 }
 
 func (c Codex) runRaw(ctx context.Context, req Request) (RunResult, error) {
-	if err := c.ValidateRequest(req); err != nil {
-		return RunResult{}, err
-	}
 	args := []string{"codex", "exec", "--sandbox", "workspace-write", "--config", `approval_policy="` + req.Approval + `"`, "--json"}
 	if req.Model != "" {
 		args = append(args, "--model", req.Model)

@@ -78,6 +78,9 @@ func (c Claude) ValidateRequest(req Request) error {
 	if err := validateClaudeEffort(req.Effort); err != nil {
 		return err
 	}
+	if err := validateClaudeApproval(req.Approval); err != nil {
+		return err
+	}
 	return validateNoParams(c.Name(), req.Params)
 }
 
@@ -89,9 +92,6 @@ func (c Claude) runner() Runner {
 }
 
 func (c Claude) runRaw(ctx context.Context, req Request) (RunResult, error) {
-	if err := c.ValidateRequest(req); err != nil {
-		return RunResult{}, err
-	}
 	args := []string{"claude", "-p", "--output-format", "json", "--permission-mode", req.Approval}
 	if req.Model != "" {
 		args = append(args, "--model", req.Model)
@@ -112,5 +112,15 @@ func validateClaudeEffort(effort string) error {
 		return nil
 	default:
 		return fmt.Errorf("claude unsupported effort %q", effort)
+	}
+}
+
+// validateClaudeApproval rejects unknown Claude Code permission-mode values.
+func validateClaudeApproval(approval string) error {
+	switch approval {
+	case "", "default", "plan", "never", "bypassPermissions":
+		return nil
+	default:
+		return fmt.Errorf("claude unsupported approval %q", approval)
 	}
 }

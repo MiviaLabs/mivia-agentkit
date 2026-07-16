@@ -117,12 +117,13 @@ func IsProtected(raw map[string]any) (policy.ProtectedKind, bool) {
 			}
 		}
 	}
-	// Check adjacent field pairs: "git" in one field and "push" in the next
-	// won't be caught by single-field or flattened checks when separated
-	// by intermediate keys.
-	if len(fields) >= 2 {
-		for i := 0; i < len(fields)-1; i++ {
-			joined := fields[i] + " " + fields[i+1]
+	// Check all field pairs: "git" in one field and "push" in another
+	// won't be caught by single-field checks when they are not adjacent in
+	// the extraction order. Use all-pairs to avoid map iteration order
+	// dependence.
+	for i := 0; i < len(fields); i++ {
+		for j := i + 1; j < len(fields); j++ {
+			joined := fields[i] + " " + fields[j]
 			for _, pattern := range patterns {
 				if pattern.re.MatchString(joined) {
 					return pattern.kind, true

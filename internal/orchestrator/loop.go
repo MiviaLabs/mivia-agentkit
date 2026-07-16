@@ -79,9 +79,12 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 		if last.Consensus && loop.ExitWhen == "review-pass" {
 			return LoopResult{Outcome: "pass", Iterations: iteration, Trace: runID}, nil
 		}
-		if !last.Consensus && loopOnFail(loop) == "fail" {
-			err := errors.New("review gate failed")
-			return LoopResult{Outcome: "fail", Iterations: iteration, Trace: runID, Err: err}, err
+		if !last.Consensus {
+			failAction := stepOnFail(loop.Steps, "fail")
+			if failAction == "fail" {
+				err := errors.New("review gate failed")
+				return LoopResult{Outcome: "fail", Iterations: iteration, Trace: runID, Err: err}, err
+			}
 		}
 	}
 	if loop.OnExhausted == "fail" {
@@ -90,6 +93,15 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 	}
 	_ = e.Store.AppendTrace(runID, runstore.TraceEvent{Kind: "loop.exhausted", Payload: map[string]any{"on_exhausted": loop.OnExhausted}})
 	return LoopResult{Outcome: "warn", Iterations: max, Trace: runID}, nil
+}
+
+func stepOnFail(steps []config.Step, fallback string) string {
+	for _, step := range steps {
+		if step.OnFail != "" {
+			return step.OnFail
+		}
+	}
+	return fallback
 }
 
 func loopOnFail(loop config.Loop) string {

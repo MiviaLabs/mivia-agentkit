@@ -65,6 +65,11 @@ func TestIsProtectedDetectsStructuredPayload(t *testing.T) {
 			map[string]any{"program": "go", "args": []any{"test", "./..."}},
 			"",
 		},
+		{
+			"git push split across non-adjacent sibling keys (map order independent)",
+			map[string]any{"a": "git", "b": "irrelevant", "c": "push"},
+			policy.ProtectedPush,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
