@@ -22,6 +22,9 @@ adapters:
   crush:
     enabled: false
     role: guidance
+  zai:
+    enabled: true
+    role: orchestrable
 
 routing:
   default_producer: codex

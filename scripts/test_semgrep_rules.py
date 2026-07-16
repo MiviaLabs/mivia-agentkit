@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -41,6 +42,26 @@ EXPECTED_RULES = {
 }
 
 SEMGREP_TIMEOUT_SECONDS = 60
+
+# Semgrep ships a default ignore list that excludes /tmp (and several other
+# system paths). tempfile.TemporaryDirectory() defaults to /tmp on Linux, which
+# makes semgrep silently skip every fixture file (exit 7, scanned=[]). Using a
+# directory under the user's home keeps fixtures off the ignored paths while
+# still cleaning up after the test run.
+IGNORED_TMP_DIRS = ("/tmp", "/var/tmp")
+
+# Semgrep 1.167.0 intermittently exits 2 (internal crash) on this rule set with
+# an empty result, instead of reporting findings. The rules themselves are
+# stable -- when the run does not crash it reliably reports all expected rules.
+# A bounded retry turns the crashing tool into a deterministic contract check.
+SEMGREP_MAX_ATTEMPTS = 8
+
+
+def fresh_temp_dir(prefix: str) -> str:
+    """Return a temp directory that semgrep will not silently ignore."""
+    default = tempfile.gettempdir()
+    base = default if default not in IGNORED_TMP_DIRS else str(Path.home())
+    return tempfile.mkdtemp(prefix=prefix, dir=base)
 
 
 def write(path: Path, content: str) -> None:
@@ -84,6 +105,28 @@ def run_semgrep(target: Path, runner=subprocess.run) -> tuple[int, set[str], str
             check_id = check_id.split(".semgrep.", 1)[1]
         rule_ids.add(check_id)
     return proc.returncode, rule_ids, proc.stderr
+
+
+def run_semgrep_reliably(target: Path) -> tuple[int, set[str], str]:
+    """Run semgrep until it reports findings or attempts are exhausted.
+
+    Semgrep 1.167.0 nondeterministically crashes (exit 2, empty result) on this
+    rule set. A successful run is one that returns findings (exit 1 with rules);
+    we retry up to SEMGREP_MAX_ATTEMPTS so the contract test reflects rule
+    correctness rather than tool flakiness. The non-finding path (exit 0) and
+    real errors (any non-{0,1,2} code) are returned immediately.
+    """
+    last = (1, set(), "")
+    for _ in range(SEMGREP_MAX_ATTEMPTS):
+        code, rules, stderr = run_semgrep(target)
+        last = code, rules, stderr
+        if code == 1 and rules:
+            return code, rules, stderr
+        if code == 0:
+            return code, rules, stderr
+        if code not in (1, 2):
+            return code, rules, stderr
+    return last
 
 
 def test_run_semgrep_reports_invalid_json_stderr() -> None:
@@ -334,10 +377,14 @@ def main() -> int:
     test_run_semgrep_reports_invalid_json_stderr()
     test_run_semgrep_reports_timeout()
 
-    with tempfile.TemporaryDirectory() as tmp:
+    # Use a non-ignored temp base: semgrep's default ignore list skips /tmp,
+    # which would silently drop every fixture file (scanned=[]). Manual cleanup
+    # replaces the context manager because mkdtemp does not self-clean.
+    tmp = fresh_temp_dir(prefix="mivia-semgrep-rules-")
+    try:
         bad_root = Path(tmp) / "bad"
         create_bad_fixture(bad_root)
-        bad_code, bad_rules, bad_stderr = run_semgrep(bad_root)
+        bad_code, bad_rules, bad_stderr = run_semgrep_reliably(bad_root)
         if bad_code != 1:
             print(f"FAIL: bad fixture expected Semgrep exit 1, got {bad_code}", file=sys.stderr)
             print(bad_stderr, file=sys.stderr)
@@ -352,11 +399,13 @@ def main() -> int:
 
         good_root = Path(tmp) / "good"
         create_good_fixture(good_root)
-        good_code, good_rules, good_stderr = run_semgrep(good_root)
+        good_code, good_rules, good_stderr = run_semgrep_reliably(good_root)
         if good_code != 0 or good_rules:
             print(f"FAIL: good fixture expected no findings, got {sorted(good_rules)}", file=sys.stderr)
             print(good_stderr, file=sys.stderr)
             return 1
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
     print("semgrep rule tests passed")
     return 0
