@@ -81,6 +81,34 @@ func TestCheckStampAcceptsFreshStamp(t *testing.T) {
 	}
 }
 
+func TestStampPathRejectsGitSymlinkEscape(t *testing.T) {
+	repo := t.TempDir()
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(repo, ".git")); err != nil {
+		t.Fatalf("Symlink() error = %v", err)
+	}
+	if _, err := stampPath(repo); err == nil {
+		t.Fatal("stampPath() error = nil, want escape rejection for .git symlinked outside repo")
+	}
+}
+
+// TestStampPathAllowsAliasedRepoRoot guards against a regression where an
+// unrelated ancestor symlink (e.g. macOS aliasing /var to /private/var for
+// the system temp directory) was mistaken for a .git escape.
+func TestStampPathAllowsAliasedRepoRoot(t *testing.T) {
+	real := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(real, ".git"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	alias := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(real, alias); err != nil {
+		t.Fatalf("Symlink() error = %v", err)
+	}
+	if _, err := stampPath(alias); err != nil {
+		t.Fatalf("stampPath() error = %v, want nil for aliased repo root", err)
+	}
+}
+
 func assertStale(t *testing.T, err error) {
 	t.Helper()
 	var stale ErrStaleStamp

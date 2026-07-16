@@ -133,19 +133,20 @@ func expandDirectoryEntries(repo string, files []string) ([]string, error) {
 	return expanded, nil
 }
 
+// stampPath resolves the on-disk quality stamp location under repo/.git.
+// policy.Abs already rejects any resolved location outside repo (including
+// one reached by a .git symlink redirecting elsewhere), so no additional
+// literal-path comparison is needed here. An earlier version compared the
+// resolved path against a raw, unresolved filepath.Join and rejected any
+// mismatch — that broke on any repo whose ancestry includes a legitimate,
+// unrelated symlink (e.g. macOS aliasing /var to /private/var), which is
+// the common case for a temp-directory-backed repo in tests and CI.
 func stampPath(repo string) (string, error) {
 	policy := pathpolicy.NewDefault()
 	if err := policy.Check(repo, stampRelPath); err != nil {
 		return "", err
 	}
-	path, err := policy.Abs(repo, stampRelPath)
-	if err != nil {
-		return "", err
-	}
-	if filepath.ToSlash(path) != filepath.ToSlash(filepath.Join(repo, stampRelPath)) {
-		return "", fmt.Errorf("quality stamp must be under .git")
-	}
-	return path, nil
+	return policy.Abs(repo, stampRelPath)
 }
 
 func defaultRepo(repo string) string {
