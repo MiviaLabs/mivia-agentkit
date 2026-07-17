@@ -109,7 +109,7 @@ func runCampaign(cmd *cobra.Command, opt campaignOptions) error {
 	}
 	runID := opt.campaign + "-" + time.Now().UTC().Format("20060102T150405Z")
 	store := auditcampaign.NewStore(repo, runID, "cli")
-	host, err := newCampaignHost(repo, runID, opt.campaign, camp, manifest)
+	host, err := newCampaignHost(cmd.Context(), repo, runID, opt.campaign, camp, manifest)
 	if err != nil {
 		return ExitError{Code: 1, Err: err}
 	}

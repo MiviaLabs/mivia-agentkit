@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
 	"github.com/MiviaLabs/mivia-agentkit/internal/auditcampaign"
 	"github.com/MiviaLabs/mivia-agentkit/internal/config"
 	"github.com/MiviaLabs/mivia-agentkit/internal/gitstate"
@@ -18,34 +20,96 @@ import (
 	"github.com/MiviaLabs/mivia-agentkit/internal/preflight"
 )
 
-// campaignHost wires local fixture adapters and coordinator-only scoped commits.
-// Local adapters read typed evidence from .ai/campaign-fixtures/<campaign>/ and
-// never invoke external agent CLIs. Non-local adapter names fail closed until
-// a future orchestrator evidence channel is available.
+// campaignHost wires campaign phase adapters and coordinator-only scoped commits.
+// Local adapters (local / local-*) read typed evidence from
+// .ai/campaign-fixtures/<campaign>/. Non-local names invoke approved
+// orchestrable adapters and accept only schema-valid
+// mivia-agent-campaign-evidence/v1 as commit authority (never raw Markdown).
 type campaignHost struct {
 	repo     string
 	runID    string
 	name     string
 	camp     config.Campaign
 	manifest config.Manifest
+	// adapters is the approved orchestrable registry; nil when only local fixtures are used.
+	adapters *adapter.Registry
 	// expectedHead is the HEAD recorded before each adapter phase.
 	expectedHead string
+	// phaseTimeout bounds each adapter invocation.
+	phaseTimeout time.Duration
 }
 
-func newCampaignHost(repo, runID, name string, camp config.Campaign, manifest config.Manifest) (*campaignHost, error) {
+func newCampaignHost(ctx context.Context, repo, runID, name string, camp config.Campaign, manifest config.Manifest) (*campaignHost, error) {
 	abs, err := filepath.Abs(repo)
 	if err != nil {
 		return nil, err
 	}
+	h := &campaignHost{
+		repo:         abs,
+		runID:        runID,
+		name:         name,
+		camp:         camp,
+		manifest:     manifest,
+		phaseTimeout: 5 * time.Minute,
+		expectedHead: "unknown",
+	}
 	head, err := gitstate.Head(abs)
 	if err != nil {
-		// Allow non-git repos only for dry structure tests without commit.
-		if !camp.CommitEnabled {
-			return &campaignHost{repo: abs, runID: runID, name: name, camp: camp, manifest: manifest, expectedHead: "unknown"}, nil
+		if camp.CommitEnabled {
+			return nil, fmt.Errorf("campaign requires git repository: %w", err)
 		}
-		return nil, fmt.Errorf("campaign requires git repository: %w", err)
+	} else {
+		h.expectedHead = head
 	}
-	return &campaignHost{repo: abs, runID: runID, name: name, camp: camp, manifest: manifest, expectedHead: head}, nil
+	required := campaignRequiredAdapters(camp, manifest)
+	if len(required) == 0 {
+		return h, nil
+	}
+	reg, err := approvedRegistry(ctx, manifest, required...)
+	if err != nil {
+		return nil, fmt.Errorf("campaign adapters unavailable: %w", err)
+	}
+	for _, n := range required {
+		if _, ok := reg.Lookup(n); !ok {
+			return nil, fmt.Errorf("campaign adapter %q is not installed or not approved for run", n)
+		}
+	}
+	h.adapters = reg
+	return h, nil
+}
+
+// campaignRequiredAdapters lists non-local orchestrable adapter names that must be approved.
+func campaignRequiredAdapters(camp config.Campaign, manifest config.Manifest) []string {
+	seen := map[string]struct{}{}
+	var out []string
+	add := func(name string) {
+		name = strings.TrimSpace(name)
+		if name == "" || isLocalCampaignAdapter(name) {
+			return
+		}
+		if _, ok := seen[name]; ok {
+			return
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	add(camp.Auditor)
+	add(camp.Confirmer)
+	add(resolveFixAdapterName(manifest, camp))
+	return out
+}
+
+func resolveFixAdapterName(manifest config.Manifest, camp config.Campaign) string {
+	loop, ok := manifest.Loops[camp.FixWorkflow]
+	if !ok {
+		return ""
+	}
+	for _, step := range loop.Steps {
+		if strings.TrimSpace(step.Producer) != "" {
+			return strings.TrimSpace(step.Producer)
+		}
+	}
+	return ""
 }
 
 func isLocalCampaignAdapter(name string) bool {
@@ -124,7 +188,7 @@ func (h *campaignHost) loadFixture(phase auditcampaign.Phase, cycle int) (auditc
 	return ev, true, nil
 }
 
-// Audit produces audit-phase evidence from local fixtures or a clean default.
+// Audit produces audit-phase evidence from local fixtures or an orchestrable auditor.
 func (h *campaignHost) Audit(ctx context.Context, phase auditcampaign.Phase, cycle int) (auditcampaign.Evidence, error) {
 	if err := ctx.Err(); err != nil {
 		return auditcampaign.Evidence{}, err
@@ -132,24 +196,35 @@ func (h *campaignHost) Audit(ctx context.Context, phase auditcampaign.Phase, cyc
 	if err := h.assertHeadUnchanged(); err != nil {
 		return auditcampaign.Evidence{}, err
 	}
-	if !isLocalCampaignAdapter(h.camp.Auditor) {
-		return auditcampaign.Evidence{}, fmt.Errorf("campaign auditor %q is not a local fixture adapter; external agent wiring is unavailable in this release", h.camp.Auditor)
+	name := strings.TrimSpace(h.camp.Auditor)
+	if name == "" {
+		return auditcampaign.Evidence{}, fmt.Errorf("campaign auditor is required")
 	}
-	ev, ok, err := h.loadFixture(phase, cycle)
+	if isLocalCampaignAdapter(name) {
+		ev, ok, err := h.loadFixture(phase, cycle)
+		if err != nil {
+			return auditcampaign.Evidence{}, err
+		}
+		if ok {
+			if err := h.assertHeadUnchanged(); err != nil {
+				return auditcampaign.Evidence{}, err
+			}
+			return ev, nil
+		}
+		// Default: clean audit (no findings).
+		return h.baseEvidence(cycle), nil
+	}
+	ev, err := h.invokeOrchestrable(ctx, name, phase, cycle)
 	if err != nil {
 		return auditcampaign.Evidence{}, err
 	}
-	if ok {
-		if err := h.assertHeadUnchanged(); err != nil {
-			return auditcampaign.Evidence{}, err
-		}
-		return ev, nil
+	if err := h.assertHeadUnchanged(); err != nil {
+		return auditcampaign.Evidence{}, err
 	}
-	// Default: clean audit (no findings).
-	return h.baseEvidence(cycle), nil
+	return ev, nil
 }
 
-// Confirm produces confirmation evidence from local fixtures.
+// Confirm produces confirmation evidence from local fixtures or an independent confirmer adapter.
 func (h *campaignHost) Confirm(ctx context.Context, phase auditcampaign.Phase, cycle int) (auditcampaign.Evidence, error) {
 	if err := ctx.Err(); err != nil {
 		return auditcampaign.Evidence{}, err
@@ -157,21 +232,30 @@ func (h *campaignHost) Confirm(ctx context.Context, phase auditcampaign.Phase, c
 	if err := h.assertHeadUnchanged(); err != nil {
 		return auditcampaign.Evidence{}, err
 	}
-	if !isLocalCampaignAdapter(h.camp.Confirmer) {
-		return auditcampaign.Evidence{}, fmt.Errorf("campaign confirmer %q is not a local fixture adapter; external agent wiring is unavailable in this release", h.camp.Confirmer)
+	name := strings.TrimSpace(h.camp.Confirmer)
+	if name == "" {
+		return auditcampaign.Evidence{}, fmt.Errorf("campaign confirmer is required")
 	}
-	if isLocalCampaignAdapter(h.camp.Auditor) && isLocalCampaignAdapter(h.camp.Confirmer) {
-		// Distinct local-* names are allowed; identical name self-confirm is rejected for commits upstream.
+	if isLocalCampaignAdapter(name) {
+		ev, ok, err := h.loadFixture(phase, cycle)
+		if err != nil {
+			return auditcampaign.Evidence{}, err
+		}
+		if !ok {
+			// No confirmation fixture: reject the finding.
+			base := h.baseEvidence(cycle)
+			base.Disposition = auditcampaign.DispositionRejected
+			return base, nil
+		}
+		if err := h.assertHeadUnchanged(); err != nil {
+			return auditcampaign.Evidence{}, err
+		}
+		return ev, nil
 	}
-	ev, ok, err := h.loadFixture(phase, cycle)
+	// Independent confirmer is always a separate adapter invocation from audit.
+	ev, err := h.invokeOrchestrable(ctx, name, phase, cycle)
 	if err != nil {
 		return auditcampaign.Evidence{}, err
-	}
-	if !ok {
-		// No confirmation fixture: reject the finding.
-		base := h.baseEvidence(cycle)
-		base.Disposition = auditcampaign.DispositionRejected
-		return base, nil
 	}
 	if err := h.assertHeadUnchanged(); err != nil {
 		return auditcampaign.Evidence{}, err
@@ -179,7 +263,7 @@ func (h *campaignHost) Confirm(ctx context.Context, phase auditcampaign.Phase, c
 	return ev, nil
 }
 
-// Fix applies optional local write fixtures and returns fix evidence.
+// Fix applies optional local write fixtures or invokes the fix-workflow producer adapter.
 func (h *campaignHost) Fix(ctx context.Context, phase auditcampaign.Phase, cycle int) (auditcampaign.Evidence, error) {
 	if err := ctx.Err(); err != nil {
 		return auditcampaign.Evidence{}, err
@@ -187,34 +271,215 @@ func (h *campaignHost) Fix(ctx context.Context, phase auditcampaign.Phase, cycle
 	if err := h.assertHeadUnchanged(); err != nil {
 		return auditcampaign.Evidence{}, err
 	}
-	// Apply file writes from sidecar before returning evidence.
-	if err := h.applyFixWrites(cycle); err != nil {
+	fixName := resolveFixAdapterName(h.manifest, h.camp)
+	if fixName == "" {
+		// Fall back to local fixture path when no producer is declared.
+		fixName = "local"
+	}
+	if isLocalCampaignAdapter(fixName) {
+		if err := h.applyFixWrites(cycle); err != nil {
+			return auditcampaign.Evidence{}, err
+		}
+		if err := h.assertHeadUnchanged(); err != nil {
+			return auditcampaign.Evidence{}, err
+		}
+		ev, ok, err := h.loadFixture(phase, cycle)
+		if err != nil {
+			return auditcampaign.Evidence{}, err
+		}
+		if !ok {
+			base := h.baseEvidence(cycle)
+			base.Disposition = auditcampaign.DispositionFixed
+			if len(h.camp.AllowedPaths) > 0 {
+				base.ChangedPathIDs = []string{"p1"}
+				base.VerifierRef = strings.TrimSpace(h.camp.VerifierProfile)
+				if base.VerifierRef == "" {
+					base.VerifierRef = "true"
+				}
+			}
+			return base, nil
+		}
+		return ev, nil
+	}
+	ev, err := h.invokeOrchestrable(ctx, fixName, phase, cycle)
+	if err != nil {
 		return auditcampaign.Evidence{}, err
 	}
 	// Fixers must not commit; HEAD must still match baseline.
 	if err := h.assertHeadUnchanged(); err != nil {
 		return auditcampaign.Evidence{}, err
 	}
-	ev, ok, err := h.loadFixture(phase, cycle)
+	return ev, nil
+}
+
+// invokeOrchestrable runs an approved adapter and decodes typed campaign evidence only.
+func (h *campaignHost) invokeOrchestrable(ctx context.Context, name string, phase auditcampaign.Phase, cycle int) (auditcampaign.Evidence, error) {
+	if h.adapters == nil {
+		return auditcampaign.Evidence{}, fmt.Errorf("campaign adapter %q is not wired: registry unavailable", name)
+	}
+	a, ok := h.adapters.Lookup(name)
+	if !ok {
+		return auditcampaign.Evidence{}, fmt.Errorf("campaign adapter %q is not installed or not approved for run", name)
+	}
+	if a.Role() != config.AdapterRoleOrchestrable {
+		return auditcampaign.Evidence{}, fmt.Errorf("campaign adapter %q is not orchestrable", name)
+	}
+	cfg := h.manifest.Adapters[name]
+	if !cfg.Enabled && cfg.Role == "" {
+		// Missing from manifest defaults is still rejected unless present in registry via test injection.
+		// Production registry only includes approved enabled adapters.
+	}
+	if cfg.Role != "" && cfg.Role != config.AdapterRoleOrchestrable {
+		return auditcampaign.Evidence{}, fmt.Errorf("campaign adapter %q is not orchestrable", name)
+	}
+	if cfg.Role == config.AdapterRoleOrchestrable && !cfg.Enabled {
+		return auditcampaign.Evidence{}, fmt.Errorf("campaign adapter %q is disabled", name)
+	}
+
+	prompt := campaignPhasePrompt(phase, h.name, h.runID, cycle, h.expectedHead, h.camp)
+	timeout := h.phaseTimeout
+	if timeout <= 0 {
+		timeout = 5 * time.Minute
+	}
+	req := adapter.Request{
+		Prompt:   prompt,
+		Workdir:  h.repo,
+		Approval: "never",
+		Model:    cfg.Model,
+		Effort:   cfg.Effort,
+		Timeout:  timeout,
+		MaxTurns: 8,
+	}
+	// Temp artifact only for adapters that write last-message files; never used as
+	// commit authority unless schema-decoded, and never persisted under .ai/runs.
+	tmp, err := os.CreateTemp("", "mivia-campaign-evidence-*.json")
 	if err != nil {
 		return auditcampaign.Evidence{}, err
 	}
-	if !ok {
-		base := h.baseEvidence(cycle)
-		base.Disposition = auditcampaign.DispositionFixed
-		if len(h.camp.AllowedPaths) > 0 {
-			// Opaque path IDs for evidence; real paths stay coordinator-owned.
-			base.ChangedPathIDs = []string{"p1"}
-			base.VerifierRef = strings.TrimSpace(h.camp.VerifierProfile)
-			if base.VerifierRef == "" {
-				base.VerifierRef = "true"
-			}
-			// CommitEligible requires DispositionConfirmed; engine also accepts DispositionFixed.
-			base.Disposition = auditcampaign.DispositionFixed
+	tmpPath := tmp.Name()
+	_ = tmp.Close()
+	defer func() { _ = os.Remove(tmpPath) }()
+	req.ArtifactOut = tmpPath
+
+	if v, ok := a.(adapter.RequestValidator); ok {
+		if err := v.ValidateRequest(req); err != nil {
+			return auditcampaign.Evidence{}, fmt.Errorf("campaign adapter %q request: %w", name, err)
 		}
-		return base, nil
+	}
+	res, err := a.Run(ctx, req)
+	if err != nil {
+		return auditcampaign.Evidence{}, fmt.Errorf("campaign adapter %q failed: %w", name, err)
+	}
+	if res.ExitCode != 0 {
+		return auditcampaign.Evidence{}, fmt.Errorf("campaign adapter %q exited %d", name, res.ExitCode)
+	}
+
+	raw := res.Stdout
+	if written, readErr := os.ReadFile(tmpPath); readErr == nil && len(bytes.TrimSpace(written)) > 0 {
+		// Prefer last-message artifact when present; still require typed evidence decode.
+		raw = written
+	}
+	// Never accept raw Markdown/prose as commit authority.
+	ev, err := decodeAdapterCampaignEvidence(raw, h.runID, cycle, h.expectedHead)
+	if err != nil {
+		return auditcampaign.Evidence{}, fmt.Errorf("campaign adapter %q: %w", name, err)
 	}
 	return ev, nil
+}
+
+func campaignPhasePrompt(phase auditcampaign.Phase, campaign, runID string, cycle int, head string, camp config.Campaign) string {
+	head = strings.TrimSpace(head)
+	if head == "" {
+		head = "unknown"
+	}
+	base := []string{
+		"Emit ONLY one JSON object with schema mivia-agent-campaign-evidence/v1.",
+		"Do not emit Markdown reports as commit authority. Do not invent telemetry numbers.",
+		fmt.Sprintf("campaign=%s campaign_run=%s cycle=%d baseline_head=%s", campaign, runID, cycle, head),
+		"Fields must use opaque finding_fingerprint and changed_path_ids (no raw paths or secrets).",
+		"Do not stage, commit, push, open a PR, or rewrite git history.",
+	}
+	switch phase {
+	case auditcampaign.PhaseAuditing:
+		return strings.Join(append([]string{
+			"You are the campaign auditor for supervised deep-bug-audit repair.",
+			"Follow the deep-bug-audit skill contract: findings only; ordinary audit is report-only outside this campaign evidence channel.",
+			"If no concrete finding: omit disposition (clean) or set disposition rejected with empty fingerprint.",
+			"If a finding is present: set disposition candidate (or confirmed only with verifier_ref and changed_path_ids) and opaque finding_fingerprint.",
+		}, base...), "\n")
+	case auditcampaign.PhaseConfirming:
+		return strings.Join(append([]string{
+			"You are the independent confirmer for supervised deep-bug-audit repair (separate adapter invocation from the auditor).",
+			"Independently verify the candidate finding. Do not self-confirm without re-checking evidence.",
+			"Set disposition confirmed only when independently verified, with opaque finding_fingerprint, changed_path_ids, and verifier_ref.",
+			"Otherwise set disposition rejected.",
+		}, base...), "\n")
+	case auditcampaign.PhaseFixing:
+		paths := strings.Join(camp.AllowedPaths, ",")
+		if paths == "" {
+			paths = "(none)"
+		}
+		return strings.Join(append([]string{
+			"You are the campaign fixer for supervised deep-bug-audit repair.",
+			"Apply a minimal scoped repair only under allowed paths; return typed evidence with disposition fixed.",
+			fmt.Sprintf("allowed_paths=%s verifier_profile=%s", paths, camp.VerifierProfile),
+			"Set disposition fixed with opaque finding_fingerprint, changed_path_ids, and verifier_ref.",
+		}, base...), "\n")
+	default:
+		return strings.Join(base, "\n")
+	}
+}
+
+// decodeAdapterCampaignEvidence extracts and validates typed campaign evidence from adapter output.
+// Raw Markdown or non-schema JSON fails closed.
+func decodeAdapterCampaignEvidence(raw []byte, runID string, cycle int, head string) (auditcampaign.Evidence, error) {
+	payload, err := extractCampaignEvidenceBytes(raw)
+	if err != nil {
+		return auditcampaign.Evidence{}, err
+	}
+	ev, err := auditcampaign.DecodeEvidence(payload)
+	if err != nil {
+		return auditcampaign.Evidence{}, fmt.Errorf("typed campaign evidence required (raw Markdown is not commit authority): %w", err)
+	}
+	// Bind runtime identity; adapters must not invent run/cycle/baseline authority.
+	ev.CampaignRun = runID
+	ev.Cycle = cycle
+	if head != "" && head != "unknown" {
+		ev.BaselineHead = head
+	} else if ev.BaselineHead == "" {
+		ev.BaselineHead = "unknown"
+	}
+	if err := ev.Validate(); err != nil {
+		return auditcampaign.Evidence{}, err
+	}
+	return ev, nil
+}
+
+func extractCampaignEvidenceBytes(raw []byte) ([]byte, error) {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 {
+		return nil, fmt.Errorf("typed campaign evidence required (empty adapter output)")
+	}
+	// Fast path: entire payload is the envelope.
+	if _, err := auditcampaign.DecodeEvidence(raw); err == nil {
+		return raw, nil
+	}
+	// Locate schema marker inside provider wrappers / mixed stdout.
+	marker := []byte(auditcampaign.EvidenceSchema)
+	idx := bytes.Index(raw, marker)
+	if idx < 0 {
+		return nil, fmt.Errorf("typed campaign evidence required (schema %s not found; raw Markdown is not commit authority)", auditcampaign.EvidenceSchema)
+	}
+	start := bytes.LastIndex(raw[:idx], []byte("{"))
+	if start < 0 {
+		return nil, fmt.Errorf("typed campaign evidence required (malformed JSON envelope)")
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw[start:]))
+	var msg json.RawMessage
+	if err := dec.Decode(&msg); err != nil {
+		return nil, fmt.Errorf("typed campaign evidence required: %w", err)
+	}
+	return msg, nil
 }
 
 type fixWrites struct {
@@ -304,9 +569,9 @@ func (h *campaignHost) Commit(ctx context.Context, e auditcampaign.Evidence) (st
 		StampCheck: func(repo, headSHA, indexHash string, paths []string) error {
 			// Post-stage fresh stamp then immediate freshness check.
 			_, err := preflight.Run(preflight.Context{
-				Repo:             repo,
-				BroadVerifiers:   []string{h.camp.VerifierProfile},
-				FocusedVerifiers: []string{h.camp.VerifierProfile},
+				Repo:              repo,
+				BroadVerifiers:    []string{h.camp.VerifierProfile},
+				FocusedVerifiers:  []string{h.camp.VerifierProfile},
 				PipelinePreflight: true,
 			})
 			if err != nil {

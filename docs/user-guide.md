@@ -330,6 +330,7 @@ Current campaign behavior:
 - Only the coordinator stages allowlisted paths and commits after verifier, quality stamp, and policy gates.
 - No auto-push, force, reset, clean, or auto-PR.
 - Local fixture adapters (`local` / `local-*` with `.ai/campaign-fixtures/`) support offline integration tests.
+- Orchestrable adapters configured as auditor/confirmer (and the fix-workflow producer) are invoked for typed `mivia-agent-campaign-evidence/v1` only; missing, unapproved, or non-evidence outputs fail closed.
 
 Ordinary deep-bug-audit remains report-only. A one-adapter self-hosted setup cannot run a commit-capable independent-confirmation campaign.
 

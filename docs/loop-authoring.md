@@ -68,7 +68,7 @@ Operator rules:
 - Ordinary deep-bug-audit and the host audit-loop hook stay **report-only** and do not commit.
 - Commit-capable campaigns require an independently configured confirmer different from the auditor. A one-adapter self-hosted setup fails closed.
 - Only the coordinator performs scoped commits (`CommitScoped`); no auto-push, force, reset, clean, or PR.
-- Local fixture adapters (`local`, `local-*`) support offline integration; external agent wiring is not a silent placeholder.
+- Local fixture adapters (`local`, `local-*`) support offline integration tests. Configured orchestrable adapters (codex, claude, and other approved runtime adapters) are invoked for campaign auditor/confirmer/fix and must return typed `mivia-agent-campaign-evidence/v1`; missing, unapproved, or non-evidence outputs fail closed.
 
 ## Consensus Modes
 

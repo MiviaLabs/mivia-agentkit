@@ -312,5 +312,14 @@ git diff --check  # pass
 - Built-binary: clean audits stop with zero commits; confirmed fixture path commits once and advances HEAD
 
 ### Residual risk
-- External agent adapters (codex/claude) are not invoked as campaign auditor/confirmer in this release; only `local` / `local-*` fixture adapters produce typed evidence. Non-local names fail closed with a clear error.
+- Orchestrable adapters (codex, claude, and other approved runtime adapters) are invoked for campaign auditor/confirmer/fix when configured; only schema-valid `mivia-agent-campaign-evidence/v1` is commit authority. Missing, unapproved, non-orchestrable, or non-evidence outputs fail closed. `local` / `local-*` fixtures remain for offline tests.
+- Live dual-CLI install (real paid codex+claude binaries) is not exercised in CI; wiring is proven with scripted adapters and local fixtures.
 - Three-auditor human deep-bug-audit of the full final diff is still an operator responsibility before merge if required by process.
+
+## Completion — 2026-07-18 (orchestrable adapter wiring)
+
+- Tests: campaign host unit tests for independent orchestrable invoke, fail-closed missing/unapproved/non-orchestrable/markdown, local fixtures; full `./internal/cli` green including built-binary local-fixture paths.
+- Mutation proofs: independent confirmer is a separate `Run` (`TestCampaignHostInvokesIndependentOrchestrableAdapters`); raw Markdown rejected (`TestCampaignHostRejectsRawMarkdownAsEvidence`); missing install fails closed (`TestNewCampaignHostFailsClosedWhenExternalNotApproved`).
+- Files: `internal/cli/campaign_adapters.go`, `internal/cli/campaign_adapters_test.go`, `internal/cli/campaign.go` (ctx host), docs ledger/tasks residual clear.
+- Residual risk: live dual-CLI install not in CI (not "adapters not wired").
+- Follow-ups: none for this residual.

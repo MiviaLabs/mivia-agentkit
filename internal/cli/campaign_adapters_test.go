@@ -1,0 +1,388 @@
+// Package cli tests campaign adapter host wiring.
+// Plan: WS15. PRD: orchestrable campaign adapters, typed evidence, independent confirm.
+package cli
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
+	"github.com/MiviaLabs/mivia-agentkit/internal/auditcampaign"
+	"github.com/MiviaLabs/mivia-agentkit/internal/config"
+)
+
+// scriptedCampaignAdapter is a test double that records Run calls and returns scripted stdout.
+type scriptedCampaignAdapter struct {
+	name    string
+	role    config.AdapterRole
+	stdout  []byte
+	exit    int
+	runErr  error
+	mu      sync.Mutex
+	calls   int
+	prompts []string
+}
+
+func (s *scriptedCampaignAdapter) Name() string { return s.name }
+func (s *scriptedCampaignAdapter) Role() config.AdapterRole {
+	if s.role == "" {
+		return config.AdapterRoleOrchestrable
+	}
+	return s.role
+}
+func (s *scriptedCampaignAdapter) Detect(context.Context) (adapter.Detection, error) {
+	return adapter.Detection{Name: s.name, Version: "test", HeadlessCapable: true}, nil
+}
+func (s *scriptedCampaignAdapter) Run(_ context.Context, req adapter.Request) (adapter.Result, error) {
+	s.mu.Lock()
+	s.calls++
+	s.prompts = append(s.prompts, req.Prompt)
+	s.mu.Unlock()
+	if s.runErr != nil {
+		return adapter.Result{}, s.runErr
+	}
+	// Mirror real adapters that honor ArtifactOut for last-message files.
+	if req.ArtifactOut != "" && len(s.stdout) > 0 {
+		_ = os.WriteFile(req.ArtifactOut, s.stdout, 0o644)
+	}
+	return adapter.Result{ExitCode: s.exit, Stdout: s.stdout}, nil
+}
+func (s *scriptedCampaignAdapter) Review(context.Context, adapter.Request) (adapter.Verdict, error) {
+	return adapter.Verdict{Adapter: s.name, Pass: true}, nil
+}
+func (s *scriptedCampaignAdapter) callCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.calls
+}
+
+func evidenceJSON(disposition, fingerprint string) []byte {
+	fp := ""
+	if fingerprint != "" {
+		fp = fmt.Sprintf(`,"finding_fingerprint":%q`, fingerprint)
+	}
+	disp := ""
+	if disposition != "" {
+		disp = fmt.Sprintf(`,"disposition":%q`, disposition)
+	}
+	extra := ""
+	if disposition == "confirmed" || disposition == "fixed" {
+		extra = `,"changed_path_ids":["p1"],"verifier_ref":"true"`
+	}
+	return []byte(fmt.Sprintf(
+		`{"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"placeholder","cycle":0,"baseline_head":"placeholder"%s%s%s}`,
+		disp, fp, extra,
+	))
+}
+
+func testManifestWithAdapters(auditor, confirmer, fixer string) config.Manifest {
+	m := config.Defaults()
+	m.Adapters = map[string]config.AdapterConfig{
+		auditor:   {Enabled: true, Role: config.AdapterRoleOrchestrable},
+		confirmer: {Enabled: true, Role: config.AdapterRoleOrchestrable},
+		fixer:     {Enabled: true, Role: config.AdapterRoleOrchestrable},
+		"local":   {Enabled: true, Role: config.AdapterRoleOrchestrable},
+	}
+	if auditor == confirmer {
+		// still set both keys
+	}
+	m.Loops = map[string]config.Loop{
+		"bug-audit-loop": {
+			Bound: "iterations", MaxIterations: 2,
+			Steps: []config.Step{{ID: "audit", Producer: auditor}},
+		},
+		"fix-loop": {
+			Bound: "iterations", MaxIterations: 1,
+			Steps: []config.Step{{ID: "fix", Producer: fixer}},
+		},
+	}
+	camp := config.CampaignDefaults()
+	camp.Enabled = true
+	camp.AuditWorkflow = "bug-audit-loop"
+	camp.FixWorkflow = "fix-loop"
+	camp.Auditor = auditor
+	camp.Confirmer = confirmer
+	camp.CommitEnabled = false
+	camp.MaxCycles = 2
+	camp.MaxDuration = "5m"
+	m.Campaigns = map[string]config.Campaign{"deep-bug-audit-repair": camp}
+	return m
+}
+
+func TestCampaignHostInvokesIndependentOrchestrableAdapters(t *testing.T) {
+	repo := t.TempDir()
+	auditor := &scriptedCampaignAdapter{name: "codex", stdout: evidenceJSON("candidate", "fp-audit-1")}
+	confirmer := &scriptedCampaignAdapter{name: "claude", stdout: evidenceJSON("confirmed", "fp-audit-1")}
+	reg, err := adapter.NewRegistry(auditor, confirmer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("codex", "claude", "local")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	h := &campaignHost{
+		repo:         repo,
+		runID:        "run-1",
+		name:         "deep-bug-audit-repair",
+		camp:         camp,
+		manifest:     m,
+		adapters:     reg,
+		expectedHead: "unknown", // non-git unit path; built-binary tests cover real HEAD checks
+	}
+
+	aev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	if err != nil {
+		t.Fatalf("Audit: %v", err)
+	}
+	if aev.Disposition != auditcampaign.DispositionCandidate {
+		t.Fatalf("audit disposition = %q, want candidate", aev.Disposition)
+	}
+	if aev.CampaignRun != "run-1" || aev.Cycle != 1 {
+		t.Fatalf("audit runtime bind = %+v", aev)
+	}
+
+	cev, err := h.Confirm(context.Background(), auditcampaign.PhaseConfirming, 1)
+	if err != nil {
+		t.Fatalf("Confirm: %v", err)
+	}
+	if cev.Disposition != auditcampaign.DispositionConfirmed {
+		t.Fatalf("confirm disposition = %q, want confirmed", cev.Disposition)
+	}
+
+	if auditor.callCount() != 1 {
+		t.Fatalf("auditor calls = %d, want 1", auditor.callCount())
+	}
+	if confirmer.callCount() != 1 {
+		t.Fatalf("confirmer calls = %d, want 1 (independent invocation)", confirmer.callCount())
+	}
+	// Prompts must identify roles distinctly.
+	if !strings.Contains(auditor.prompts[0], "campaign auditor") {
+		t.Fatalf("auditor prompt missing role: %q", auditor.prompts[0])
+	}
+	if !strings.Contains(confirmer.prompts[0], "independent confirmer") {
+		t.Fatalf("confirmer prompt missing independent role: %q", confirmer.prompts[0])
+	}
+}
+
+func TestCampaignHostInvokesFixOrchestrableAdapter(t *testing.T) {
+	repo := t.TempDir()
+	fixer := &scriptedCampaignAdapter{name: "codex", stdout: evidenceJSON("fixed", "fp-1")}
+	reg, err := adapter.NewRegistry(fixer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("local", "local-confirm", "codex")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	camp.AllowedPaths = []string{"fixme.txt"}
+	camp.VerifierProfile = "true"
+	h := &campaignHost{
+		repo: repo, runID: "run-fix", name: "c", camp: camp, manifest: m,
+		adapters: reg, expectedHead: "unknown",
+	}
+	ev, err := h.Fix(context.Background(), auditcampaign.PhaseFixing, 1)
+	if err != nil {
+		t.Fatalf("Fix: %v", err)
+	}
+	if ev.Disposition != auditcampaign.DispositionFixed {
+		t.Fatalf("disposition = %q, want fixed", ev.Disposition)
+	}
+	if fixer.callCount() != 1 {
+		t.Fatalf("fixer calls = %d, want 1", fixer.callCount())
+	}
+	if !strings.Contains(fixer.prompts[0], "campaign fixer") {
+		t.Fatalf("fix prompt = %q", fixer.prompts[0])
+	}
+}
+
+func TestCampaignHostLocalFixtureStillWorks(t *testing.T) {
+	repo := t.TempDir()
+	fixtureDir := filepath.Join(repo, ".ai", "campaign-fixtures", "deep-bug-audit-repair")
+	if err := os.MkdirAll(fixtureDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	raw := evidenceJSON("candidate", "fp-local")
+	if err := os.WriteFile(filepath.Join(fixtureDir, "audit-cycle-1.json"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("local", "local-confirm", "local")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	h := &campaignHost{
+		repo: repo, runID: "run-local", name: "deep-bug-audit-repair",
+		camp: camp, manifest: m, expectedHead: "unknown",
+	}
+	ev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	if err != nil {
+		t.Fatalf("Audit local: %v", err)
+	}
+	if ev.Disposition != auditcampaign.DispositionCandidate || ev.FindingFingerprint != "fp-local" {
+		t.Fatalf("ev = %+v", ev)
+	}
+	// Confirmer without fixture rejects.
+	cev, err := h.Confirm(context.Background(), auditcampaign.PhaseConfirming, 1)
+	if err != nil {
+		t.Fatalf("Confirm local: %v", err)
+	}
+	if cev.Disposition != auditcampaign.DispositionRejected {
+		t.Fatalf("confirm = %q, want rejected without fixture", cev.Disposition)
+	}
+}
+
+func TestCampaignHostRejectsMissingAdapterInRegistry(t *testing.T) {
+	m := testManifestWithAdapters("codex", "claude", "local")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	// Registry has only codex; confirmer claude missing.
+	codex := &scriptedCampaignAdapter{name: "codex", stdout: evidenceJSON("", "")}
+	reg, err := adapter.NewRegistry(codex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := &campaignHost{
+		repo: t.TempDir(), runID: "r", name: "c", camp: camp, manifest: m,
+		adapters: reg, expectedHead: "unknown",
+	}
+	_, err = h.Confirm(context.Background(), auditcampaign.PhaseConfirming, 1)
+	if err == nil || !strings.Contains(err.Error(), "not installed or not approved") {
+		t.Fatalf("error = %v, want not approved/installed", err)
+	}
+}
+
+func TestCampaignHostRejectsNonOrchestrableRole(t *testing.T) {
+	a := &scriptedCampaignAdapter{
+		name:   "copilot",
+		role:   config.AdapterRoleGuidance,
+		stdout: evidenceJSON("candidate", "fp1"),
+	}
+	reg, err := adapter.NewRegistry(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("copilot", "claude", "local")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	camp.Auditor = "copilot"
+	h := &campaignHost{
+		repo: t.TempDir(), runID: "r", name: "c", camp: camp, manifest: m,
+		adapters: reg, expectedHead: "unknown",
+	}
+	_, err = h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	if err == nil || !strings.Contains(err.Error(), "not orchestrable") {
+		t.Fatalf("error = %v, want not orchestrable", err)
+	}
+}
+
+func TestCampaignHostRejectsRawMarkdownAsEvidence(t *testing.T) {
+	a := &scriptedCampaignAdapter{
+		name:   "codex",
+		stdout: []byte("# Report\n\nLooks fine. ResidualRisk: none\n"),
+	}
+	reg, err := adapter.NewRegistry(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("codex", "claude", "local")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	h := &campaignHost{
+		repo: t.TempDir(), runID: "r", name: "c", camp: camp, manifest: m,
+		adapters: reg, expectedHead: "unknown",
+	}
+	_, err = h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	if err == nil || !strings.Contains(err.Error(), "typed campaign evidence") {
+		t.Fatalf("error = %v, want typed campaign evidence rejection", err)
+	}
+}
+
+func TestCampaignHostRejectsNonZeroExit(t *testing.T) {
+	a := &scriptedCampaignAdapter{name: "codex", stdout: evidenceJSON("", ""), exit: 2}
+	reg, err := adapter.NewRegistry(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("codex", "claude", "local")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	h := &campaignHost{
+		repo: t.TempDir(), runID: "r", name: "c", camp: camp, manifest: m,
+		adapters: reg, expectedHead: "unknown",
+	}
+	_, err = h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	if err == nil || !strings.Contains(err.Error(), "exited 2") {
+		t.Fatalf("error = %v, want exited 2", err)
+	}
+}
+
+func TestDecodeAdapterCampaignEvidenceExtractsWrappedSchema(t *testing.T) {
+	inner := evidenceJSON("candidate", "fp-wrap")
+	// Provider wrappers may nest the envelope object; schema marker extraction must still bind runtime fields.
+	wrapped := []byte(`{"type":"result","payload":` + string(inner) + `}`)
+	ev, err := decodeAdapterCampaignEvidence(wrapped, "run-x", 3, "deadbeef")
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if ev.Disposition != auditcampaign.DispositionCandidate || ev.FindingFingerprint != "fp-wrap" {
+		t.Fatalf("ev = %+v", ev)
+	}
+	if ev.CampaignRun != "run-x" || ev.Cycle != 3 || ev.BaselineHead != "deadbeef" {
+		t.Fatalf("runtime bind = %+v", ev)
+	}
+}
+
+func TestNewCampaignHostFailsClosedWhenExternalNotApproved(t *testing.T) {
+	// Force Detect failures by pointing PATH at empty dir so codex/claude are missing.
+	empty := t.TempDir()
+	t.Setenv("PATH", empty)
+	repo := t.TempDir()
+	m := testManifestWithAdapters("codex", "claude", "local")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	_, err := newCampaignHost(context.Background(), repo, "run", "deep-bug-audit-repair", camp, m)
+	if err == nil {
+		t.Fatal("want error when external adapters are not installed")
+	}
+	if !strings.Contains(err.Error(), "unavailable") && !strings.Contains(err.Error(), "not approved") && !strings.Contains(err.Error(), "not installed") {
+		t.Fatalf("error = %v, want unavailable/not approved/not installed", err)
+	}
+}
+
+func TestNewCampaignHostAllowsLocalOnlyWithoutRegistry(t *testing.T) {
+	repo := t.TempDir()
+	m := testManifestWithAdapters("local", "local-confirm", "local")
+	// local-confirm must be in adapters map for Validate; host does not require Detect.
+	m.Adapters["local-confirm"] = config.AdapterConfig{Enabled: true, Role: config.AdapterRoleOrchestrable}
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	camp.Confirmer = "local-confirm"
+	h, err := newCampaignHost(context.Background(), repo, "run", "deep-bug-audit-repair", camp, m)
+	if err != nil {
+		t.Fatalf("newCampaignHost local-only: %v", err)
+	}
+	if h.adapters != nil {
+		t.Fatalf("expected nil registry for local-only host, got %#v", h.adapters)
+	}
+}
+
+func TestCampaignRequiredAdaptersSkipsLocal(t *testing.T) {
+	m := testManifestWithAdapters("codex", "local-confirm", "claude")
+	m.Adapters["local-confirm"] = config.AdapterConfig{Enabled: true, Role: config.AdapterRoleOrchestrable}
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	camp.Confirmer = "local-confirm"
+	got := campaignRequiredAdapters(camp, m)
+	joined := strings.Join(got, ",")
+	if !strings.Contains(joined, "codex") {
+		t.Fatalf("got %v, want codex", got)
+	}
+	if !strings.Contains(joined, "claude") {
+		t.Fatalf("got %v, want claude (fix producer)", got)
+	}
+	for _, n := range got {
+		if isLocalCampaignAdapter(n) {
+			t.Fatalf("local adapter %q should not be required for Detect", n)
+		}
+	}
+}
+
+func TestExtractCampaignEvidenceBytesRejectsProse(t *testing.T) {
+	_, err := extractCampaignEvidenceBytes([]byte("all good, ResidualRisk: none"))
+	if err == nil || !strings.Contains(err.Error(), "typed campaign evidence") {
+		t.Fatalf("error = %v", err)
+	}
+}

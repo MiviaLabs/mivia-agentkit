@@ -9,7 +9,8 @@ Rules: no raw prompts, raw model output, secrets, absolute paths, or `.ai/runs/*
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 0 | `40f6aa9..67f8df9` | final | correctness; security; tests | PASS; PASS; PASS | none | see phase0 | dual-home telemetry/plan gates; protect:commit≠Git; WS15 artifacts |
 | 1–3 | prior tip..a51238b | implementation | tests | PASS | none | a51238b | config/evidence/state/CommitScoped; Windows runner fix |
-| 4–6 | a51238b..HEAD | implementation+suite | tests; correctness self-check; security self-check | PASS; PASS; PASS | external-agent adapters not wired (local fixtures only; fail-closed) | this-commit | local adapters + scoped commit + built-binary + template/docs |
+| 4–6 | a51238b..HEAD | implementation+suite | tests; correctness self-check; security self-check | PASS; PASS; PASS | live dual-CLI install not exercised in CI (wiring covered by fakes) | this-commit | local + orchestrable adapters + scoped commit + built-binary |
+| adapters | prior..HEAD | orchestrable wiring | tests; correctness self-check | PASS; PASS | live dual-CLI install not exercised in CI | this-commit | codex/claude/etc. invoke path + typed evidence; local fixtures retained |
 
 ## Phase 0 entry
 
@@ -44,7 +45,7 @@ CommitRange: a51238b..HEAD
 AuditRound: final implementation suite
 Auditors: correctness | security | tests
 Results: PASS ; PASS ; PASS
-ResidualRisk: external agent auditor/confirmer adapters not wired; local fixtures only; non-local fail closed
+ResidualRisk: live dual-CLI install not exercised in CI (orchestrable wiring covered by scripted adapters + local fixtures)
 Verification:
   go test ./... -count=1
   go vet ./...
@@ -56,12 +57,40 @@ FindingsFixed:
   continuous requiring TTY for finite non-continuous runs
   structural-only built-binary test
   template/docs campaign parity gaps
+  external agent auditor/confirmer/fix adapters not invoked (now wired)
 MutationProofs:
   TestEngineRejectsNonInteractive / TestEngineFiniteRunWithoutContinuousTTY
   TestCampaignCLIRejectsNonInteractiveContinuous
   TestCampaignCLIBuiltBinaryIntegration / TestCampaignCLIBuiltBinaryScopedCommit
   TestCampaignCLIRejectsSelfConfirmCommit
+  TestCampaignHostInvokesIndependentOrchestrableAdapters
+  TestCampaignHostRejectsRawMarkdownAsEvidence / TestNewCampaignHostFailsClosedWhenExternalNotApproved
   gitstate CommitScoped dirty/denied/stamp/policy tests
+```
+
+## Orchestrable adapter wiring entry
+
+```text
+Phase: adapters (post 4-6 residual clear)
+CommitRange: prior..HEAD
+AuditRound: implementation suite
+Auditors: tests | correctness self-check
+Results: PASS ; PASS
+ResidualRisk: live dual-CLI install not exercised in CI
+Verification:
+  go test ./internal/cli -count=1
+  go test ./... -count=1
+  go vet ./...
+  go build ./cmd/mivia-agent
+FindingsFixed:
+  campaignHost hard-failed non-local adapters with "external agent wiring is unavailable"
+  residual risk claimed external adapters not wired
+MutationProofs:
+  TestCampaignHostInvokesIndependentOrchestrableAdapters (distinct audit+confirm Run calls)
+  TestCampaignHostRejectsRawMarkdownAsEvidence
+  TestCampaignHostRejectsMissingAdapterInRegistry
+  TestNewCampaignHostFailsClosedWhenExternalNotApproved
+  TestCampaignHostLocalFixtureStillWorks
 ```
 
 ## Entry template
