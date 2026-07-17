@@ -9,6 +9,10 @@ import re
 import sys
 from pathlib import Path
 
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+import agent_contract_lib as contracts  # noqa: E402
+
 
 ROOT = Path(__file__).resolve().parents[1]
 FAILURES: list[str] = []
@@ -194,6 +198,11 @@ def verify_skill_report_contract() -> None:
         "Gap statuses are `open`, `missing`, `shallow`, and `gated`.",
         "Low-severity gaps still require `BLOCK` or `PARTIAL` until fixed.",
         "`Status` values are `open`, `fixed`, `closed`, `missing`, `shallow`, `gated`, or `none`.",
+        "## Measurement Rules",
+        "NOT_MEASURED",
+        "Never invent elapsed time, duration, tokens, cost, throughput, or efficiency numbers.",
+        "TimingSource",
+        "token_source",
     ]:
         require(needle in template, f"{template_path}: missing {needle}")
 
@@ -207,6 +216,8 @@ def verify_skill_report_contract() -> None:
             findings_header,
             command_header,
             "Severity never gates approval; every open gap must be fixed.",
+            "Never invent elapsed time, duration, tokens, cost, throughput, or efficiency numbers",
+            "NOT_MEASURED",
             "ResidualRisk:",
             "NextAction:",
         ]:
@@ -692,6 +703,7 @@ def verify_git_hooks() -> None:
         "scripts/test_agent_plan_contracts.py",
         "scripts/test_plan_hook_guard.py",
         "scripts/test_skill_contracts.py",
+        "scripts/test_report_telemetry_contracts.py",
         "--disable-nosem",
         "semgrep --config semgrep/agent-standards.yml",
         "mivia-agent-precommit-summary",
@@ -702,6 +714,7 @@ def verify_git_hooks() -> None:
         "audit loop tests passed",
         "plan contract tests passed",
         "skill contract tests passed",
+        "telemetry contract tests passed",
     ]:
         require(needle in pre_commit, f"scripts/git-hooks/pre-commit: missing {needle}")
 
@@ -772,6 +785,7 @@ def verify_git_hooks() -> None:
         "scripts/test_agent_plan_contracts.py",
         "scripts/test_plan_hook_guard.py",
         "scripts/test_skill_contracts.py",
+        "scripts/test_report_telemetry_contracts.py",
         "--disable-nosem",
         "semgrep --config semgrep/agent-standards.yml",
         "go test ./...",
@@ -843,11 +857,25 @@ def verify_secret_hygiene() -> None:
         "docs/agent-planning.md",
         "docs/agent-hooks.md",
         "docs/development-hooks.md",
+        "docs/plans",
+        "docs/examples",
+        "docs/config-examples.md",
+        "docs/development-hooks.md",
+        "docs/loop-authoring.md",
+        "docs/agent-hooks.md",
+        "docs/template-authoring.md",
+        "docs/user-guide.md",
+        "docs/prd",
         "README.md",
+        "Makefile",
+        "mivia-agent.yaml",
         "scripts/git-hooks",
         "scripts/install_git_hooks.sh",
         "scripts/test_semgrep_rules.py",
         "scripts/test_git_hooks.py",
+        "scripts/test_report_telemetry_contracts.py",
+        "scripts/test_agent_plan_contracts.py",
+        "scripts/agent_contract_lib.py",
         "scripts/agent_hook_guard.py",
         "scripts/run_agent_hook_guard.sh",
         "scripts/test_agent_hook_guard.py",
@@ -884,6 +912,68 @@ def verify_secret_hygiene() -> None:
             )
 
 
+def verify_report_telemetry_contract() -> None:
+    import subprocess
+
+    script = "scripts/test_report_telemetry_contracts.py"
+    require(repo_path(script).is_file(), f"{script}: missing")
+    require(repo_path("scripts/agent_contract_lib.py").is_file(), "scripts/agent_contract_lib.py: missing")
+    content = text(script)
+    for needle in [
+        "NOT_MEASURED",
+        "Measurement Rules",
+        "test_report_template_forbids_unproven_telemetry",
+        "test_false_commit_claims_removed",
+        "test_inventory_exists",
+        "test_canonical_skills_ban_invented_metrics",
+        "test_makefile_and_verifier_wire_telemetry_contract",
+        "test_main_invokes_all_tests",
+        "agent_contract_lib",
+        "def main()",
+    ]:
+        require(needle in content, f"{script}: missing {needle}")
+    missing = contracts.missing_main_test_calls(content)
+    require(not missing, f"{script}: main() missing AST calls: {missing}")
+
+    makefile = text("Makefile")
+    require("telemetry-contract-test:" in makefile, "Makefile missing telemetry-contract-test target")
+    require("scripts/test_report_telemetry_contracts.py" in makefile, "Makefile missing telemetry contract script")
+
+    # Shared dual-home false-commit + clarifier checks.
+    for failure in contracts.check_false_commit_surfaces():
+        require(False, failure)
+    for failure in contracts.positive_false_commit_fixtures_blocked():
+        require(False, failure)
+
+    proc = subprocess.run(
+        [sys.executable, str(repo_path(script))],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    require(proc.returncode == 0, f"{script}: failed: {proc.stderr or proc.stdout}")
+    require("report telemetry contract tests passed" in proc.stdout, f"{script}: missing success marker")
+
+
+def verify_supervised_plan_allowlist() -> None:
+    plan_script = "scripts/test_agent_plan_contracts.py"
+    require(repo_path(plan_script).is_file(), f"{plan_script}: missing")
+    content = text(plan_script)
+    for needle in [
+        "test_supervised_campaign_plan_files_edit_subset_of_scope_in",
+        "test_main_invokes_all_tests",
+        "agent_contract_lib",
+        "check_supervised_plan_allowlist",
+    ]:
+        require(needle in content, f"{plan_script}: missing {needle}")
+    missing = contracts.missing_main_test_calls(content)
+    require(not missing, f"{plan_script}: main() missing AST calls: {missing}")
+    for failure in contracts.check_supervised_plan_allowlist():
+        require(False, failure)
+
+
 def main() -> int:
     for path in [".claude/settings.json", ".codex/hooks.json", ".agents/skills.json"]:
         load_json(path)
@@ -892,6 +982,8 @@ def main() -> int:
     verify_agent_quality_rules()
     verify_skills()
     verify_skill_report_contract()
+    verify_report_telemetry_contract()
+    verify_supervised_plan_allowlist()
     verify_adapters()
     verify_agents_hooks()
     verify_agent_hook_guard()
