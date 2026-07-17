@@ -93,6 +93,7 @@ func coreOutputs(profile string, enabled map[string]bool) []string {
 		".ai/skills/adversarial-test-review/SKILL.md",
 		".ai/skills/mivia-agent-workflows/SKILL.md",
 		".agents/skills/mivia-agent-workflows/SKILL.md",
+		".ai/templates/agent-report-v1.md",
 		".ai/quality/contracts/project-runtime.yaml",
 		".ai/quality/review-policies/default.yaml",
 	}
@@ -129,6 +130,7 @@ var outputTemplates = map[string]string{
 	".ai/skills/adversarial-test-review/SKILL.md":        "core/skills/adversarial-test-review/SKILL.md.tmpl",
 	".ai/skills/mivia-agent-workflows/SKILL.md":          "core/skills/mivia-agent-workflows/SKILL.md.tmpl",
 	".agents/skills/mivia-agent-workflows/SKILL.md":      "adapters/agents/skills/mivia-agent-workflows/SKILL.md.tmpl",
+	".ai/templates/agent-report-v1.md":                   "core/templates/agent-report-v1.md.tmpl",
 	".ai/quality/contracts/project-runtime.yaml":         "core/quality/contracts/project-runtime.yaml.tmpl",
 	".ai/quality/review-policies/default.yaml":           "core/quality/review-policies/default.yaml.tmpl",
 	".ai/workflows/research-loop.yaml":                   "workflows/research-loop.yaml.tmpl",

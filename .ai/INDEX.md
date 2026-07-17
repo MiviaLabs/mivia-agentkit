@@ -73,6 +73,17 @@ Always dry-run before live execution:
 ./mivia-agent run --repo . --workflow <name> --dry-run --json
 ```
 
+## Supervised Campaigns
+
+Optional finite audit→confirm→fix→verify→scoped-commit campaigns live under `campaigns:` in `mivia-agent.yaml` (disabled by default). They are separate from `loops` and from the host audit-loop hook.
+
+```bash
+./mivia-agent campaign run --repo . --campaign deep-bug-audit-repair --json
+./mivia-agent campaign status --repo . --run <id> --json
+```
+
+Ordinary `deep-bug-audit` remains report-only. Commit-capable campaigns require an independent confirmer; one-adapter self-confirmation fails closed. No auto-push or auto-PR.
+
 ## Policy
 
 - `.ai/policy/commit-message.json` - allowed commit message types, scopes, and subject length for the repo `commit-msg` hook.

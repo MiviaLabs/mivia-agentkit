@@ -29,5 +29,5 @@
   },
   "cleanReportsToStop": 2,
   "maxMalformedReports": 2,
-  "instruction": "Audit loop active: emit mivia-agent-report/v1 on every pass, fix every gap regardless of severity, continue until two consecutive clean reports have zero gap rows and ResidualRisk: none, or until the hook reaches the maximum iteration cap."
+  "instruction": "Audit loop active: emit mivia-agent-report/v1 on every pass, fix every gap regardless of severity, continue until two consecutive clean reports have zero gap rows and ResidualRisk: none, or until the hook reaches the maximum iteration cap. This host loop is report-only: do not stage, commit, push, open a PR, or start mivia-agent campaign; campaign commits require explicit operator-launched campaign run with independent confirmation."
 }

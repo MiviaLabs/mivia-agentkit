@@ -3,14 +3,15 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/auditcampaign"
 	"github.com/MiviaLabs/mivia-agentkit/internal/config"
+	"github.com/MiviaLabs/mivia-agentkit/internal/gitstate"
 	"github.com/spf13/cobra"
 )
 
@@ -91,8 +92,8 @@ func runCampaign(cmd *cobra.Command, opt campaignOptions) error {
 		}
 		opt.confirmContinuous = true
 	}
-	// Load manifest if present; fail closed when campaign missing/enabled incorrectly.
-	manifest, err := loadCampaignManifest(opt.repo)
+	repo := absRepoPath(opt.repo)
+	manifest, err := loadCampaignManifest(repo)
 	if err != nil {
 		return ExitError{Code: 2, Err: err}
 	}
@@ -106,30 +107,22 @@ func runCampaign(cmd *cobra.Command, opt campaignOptions) error {
 	if camp.CommitEnabled && camp.Auditor == camp.Confirmer {
 		return ExitError{Code: 2, Err: fmt.Errorf("self-confirmation rejected for commit-capable campaign")}
 	}
-	store := auditcampaign.NewStore(opt.repo, opt.campaign+"-"+time.Now().UTC().Format("20060102T150405Z"), "cli")
+	runID := opt.campaign + "-" + time.Now().UTC().Format("20060102T150405Z")
+	store := auditcampaign.NewStore(repo, runID, "cli")
+	host, err := newCampaignHost(repo, runID, opt.campaign, camp, manifest)
+	if err != nil {
+		return ExitError{Code: 1, Err: err}
+	}
 	eng := &auditcampaign.Engine{
 		Campaign:              camp,
 		Store:                 store,
+		Continuous:            opt.continuous,
 		InteractiveContinuous: opt.confirmContinuous,
 		SelfConfirm:           camp.Auditor != "" && camp.Auditor == camp.Confirmer,
-		Audit: func(ctx context.Context, phase auditcampaign.Phase, cycle int) (auditcampaign.Evidence, error) {
-			// Placeholder: real adapters wired in later integration; return clean for dry structure.
-			return auditcampaign.Evidence{
-				Schema:       auditcampaign.EvidenceSchema,
-				CampaignRun:  store.ID,
-				Cycle:        cycle,
-				BaselineHead: "unknown",
-			}, nil
-		},
-		Confirm: func(ctx context.Context, phase auditcampaign.Phase, cycle int) (auditcampaign.Evidence, error) {
-			return auditcampaign.Evidence{Schema: auditcampaign.EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle}, nil
-		},
-		Fix: func(ctx context.Context, phase auditcampaign.Phase, cycle int) (auditcampaign.Evidence, error) {
-			return auditcampaign.Evidence{Schema: auditcampaign.EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle}, nil
-		},
-		Commit: func(ctx context.Context, e auditcampaign.Evidence) (string, error) {
-			return "", fmt.Errorf("commit not wired in this binary slice")
-		},
+		Audit:                 host.Audit,
+		Confirm:               host.Confirm,
+		Fix:                   host.Fix,
+		Commit:                host.Commit,
 	}
 	res, err := eng.Run(cmd.Context())
 	if err != nil {
@@ -142,7 +135,8 @@ func statusCampaign(cmd *cobra.Command, opt campaignOptions) error {
 	if opt.runID == "" {
 		return ExitError{Code: 2, Err: fmt.Errorf("--run is required")}
 	}
-	store := auditcampaign.NewStore(opt.repo, opt.runID, "cli")
+	repo := absRepoPath(opt.repo)
+	store := auditcampaign.NewStore(repo, opt.runID, "cli")
 	snap, err := store.Load()
 	if err != nil {
 		return ExitError{Code: 1, Err: err}
@@ -167,10 +161,25 @@ func resumeCampaign(cmd *cobra.Command, opt campaignOptions) error {
 	if isCIEnv() {
 		return ExitError{Code: 2, Err: fmt.Errorf("resume rejected in CI/noninteractive environment")}
 	}
-	store := auditcampaign.NewStore(opt.repo, opt.runID, "cli")
-	if err := store.ResumePreconditions("", "", "cli"); err != nil && err.Error() != "resume rejected: branch mismatch" {
-		// head/branch empty means skip those checks when unknown
-		_ = err
+	repo := absRepoPath(opt.repo)
+	store := auditcampaign.NewStore(repo, opt.runID, "cli")
+	wantHead := ""
+	wantBranch := ""
+	if head, err := gitstate.Head(repo); err == nil {
+		wantHead = head
+	}
+	if err := store.ResumePreconditions(wantBranch, wantHead, "cli"); err != nil {
+		// Empty branch skips branch check when unknown; head mismatch still fails.
+		if wantHead != "" || err.Error() != "resume rejected: head mismatch" {
+			if err.Error() == "resume rejected: branch mismatch" && wantBranch == "" {
+				// skip empty branch
+			} else if err.Error() != "resume rejected: branch mismatch" {
+				// allow load for status-like resume when only branch empty and head empty
+				if wantHead != "" {
+					return ExitError{Code: 1, Err: err}
+				}
+			}
+		}
 	}
 	snap, err := store.Load()
 	if err != nil {
@@ -181,7 +190,7 @@ func resumeCampaign(cmd *cobra.Command, opt campaignOptions) error {
 }
 
 func loadCampaignManifest(repo string) (config.Manifest, error) {
-	path := repo + "/mivia-agent.yaml"
+	path := filepath.Join(repo, "mivia-agent.yaml")
 	b, err := os.ReadFile(path)
 	if err != nil {
 		// empty campaigns map is valid

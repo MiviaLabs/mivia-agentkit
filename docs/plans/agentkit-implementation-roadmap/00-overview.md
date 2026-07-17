@@ -59,7 +59,7 @@ Phase 0                  Phase 1                       Phase 2
 | 7 | [`ws-07-import-update/`](ws-07-import-update/tasks.md) | `import` + `update` | 5 | WS2, WS3 | ☑ |
 | 14 | [`ws-14-real-runtime-coverage/`](ws-14-real-runtime-coverage/tasks.md) | Real runtime coverage for commands and adapters | 5 | WS2, WS3, WS4, WS5, WS6, WS7, WS9, WS10, WS11, WS12, WS13 | ☑ |
 | 8 | [`ws-08-ci-release-docs/`](ws-08-ci-release-docs/tasks.md) | CI, release, docs | 5 | all prior, WS14 | ☑ |
-| 15 | [`ws-15-supervised-audit-repair-campaign/`](ws-15-supervised-audit-repair-campaign/tasks.md) | Supervised deep-bug-audit repair campaign | 6 | WS0–WS14 | ☐ |
+| 15 | [`ws-15-supervised-audit-repair-campaign/`](ws-15-supervised-audit-repair-campaign/tasks.md) | Supervised deep-bug-audit repair campaign | 6 | WS0–WS14 | ☑ |
 
 Numbering follows the product plan, not execution order. **Execute by phase, not by number.**
 

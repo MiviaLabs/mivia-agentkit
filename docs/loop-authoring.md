@@ -51,6 +51,25 @@ Model/effort precedence is:
 
 Strict-profile loops that end in a protected action must use `majority` or `unanimous`; `first-pass` is rejected.
 
+## Supervised Campaigns (Not Loops)
+
+`config.Loop` remains the bounded `mivia-agent run` surface. Supervised audit-repair campaigns are a separate, disabled-by-default contract under `campaigns:` in `mivia-agent.yaml`.
+
+```bash
+./mivia-agent campaign run --repo . --campaign deep-bug-audit-repair --json
+./mivia-agent campaign status --repo . --run <id> --json
+./mivia-agent campaign resume --repo . --run <id> --json
+```
+
+Operator rules:
+
+- Finite cycles, duration caps, and no-progress stops; never an unbounded self-loop.
+- `--continuous` is interactive TTY only; CI/noninteractive environments are rejected.
+- Ordinary deep-bug-audit and the host audit-loop hook stay **report-only** and do not commit.
+- Commit-capable campaigns require an independently configured confirmer different from the auditor. A one-adapter self-hosted setup fails closed.
+- Only the coordinator performs scoped commits (`CommitScoped`); no auto-push, force, reset, clean, or PR.
+- Local fixture adapters (`local`, `local-*`) support offline integration; external agent wiring is not a silent placeholder.
+
 ## Consensus Modes
 
 - `majority`

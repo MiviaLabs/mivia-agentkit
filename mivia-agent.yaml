@@ -80,6 +80,20 @@ governance:
   provider: noop
   audit_log: .ai/audit.jsonl
 
+# Supervised audit-repair campaigns are disabled by default.
+# Operator launch only: mivia-agent campaign run --repo . --campaign deep-bug-audit-repair
+# Commit-capable mode requires independent auditor/confirmer and explicit allowed_paths.
+campaigns:
+  deep-bug-audit-repair:
+    enabled: false
+    clean_pass_threshold: 2
+    max_cycles: 10
+    max_duration: 2h
+    max_repair_attempts: 3
+    no_progress_threshold: 2
+    commit_enabled: false
+    on_exhausted: fail
+
 global:
   layer: ~/.agents
   merge: project_wins

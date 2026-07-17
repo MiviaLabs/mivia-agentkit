@@ -38,6 +38,8 @@ That contract must stay:
 - deterministic in ordering
 - adapter-sensitive
 - profile-sensitive
+
+Generated targets receive a disabled-by-default `campaigns.deep-bug-audit-repair` block in `mivia-agent.yaml`, the deep-bug-audit skill with report-only boundary text, and `.ai/templates/agent-report-v1.md`. Init/update must not enable campaigns or install Python-only campaign executors the binary cannot run.
 - aligned with the embedded template tree
 
 If `List` changes, update its tests and any generated-fixture expectations that depend on the standard profile file set.

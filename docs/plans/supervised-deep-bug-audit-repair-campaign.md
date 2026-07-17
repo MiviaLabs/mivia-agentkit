@@ -1,12 +1,12 @@
 # Supervised Deep-Bug-Audit Repair Campaign
 
-Status: Phase 0 complete — unanimous deep-bug-audit PASS; Phase 1 next
+Status: Phases 0–6 implemented on feature branch; verification suite green
 
-Current phase: 1
+Current phase: 6 (closure)
 
-Last verified: 2026-07-17 Phase 0 audit PASS on `40f6aa9..67f8df9`
+Last verified: 2026-07-18 full Phase 6 verification suite green after Phase 4–6 wiring
 
-Next action: Implement Phase 1 typed campaign configuration.
+Next action: land PR after human review of residual risk notes in audit ledger.
 
 ## Decision
 

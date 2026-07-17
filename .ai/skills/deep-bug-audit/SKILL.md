@@ -27,6 +27,19 @@ triggers:
 4. Check that tests exercise real boundaries rather than mocks of the thing under test.
 5. For each finding, provide file, symbol, failure mode, user impact, and the test that should catch it.
 
+## Supervised Campaign Boundary
+
+Ordinary deep-bug-audit is **report-only**. It must not stage, commit, push, open a PR, or rewrite Git history.
+
+Commit-capable audit→confirm→fix→verify→scoped-commit cycles use the separate supervised campaign surface only:
+
+```bash
+./mivia-agent campaign run --repo . --campaign deep-bug-audit-repair --json
+./mivia-agent campaign status --repo . --run <id> --json
+```
+
+Campaigns are disabled by default in `mivia-agent.yaml`, require an independently configured confirmer for commit-capable mode, and are never activated by prompt substring matching or the host audit-loop hook. A one-adapter self-hosted setup fails closed for commit-capable campaigns.
+
 ## Required Report
 
 Never invent elapsed time, duration, tokens, cost, throughput, or efficiency numbers; use runtime-owned metrics or `NOT_MEASURED`.

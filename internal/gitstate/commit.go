@@ -175,7 +175,8 @@ func assertCleanOwnedWorktree(repo string, allowed []string) error {
 			return fmt.Errorf("%w: merge/rebase/cherry-pick in progress", ErrScopedCommit)
 		}
 	}
-	out, err := exec.Command("git", "-C", repo, "status", "--porcelain").Output()
+	// Respect .gitignore so ignored coordinator state (.ai/runs/, fixtures) does not block.
+	out, err := exec.Command("git", "-C", repo, "status", "--porcelain", "--untracked-files=all").Output()
 	if err != nil {
 		return fmt.Errorf("git status: %w", err)
 	}
@@ -200,10 +201,27 @@ func assertCleanOwnedWorktree(repo string, allowed []string) error {
 		if i := strings.Index(path, " -> "); i >= 0 {
 			path = path[i+4:]
 		}
-		path = filepath.ToSlash(path)
-		if _, ok := allow[path]; !ok {
-			return fmt.Errorf("%w: unrelated dirty path %q", ErrScopedCommit, path)
+		path = filepath.ToSlash(strings.Trim(path, "\""))
+		// Directory entries from untracked-files=all end with '/'.
+		path = strings.TrimSuffix(path, "/")
+		if path == "" {
+			continue
 		}
+		if _, ok := allow[path]; ok {
+			continue
+		}
+		// Prefix match: allowed "internal/foo" covers "internal/foo/bar.go".
+		covered := false
+		for a := range allow {
+			if path == a || strings.HasPrefix(path, a+"/") {
+				covered = true
+				break
+			}
+		}
+		if covered {
+			continue
+		}
+		return fmt.Errorf("%w: unrelated dirty path %q", ErrScopedCommit, path)
 	}
 	return nil
 }

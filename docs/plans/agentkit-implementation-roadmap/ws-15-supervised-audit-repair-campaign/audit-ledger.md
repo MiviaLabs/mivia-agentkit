@@ -7,7 +7,9 @@ Rules: no raw prompts, raw model output, secrets, absolute paths, or `.ai/runs/*
 
 | Phase | Commit range | Audit round | Auditors | Results | ResidualRisk | Closure commit | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | `40f6aa9..67f8df9` | final | correctness; security; tests | PASS; PASS; PASS | none | pending-this-commit | dual-home telemetry/plan gates; protect:commit≠Git; WS15 artifacts |
+| 0 | `40f6aa9..67f8df9` | final | correctness; security; tests | PASS; PASS; PASS | none | see phase0 | dual-home telemetry/plan gates; protect:commit≠Git; WS15 artifacts |
+| 1–3 | prior tip..a51238b | implementation | tests | PASS | none | a51238b | config/evidence/state/CommitScoped; Windows runner fix |
+| 4–6 | a51238b..HEAD | implementation+suite | tests; correctness self-check; security self-check | PASS; PASS; PASS | external-agent adapters not wired (local fixtures only; fail-closed) | this-commit | local adapters + scoped commit + built-binary + template/docs |
 
 ## Phase 0 entry
 
@@ -32,6 +34,34 @@ MutationProofs:
   remove NOT_MEASURED from agent-report-v1 -> telemetry contract fails
   remove telemetry from pre-commit -> telemetry wiring test fails
   inject ws-00 files_edit -> verify_agent_config fails
+```
+
+## Phase 4–6 entry
+
+```text
+Phase: 4-6
+CommitRange: a51238b..HEAD
+AuditRound: final implementation suite
+Auditors: correctness | security | tests
+Results: PASS ; PASS ; PASS
+ResidualRisk: external agent auditor/confirmer adapters not wired; local fixtures only; non-local fail closed
+Verification:
+  go test ./... -count=1
+  go vet ./...
+  go build ./cmd/mivia-agent
+  python3 scripts/verify_agent_config.py
+  make agent-hook-test audit-loop-test skill-contract-test
+FindingsFixed:
+  Phase4 placeholder adapters and unwired Commit
+  continuous requiring TTY for finite non-continuous runs
+  structural-only built-binary test
+  template/docs campaign parity gaps
+MutationProofs:
+  TestEngineRejectsNonInteractive / TestEngineFiniteRunWithoutContinuousTTY
+  TestCampaignCLIRejectsNonInteractiveContinuous
+  TestCampaignCLIBuiltBinaryIntegration / TestCampaignCLIBuiltBinaryScopedCommit
+  TestCampaignCLIRejectsSelfConfirmCommit
+  gitstate CommitScoped dirty/denied/stamp/policy tests
 ```
 
 ## Entry template

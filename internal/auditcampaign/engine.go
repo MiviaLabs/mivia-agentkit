@@ -25,6 +25,8 @@ type Engine struct {
 	Fix      AdapterFunc
 	Commit   CommitFunc
 	Clock    func() time.Time
+	// Continuous is true when the operator requested --continuous mode.
+	Continuous bool
 	// InteractiveContinuous is true only when operator confirmed TTY continuous.
 	InteractiveContinuous bool
 	// SelfConfirm is true when auditor==confirmer; rejected for commit campaigns.
@@ -44,8 +46,14 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 	if e.Campaign.CommitEnabled && e.SelfConfirm {
 		return Result{}, fmt.Errorf("commit-capable campaign rejects self-confirmation")
 	}
-	if e.Campaign.Enabled && e.Campaign.RequireInteractiveContinuous != nil && *e.Campaign.RequireInteractiveContinuous {
-		if !e.InteractiveContinuous {
+	// Continuous mode requires interactive operator confirmation when the campaign demands it.
+	// Finite non-continuous runs do not require a TTY.
+	if e.Continuous {
+		req := true
+		if e.Campaign.RequireInteractiveContinuous != nil {
+			req = *e.Campaign.RequireInteractiveContinuous
+		}
+		if req && !e.InteractiveContinuous {
 			return Result{}, fmt.Errorf("continuous requires interactive operator confirmation")
 		}
 	}
@@ -71,10 +79,10 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 	commits := 0
 	for snap.CyclesUsed < maxCycles {
 		if err := ctx.Err(); err != nil {
-			return e.terminate(snap, TerminalCancelled, "cancelled")
+			return e.terminate(snap, TerminalCancelled, "cancelled", commits)
 		}
 		if now().Sub(start) > maxDur {
-			return e.terminate(snap, TerminalDurationCap, "duration cap")
+			return e.terminate(snap, TerminalDurationCap, "duration cap", commits)
 		}
 		snap.CyclesUsed++
 		snap.Cycle = snap.CyclesUsed
@@ -86,14 +94,14 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 		_ = e.Store.Save(snap)
 		ev, err := e.Audit(ctx, PhaseAuditing, snap.Cycle)
 		if err != nil {
-			return e.terminate(snap, TerminalVerificationFailed, err.Error())
+			return e.terminate(snap, TerminalVerificationFailed, err.Error(), commits)
 		}
 		if ev.Disposition == "" || ev.Disposition == DispositionRejected {
 			// treat empty as clean audit for stop predicate when ResidualRisk none path
 			if isCleanEvidence(ev) {
 				snap.CleanStreak++
 				if snap.CleanStreak >= cleanNeed {
-					return e.terminate(snap, TerminalClean, "two consecutive clean audits")
+					return e.terminate(snap, TerminalClean, "two consecutive clean audits", commits)
 				}
 				snap.Phase = PhaseCompletedCycle
 				_ = e.Store.Save(snap)
@@ -106,7 +114,7 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 		if ev.Disposition == DispositionCandidate || !ev.CommitEligible() {
 			if RecordFingerprint(&snap, ev.FindingFingerprint) {
 				if snap.NoProgressCount >= e.Campaign.NoProgressThreshold {
-					return e.terminate(snap, TerminalNoProgress, "duplicate fingerprint")
+					return e.terminate(snap, TerminalNoProgress, "duplicate fingerprint", commits)
 				}
 			}
 			snap.Phase = PhaseCompletedCycle
@@ -119,7 +127,7 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 		_ = e.Store.Save(snap)
 		cev, err := e.Confirm(ctx, PhaseConfirming, snap.Cycle)
 		if err != nil {
-			return e.terminate(snap, TerminalVerificationFailed, err.Error())
+			return e.terminate(snap, TerminalVerificationFailed, err.Error(), commits)
 		}
 		if cev.Disposition != DispositionConfirmed && !cev.CommitEligible() {
 			snap.Phase = PhaseCompletedCycle
@@ -132,10 +140,10 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 		_ = e.Store.Save(snap)
 		fev, err := e.Fix(ctx, PhaseFixing, snap.Cycle)
 		if err != nil {
-			return e.terminate(snap, TerminalVerificationFailed, err.Error())
+			return e.terminate(snap, TerminalVerificationFailed, err.Error(), commits)
 		}
 		if !fev.CommitEligible() && fev.Disposition != DispositionFixed {
-			return e.terminate(snap, TerminalVerificationFailed, "fix did not produce commit-eligible evidence")
+			return e.terminate(snap, TerminalVerificationFailed, "fix did not produce commit-eligible evidence", commits)
 		}
 		snap.Phase = PhaseVerifying
 		_ = e.Store.Save(snap)
@@ -144,11 +152,14 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 		snap.Phase = PhaseCommitting
 		_ = e.Store.Save(snap)
 		if e.Commit == nil {
-			return e.terminate(snap, TerminalCommitFailed, "commit function missing")
+			return e.terminate(snap, TerminalCommitFailed, "commit function missing", commits)
+		}
+		if !e.Campaign.CommitEnabled {
+			return e.terminate(snap, TerminalCommitFailed, "commit_enabled is false", commits)
 		}
 		sha, err := e.Commit(ctx, fev)
 		if err != nil {
-			return e.terminate(snap, TerminalCommitFailed, err.Error())
+			return e.terminate(snap, TerminalCommitFailed, err.Error(), commits)
 		}
 		commits++
 		snap.LastCommitSHA = sha
@@ -157,7 +168,7 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 		_ = e.Store.Save(snap)
 		// schedule next audit only after recorded commit (loop continues)
 	}
-	return e.terminate(snap, TerminalCycleCap, "cycle cap")
+	return e.terminate(snap, TerminalCycleCap, "cycle cap", commits)
 }
 
 func (e *Engine) ensureSnapshot() (Snapshot, error) {
@@ -183,19 +194,12 @@ func (e *Engine) ensureSnapshot() (Snapshot, error) {
 	return snap, nil
 }
 
-func (e *Engine) terminate(snap Snapshot, reason TerminalReason, msg string) (Result, error) {
+func (e *Engine) terminate(snap Snapshot, reason TerminalReason, msg string, commits int) (Result, error) {
 	snap.Phase = PhaseTerminal
 	snap.TerminalReason = reason
 	_ = e.Store.Save(snap)
 	_ = e.Store.Unlock()
-	return Result{Terminal: reason, Cycles: snap.CyclesUsed, Commits: countCommits(snap), Message: msg}, nil
-}
-
-func countCommits(snap Snapshot) int {
-	if snap.LastCommitSHA == "" {
-		return 0
-	}
-	return 1
+	return Result{Terminal: reason, Cycles: snap.CyclesUsed, Commits: commits, Message: msg}, nil
 }
 
 func isCleanEvidence(e Evidence) bool {

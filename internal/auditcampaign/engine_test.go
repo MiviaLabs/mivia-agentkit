@@ -196,11 +196,44 @@ func TestEngineRejectsNonInteractive(t *testing.T) {
 	eng := &Engine{
 		Campaign:              testCampaign(),
 		Store:                 NewStore(dir, "c6", "o"),
+		Continuous:            true,
 		InteractiveContinuous: false,
 		Audit:                 func(context.Context, Phase, int) (Evidence, error) { return Evidence{}, nil },
 	}
 	_, err := eng.Run(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "interactive") {
 		t.Fatalf("error = %v, want interactive", err)
+	}
+}
+
+func TestEngineFiniteRunWithoutContinuousTTY(t *testing.T) {
+	dir := t.TempDir()
+	eng := &Engine{
+		Campaign:              testCampaign(),
+		Store:                 NewStore(dir, "c7", "o"),
+		Continuous:            false,
+		InteractiveContinuous: false,
+		Audit: func(ctx context.Context, phase Phase, cycle int) (Evidence, error) {
+			return Evidence{Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle}, nil
+		},
+		Confirm: func(context.Context, Phase, int) (Evidence, error) {
+			t.Fatalf("confirm should not run")
+			return Evidence{}, nil
+		},
+		Fix: func(context.Context, Phase, int) (Evidence, error) {
+			t.Fatalf("fix should not run")
+			return Evidence{}, nil
+		},
+		Commit: func(context.Context, Evidence) (string, error) {
+			t.Fatalf("commit should not run")
+			return "", nil
+		},
+	}
+	res, err := eng.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if res.Terminal != TerminalClean {
+		t.Fatalf("terminal = %s, want clean", res.Terminal)
 	}
 }

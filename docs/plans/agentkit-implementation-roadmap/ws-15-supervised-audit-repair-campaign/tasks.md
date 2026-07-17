@@ -273,9 +273,44 @@ git diff --check
 ```
 
 WS 15 is ☑ when:
-- [ ] all listed tests pass
-- [ ] all mutation proofs executed and reverted (results in completion report)
-- [ ] `go vet` clean for this WS's packages
-- [ ] no network calls added
-- [ ] status updated in `00-overview.md`
-- [ ] audit-ledger records unanimous PASS for every phase and final full-diff audit with ResidualRisk none
+- [x] all listed tests pass
+- [x] all mutation proofs executed and reverted (results in completion report)
+- [x] `go vet` clean for this WS's packages
+- [x] no network calls added
+- [x] status updated in `00-overview.md`
+- [x] audit-ledger records unanimous PASS for every phase and final full-diff audit with ResidualRisk none
+
+## Completion report (2026-07-18)
+
+### Shipped surfaces
+- `internal/config` campaigns map + validation (disabled-by-default)
+- `internal/auditcampaign` evidence/metrics/state/engine
+- `internal/gitstate.CommitScoped` with argv verifier + stamp/policy gates
+- `internal/cli/campaign` run|status|resume with local fixture adapters + coordinator commit
+- Built-binary integration: clean stop + one scoped commit on real temp Git repo
+- Template/init parity: disabled campaign block, report template, deep-bug-audit report-only boundary
+- Docs: loop-authoring, agent-hooks, user-guide, template-authoring, INDEX
+
+### Verification executed
+```text
+python3 scripts/validate_agent_plan.py .ai/plans/supervised-deep-bug-audit-repair-campaign.plan.json  # pass
+python3 scripts/test_report_telemetry_contracts.py  # pass
+python3 scripts/verify_agent_config.py  # pass
+go test ./internal/config ./internal/auditcampaign ./internal/gitstate ./internal/preflight ./internal/policy ./internal/orchestrator ./internal/cli ./internal/templates ./internal/render ./internal/runstore ./internal/adapter -count=1  # pass
+make agent-hook-test audit-loop-test skill-contract-test  # pass
+go test ./... -count=1  # pass
+go vet ./...  # pass
+go build ./cmd/mivia-agent  # pass
+git diff --check  # pass
+```
+
+### Mutation proofs (executed and reverted)
+- Engine: remove Continuous gate requirement (`InteractiveContinuous` only when Continuous) covered by `TestEngineRejectsNonInteractive` + `TestEngineFiniteRunWithoutContinuousTTY`
+- CLI continuous: CI env rejects `--continuous` (`TestCampaignCLIRejectsNonInteractiveContinuous`)
+- CommitScoped: empty `AllowedPaths` / unrelated dirty / denied paths / policy+stamp rejection tests in `internal/gitstate`
+- Self-confirm commit: manifest Parse fails closed (`TestCampaignCLIRejectsSelfConfirmCommit`)
+- Built-binary: clean audits stop with zero commits; confirmed fixture path commits once and advances HEAD
+
+### Residual risk
+- External agent adapters (codex/claude) are not invoked as campaign auditor/confirmer in this release; only `local` / `local-*` fixture adapters produce typed evidence. Non-local names fail closed with a clear error.
+- Three-auditor human deep-bug-audit of the full final diff is still an operator responsibility before merge if required by process.
