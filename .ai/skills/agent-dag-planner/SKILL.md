@@ -74,6 +74,8 @@ If any gap remains `open`, `missing`, `shallow`, or `gated`, the final report mu
 
 ## Required Report
 
+Never invent elapsed time, duration, tokens, cost, throughput, or efficiency numbers; use runtime-owned metrics or `NOT_MEASURED`.
+
 Always use `mivia-agent-report/v1` from `.ai/templates/agent-report-v1.md`. Keep the report strict and concise; do not add free-form sections unless the user asks for a long artifact.
 
 Result semantics:
