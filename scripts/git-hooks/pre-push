@@ -27,6 +27,7 @@ python3 scripts/test_audit_loop_guard.py
 python3 scripts/test_agent_plan_contracts.py
 python3 scripts/test_plan_hook_guard.py
 python3 scripts/test_skill_contracts.py
+python3 scripts/test_report_telemetry_contracts.py
 semgrep --config semgrep/agent-standards.yml --error --skip-unknown-extensions --metrics off --disable-nosem .
 
 if [[ ! -f go.mod ]]; then
