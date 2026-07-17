@@ -80,6 +80,38 @@
       "triggers": ["implement this plan", "implement the plan", "execute dag plan", "run the plan", "plan implementation"]
     },
     {
+      "name": "adversarial-test-review",
+      "agent": "codex",
+      "source": "project",
+      "path": ".agents/skills/adversarial-test-review/SKILL.md",
+      "description": "Adversarial pre-merge review for implementation and tests.",
+      "triggers": ["adversarial test review", "code review", "review this", "safe to ship"]
+    },
+    {
+      "name": "airtight-feature-delivery",
+      "agent": "codex",
+      "source": "project",
+      "path": ".agents/skills/airtight-feature-delivery/SKILL.md",
+      "description": "End-to-end feature delivery checklist for one scoped workstream task.",
+      "triggers": ["implement feature", "airtight delivery", "workstream implementation"]
+    },
+    {
+      "name": "deep-bug-audit",
+      "agent": "codex",
+      "source": "project",
+      "path": ".agents/skills/deep-bug-audit/SKILL.md",
+      "description": "Structured bug-finding methodology for this repo.",
+      "triggers": ["deep bug audit", "bug hunt", "production readiness audit"]
+    },
+    {
+      "name": "test-coverage-audit",
+      "agent": "codex",
+      "source": "project",
+      "path": ".agents/skills/test-coverage-audit/SKILL.md",
+      "description": "Coverage gap analysis for this repo.",
+      "triggers": ["test coverage audit", "missing tests", "coverage gaps"]
+    },
+    {
       "name": "mivia-agent-workflows",
       "agent": "codex",
       "source": "project",

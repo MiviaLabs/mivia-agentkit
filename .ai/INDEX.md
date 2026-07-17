@@ -32,9 +32,13 @@ Canonical project skills:
 
 Codex repo-discovery adapters:
 
+- `.agents/skills/adversarial-test-review/SKILL.md`
 - `.agents/skills/agent-dag-planner/SKILL.md`
 - `.agents/skills/agent-plan-implementer/SKILL.md`
+- `.agents/skills/airtight-feature-delivery/SKILL.md`
+- `.agents/skills/deep-bug-audit/SKILL.md`
 - `.agents/skills/mivia-agent-workflows/SKILL.md`
+- `.agents/skills/test-coverage-audit/SKILL.md`
 
 Claude Code adapters:
 
