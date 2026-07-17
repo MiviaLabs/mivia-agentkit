@@ -68,7 +68,7 @@ go-check:
 		exit 0; \
 	fi; \
 	mapfile -t files < <(git ls-files '*.go'); \
-	if (($${files[@]})); then \
+	if ((${#files[@]})); then \
 		unformatted="$$(gofmt -l "$${files[@]}")"; \
 		if [[ -n "$$unformatted" ]]; then \
 			printf 'gofmt required for:\n%s\n' "$$unformatted" >&2; \
