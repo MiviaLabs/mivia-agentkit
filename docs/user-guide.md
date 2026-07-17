@@ -48,7 +48,6 @@ Flags that exist but are not fully wired yet:
 - `init --with-loop`
 - `run --step`
 - `run --input-artifact`
-- `preflight --pipeline-preflight`
 
 Treat those as reserved surface. They are accepted by the CLI but do not materially change behavior yet.
 
@@ -241,9 +240,11 @@ What `preflight` does now:
 
 Current notes:
 
+- `--broad-verifier` is required unless `--not-run` or `--pipeline-preflight` is provided.
 - `--not-run` is only accepted when no `--broad-verifier` was provided.
 - High-risk changes require contract rows, focused verifiers, and mutation proofs.
-- `--pipeline-preflight` is currently accepted but does not materially change validation behavior.
+- `--pipeline-preflight` skips the broad-verifier requirement for pipeline contexts where the broad suite runs as a separate CI step.
+- Preflight now resolves the stamp path correctly for linked git worktrees (`.git` file form).
 
 ## Inspect Adapters
 
@@ -355,8 +356,10 @@ Current hook behavior:
 
 - Supports `codex` and `claude`.
 - Reads event payload from stdin.
-- Denies protected actions when stamp or policy requirements are missing.
-- Fails closed for malformed protected payloads.
+- Loads the repository governance provider from `mivia-agent.yaml` (`governance.provider`); defaults to `noop` when no manifest is present.
+- Fails closed (adapter-native deny) for any setup error: oversized payload, stdin read failure, or governance load failure. Claude gets exit 2; Codex gets a deny JSON object. Bare exit 1 is never used for protected-action flows.
+- Detects protected git/gh/deploy commands after global flags (e.g. `git -C repo push`, `gh -R owner/repo pr create`, `kubectl -n prod apply`) and quoted or Windows-style paths (`"C:\...\git.exe"`).
+- Does not false-positive on path tokens such as `./internal/deploy` or `charts/deploy/values.yaml`.
 
 For desktop agents, use hooks only as fast policy and context gates. Put long workflow instructions in repo skills, then let hooks remind the agent to use that skill and to run `mivia-agent run --dry-run --json` before live workflow execution. See [desktop-agent-workflows.md](./desktop-agent-workflows.md).
 

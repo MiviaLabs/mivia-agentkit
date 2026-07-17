@@ -51,6 +51,32 @@ Model/effort precedence is:
 
 Strict-profile loops that end in a protected action must use `majority` or `unanimous`; `first-pass` is rejected.
 
+### Protected-Action Steps
+
+Steps that should trigger the hook governance gate before execution use `approval: protect:<kind>`:
+
+- `protect:commit` — producer step requires a fresh quality stamp before `git commit`.
+- `protect:push` — requires stamp before `git push`.
+- `protect:pr` — requires stamp before pull request creation.
+- `protect:release` — requires stamp before release.
+- `protect:deploy` — requires stamp before deployment (kubectl/helm/terraform apply).
+
+Example:
+
+```yaml
+steps:
+  - id: produce
+    producer: codex
+    artifact: patch.md
+  - id: gate-commit
+    producer: codex
+    approval: protect:commit
+```
+
+`protected_action` loops exit successfully after the protect step executes. Review steps that fail before the protect step (with `on_fail: fail` or `on_fail: iterate`) prevent the protect step from running in that iteration.
+
+Strict-profile protect-bound loops require `majority` or `unanimous` consensus and at least 2 reviewers; `first-pass` and `min_reviewers: 1` are rejected at validation time.
+
 ## Consensus Modes
 
 - `majority`

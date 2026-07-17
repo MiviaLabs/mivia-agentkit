@@ -98,7 +98,7 @@ loops:
       - id: patch
         producer: codex
         artifact: patch.md
-        approval: commit
+        approval: protect:commit
         max_turns: 4
         timeout: 10m
       - id: review
