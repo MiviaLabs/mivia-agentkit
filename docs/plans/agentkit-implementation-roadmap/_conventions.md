@@ -114,6 +114,7 @@ internal/runstore/       .ai/runs/<id>/ storage
 internal/importer/       import (WS7)
 internal/update/         update (WS7)
 internal/report/         text + json reporting
+internal/auditcampaign/  supervised audit-repair campaign (WS15)
 ```
 
 When a task creates a file outside this map, the task notes it explicitly and the overview's map is updated when the WS lands.
