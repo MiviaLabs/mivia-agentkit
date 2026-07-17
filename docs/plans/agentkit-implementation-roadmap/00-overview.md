@@ -59,8 +59,11 @@ Phase 0                  Phase 1                       Phase 2
 | 7 | [`ws-07-import-update/`](ws-07-import-update/tasks.md) | `import` + `update` | 5 | WS2, WS3 | ☑ |
 | 14 | [`ws-14-real-runtime-coverage/`](ws-14-real-runtime-coverage/tasks.md) | Real runtime coverage for commands and adapters | 5 | WS2, WS3, WS4, WS5, WS6, WS7, WS9, WS10, WS11, WS12, WS13 | ☑ |
 | 8 | [`ws-08-ci-release-docs/`](ws-08-ci-release-docs/tasks.md) | CI, release, docs | 5 | all prior, WS14 | ☑ |
+| 15 | [`ws-15-supervised-audit-repair-campaign/`](ws-15-supervised-audit-repair-campaign/tasks.md) | Supervised deep-bug-audit repair campaign | 6 | WS0–WS14 | ☐ |
 
 Numbering follows the product plan, not execution order. **Execute by phase, not by number.**
+
+WS15 is a post-roadmap product extension. Do not rewrite historical WS0–WS14 tasks. Human plan: [`docs/plans/supervised-deep-bug-audit-repair-campaign.md`](../supervised-deep-bug-audit-repair-campaign.md). Machine DAG: [`.ai/plans/supervised-deep-bug-audit-repair-campaign.plan.json`](../../../.ai/plans/supervised-deep-bug-audit-repair-campaign.plan.json).
 
 ## How to use this
 
@@ -78,3 +81,4 @@ Numbering follows the product plan, not execution order. **Execute by phase, not
 - **Phase 3:** FR-4.1–4.5, 5.1–5.3, 6.3 green; loop-bound + stamp-before-protect + consensus-threshold mutation proofs.
 - **Phase 4:** FR-2.2, 6.4, 7.1, 7.2, 8.1–8.3 green; strict-requires-AGT doctor failure.
 - **Phase 5:** FR-1.4, 9.1, 9.2; release binaries build for linux/macOS/windows and every implemented command plus approved adapter has real runtime coverage beyond fake-only tests.
+- **Phase 6 (WS15):** optional supervised audit-repair campaign ships disabled by default; finite cycles; independent confirmer; runtime-owned metrics only; coordinator-only scoped commits; ordinary `run`/deep-bug-audit remain report-only.

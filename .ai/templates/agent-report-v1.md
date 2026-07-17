@@ -40,3 +40,10 @@ NextAction: none|<exact task>
 - `File:Line` must be an exact repo path with line number when possible, or `none`.
 - `Required Test` must name the exact test file and test name for open gaps, or `none`.
 - `Mutation` must name the guard or branch that should fail when changed, or `none`.
+
+## Measurement Rules
+
+- Never invent elapsed time, duration, tokens, cost, throughput, or efficiency numbers.
+- Time, token, cost, throughput, and efficiency fields are evidence only when the runtime records them with provenance (`TimingSource`, `token_source`, or equivalent runtime metric reference).
+- If the runtime has no measured source, render `NOT_MEASURED` — not `0`, an estimate, or prose such as "efficient".
+- Agent prose, Markdown tables, and review consensus are not trusted telemetry channels.

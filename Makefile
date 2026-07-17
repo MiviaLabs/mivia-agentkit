@@ -1,7 +1,7 @@
 SHELL := /usr/bin/env bash
 .SHELLFLAGS := -euo pipefail -c
 
-.PHONY: help install-hooks hooks verify verify-agent semgrep-validate semgrep-test hook-test agent-hook-test audit-loop-test plan-contract-test skill-contract-test semgrep pre-commit pre-push go-check test vet build
+.PHONY: help install-hooks hooks verify verify-agent semgrep-validate semgrep-test hook-test agent-hook-test audit-loop-test plan-contract-test skill-contract-test telemetry-contract-test semgrep pre-commit pre-push go-check test vet build
 
 help:
 	@printf '%s\n' \
@@ -17,12 +17,13 @@ help:
 		'  make audit-loop-test   Run audit loop Stop-hook contract tests' \
 		'  make plan-contract-test Run agent plan contract and hook tests' \
 		'  make skill-contract-test Run skill report contract tests' \
+		'  make telemetry-contract-test Run report telemetry contract tests' \
 		'  make go-check          Run Go format/test/vet/build when go.mod exists'
 
 install-hooks hooks:
 	@scripts/install_git_hooks.sh
 
-verify: verify-agent semgrep-validate semgrep-test hook-test agent-hook-test audit-loop-test plan-contract-test skill-contract-test semgrep go-check
+verify: verify-agent semgrep-validate semgrep-test hook-test agent-hook-test audit-loop-test plan-contract-test skill-contract-test telemetry-contract-test semgrep go-check
 
 verify-agent:
 	@python3 scripts/verify_agent_config.py
@@ -49,6 +50,9 @@ plan-contract-test:
 skill-contract-test:
 	@python3 scripts/test_skill_contracts.py
 
+telemetry-contract-test:
+	@python3 scripts/test_report_telemetry_contracts.py
+
 semgrep:
 	@semgrep --config semgrep/agent-standards.yml --error --skip-unknown-extensions --metrics off --disable-nosem .
 
@@ -64,7 +68,7 @@ go-check:
 		exit 0; \
 	fi; \
 	mapfile -t files < <(git ls-files '*.go'); \
-	if ((${#files[@]})); then \
+	if (($${files[@]})); then \
 		unformatted="$$(gofmt -l "$${files[@]}")"; \
 		if [[ -n "$$unformatted" ]]; then \
 			printf 'gofmt required for:\n%s\n' "$$unformatted" >&2; \
