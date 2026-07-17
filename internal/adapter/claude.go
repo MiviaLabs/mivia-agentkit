@@ -45,6 +45,8 @@ func (c Claude) Run(ctx context.Context, req Request) (Result, error) {
 		defer cancel()
 	}
 	res, err := c.runRaw(runCtx, req)
+	// Claude --output-format json nests assistant text in result; capture before sanitize.
+	materializeArtifactOut(req.ArtifactOut, res.Stdout)
 	return Result{
 		ExitCode:     res.ExitCode,
 		Stdout:       truncate(sanitizeProviderOutput(res.Stdout)),

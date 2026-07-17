@@ -49,6 +49,9 @@ func (c Codex) Run(ctx context.Context, req Request) (Result, error) {
 		defer cancel()
 	}
 	res, err := c.runRaw(runCtx, req)
+	// Capture last-message for campaign typed evidence before sanitize drops payload text.
+	// Codex CLI may already have written --output-last-message; materialize scrubs or fills.
+	materializeArtifactOut(req.ArtifactOut, res.Stdout)
 	return Result{
 		ExitCode:     res.ExitCode,
 		Stdout:       truncate(sanitizeProviderOutput(res.Stdout)),

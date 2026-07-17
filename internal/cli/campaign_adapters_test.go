@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -384,5 +385,98 @@ func TestExtractCampaignEvidenceBytesRejectsProse(t *testing.T) {
 	_, err := extractCampaignEvidenceBytes([]byte("all good, ResidualRisk: none"))
 	if err == nil || !strings.Contains(err.Error(), "typed campaign evidence") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+// TestCampaignHostRealClaudeAdapterEnvelope proves invokeOrchestrable works through
+// adapter.Claude (sanitizeProviderOutput drops result) via ArtifactOut materialization.
+func TestCampaignHostRealClaudeAdapterEnvelope(t *testing.T) {
+	inner := evidenceJSON("confirmed", "fp-claude-host")
+	enc, err := json.Marshal(string(inner))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := []byte(`{"type":"result","subtype":"success","result":` + string(enc) + `}`)
+	r := &adapter.FakeRunner{Scripts: map[string]adapter.FakeResponse{
+		"claude": {Result: adapter.RunResult{ExitCode: 0, Stdout: raw}},
+	}}
+	claude := adapter.Claude{Runner: r}
+	reg, err := adapter.NewRegistry(claude)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("claude", "claude", "local")
+	// Self-confirm allowed only when commit disabled; here we only exercise Audit path.
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	camp.Auditor = "claude"
+	camp.Confirmer = "local-confirm"
+	m.Adapters["local-confirm"] = config.AdapterConfig{Enabled: true, Role: config.AdapterRoleOrchestrable}
+	h := &campaignHost{
+		repo: t.TempDir(), runID: "run-claude", name: "c", camp: camp, manifest: m,
+		adapters: reg, expectedHead: "unknown",
+	}
+	ev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	if err != nil {
+		t.Fatalf("Audit through real Claude adapter: %v", err)
+	}
+	if ev.Disposition != auditcampaign.DispositionConfirmed || ev.FindingFingerprint != "fp-claude-host" {
+		t.Fatalf("ev = %+v", ev)
+	}
+	if len(r.Calls) != 1 {
+		t.Fatalf("claude Run calls = %d, want 1", len(r.Calls))
+	}
+}
+
+// TestCampaignHostRealCodexAndClaudeIndependentConfirm drives real Codex+Claude adapters
+// with FakeRunner envelopes end-to-end through Audit then Confirm (distinct invocations).
+func TestCampaignHostRealCodexAndClaudeIndependentConfirm(t *testing.T) {
+	auditBody := evidenceJSON("candidate", "fp-dual")
+	confirmBody := evidenceJSON("confirmed", "fp-dual")
+	claudeEnc, _ := json.Marshal(string(confirmBody))
+	claudeRaw := []byte(`{"type":"result","result":` + string(claudeEnc) + `}`)
+	// Codex FakeRunner returns NDJSON with text field (CLI would also write --output-last-message).
+	codexLine, _ := json.Marshal(map[string]any{"type": "message", "text": string(auditBody)})
+
+	codexRunner := &adapter.FakeRunner{Scripts: map[string]adapter.FakeResponse{
+		"codex": {Result: adapter.RunResult{ExitCode: 0, Stdout: codexLine}},
+	}}
+	claudeRunner := &adapter.FakeRunner{Scripts: map[string]adapter.FakeResponse{
+		"claude": {Result: adapter.RunResult{ExitCode: 0, Stdout: claudeRaw}},
+	}}
+	reg, err := adapter.NewRegistry(
+		adapter.Codex{Runner: codexRunner},
+		adapter.Claude{Runner: claudeRunner},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("codex", "claude", "local")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	h := &campaignHost{
+		repo: t.TempDir(), runID: "run-dual", name: "deep-bug-audit-repair",
+		camp: camp, manifest: m, adapters: reg, expectedHead: "unknown",
+	}
+
+	aev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	if err != nil {
+		t.Fatalf("Audit codex: %v", err)
+	}
+	if aev.Disposition != auditcampaign.DispositionCandidate {
+		t.Fatalf("audit = %+v", aev)
+	}
+	cev, err := h.Confirm(context.Background(), auditcampaign.PhaseConfirming, 1)
+	if err != nil {
+		t.Fatalf("Confirm claude: %v", err)
+	}
+	if cev.Disposition != auditcampaign.DispositionConfirmed {
+		t.Fatalf("confirm = %+v", cev)
+	}
+	if len(codexRunner.Calls) != 1 || len(claudeRunner.Calls) != 1 {
+		t.Fatalf("calls codex=%d claude=%d, want 1 each (independent confirmer)", len(codexRunner.Calls), len(claudeRunner.Calls))
+	}
+	// Codex must receive --output-last-message (ArtifactOut wiring).
+	codexArgs := strings.Join(codexRunner.Calls[0].Args, " ")
+	if !strings.Contains(codexArgs, "--output-last-message") {
+		t.Fatalf("codex args missing ArtifactOut flag: %s", codexArgs)
 	}
 }

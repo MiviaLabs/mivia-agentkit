@@ -53,6 +53,7 @@ func (z Zai) Run(ctx context.Context, req Request) (Result, error) {
 		defer cancel()
 	}
 	res, err := z.runRaw(runCtx, req)
+	materializeArtifactOut(req.ArtifactOut, res.Stdout)
 	return Result{
 		ExitCode:     res.ExitCode,
 		Stdout:       truncate(sanitizeProviderOutput(res.Stdout)),
