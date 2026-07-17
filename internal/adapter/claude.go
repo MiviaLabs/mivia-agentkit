@@ -94,7 +94,7 @@ func (c Claude) runner() Runner {
 }
 
 func (c Claude) runRaw(ctx context.Context, req Request) (RunResult, error) {
-	args := []string{"claude", "-p", "--output-format", "json", "--permission-mode", req.Approval}
+	args := []string{"claude", "-p", "--output-format", "json", "--permission-mode", claudePermissionMode(req.Approval)}
 	if req.Model != "" {
 		args = append(args, "--model", req.Model)
 	}
@@ -117,12 +117,28 @@ func validateClaudeEffort(effort string) error {
 	}
 }
 
-// validateClaudeApproval rejects unknown Claude Code permission-mode values.
+// validateClaudeApproval rejects unknown or unsafe Claude Code permission-mode values.
+// bypassPermissions is never allowed: headless orchestration must stay gated.
+// The orchestrator sentinel "never" is accepted and mapped by claudePermissionMode.
 func validateClaudeApproval(approval string) error {
 	switch approval {
-	case "", "default", "plan", "never", "bypassPermissions":
+	case "", "never", "default", "plan", "acceptEdits":
 		return nil
+	case "bypassPermissions":
+		return fmt.Errorf("claude approval bypassPermissions is not allowed")
 	default:
 		return fmt.Errorf("claude unsupported approval %q", approval)
+	}
+}
+
+// claudePermissionMode maps the shared adapter Approval field onto a Claude
+// Code --permission-mode value. Claude does not understand Codex-style "never";
+// empty/never become acceptEdits for non-interactive automation.
+func claudePermissionMode(approval string) string {
+	switch approval {
+	case "", "never":
+		return "acceptEdits"
+	default:
+		return approval
 	}
 }

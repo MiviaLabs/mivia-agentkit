@@ -65,6 +65,39 @@ func TestPreflightAcceptsNotRunReasonForMissingBroad(t *testing.T) {
 	}
 }
 
+func TestPreflightRequiresBroadOrNotRunOrPipeline(t *testing.T) {
+	repo := newRepo(t)
+	writeFile(t, repo, "docs/readme.md", "hello\n")
+	runGit(t, repo, "add", "docs/readme.md")
+
+	// No broad, no not-run, no pipeline flag → reject.
+	_, err := Run(Context{Repo: repo})
+	if err == nil || !strings.Contains(err.Error(), "broad verifier") {
+		t.Fatalf("Run() error = %v, want broad verifier requirement", err)
+	}
+
+	// Broad present → accept.
+	if _, err := Run(Context{Repo: repo, BroadVerifiers: []string{"go test ./..."}}); err != nil {
+		t.Fatalf("Run() with broad error = %v", err)
+	}
+
+	// Not-run reason alone → accept.
+	repo2 := newRepo(t)
+	writeFile(t, repo2, "docs/readme.md", "hello\n")
+	runGit(t, repo2, "add", "docs/readme.md")
+	if _, err := Run(Context{Repo: repo2, NotRun: []string{"runs in CI"}}); err != nil {
+		t.Fatalf("Run() with not-run error = %v", err)
+	}
+
+	// Pipeline-preflight alone → accept.
+	repo3 := newRepo(t)
+	writeFile(t, repo3, "docs/readme.md", "hello\n")
+	runGit(t, repo3, "add", "docs/readme.md")
+	if _, err := Run(Context{Repo: repo3, PipelinePreflight: true}); err != nil {
+		t.Fatalf("Run() with pipeline-preflight error = %v", err)
+	}
+}
+
 func TestPreflightRejectsNotRunWhenBroadVerifierPresent(t *testing.T) {
 	repo := newRepo(t)
 	writeFile(t, repo, "docs/readme.md", "hello\n")
@@ -109,6 +142,48 @@ func TestPreflightStampWrittenUnderDotGit(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(repo, "mivia-agent-quality-stamp.json")); !os.IsNotExist(err) {
 		t.Fatalf("stamp written outside .git or stat failed err=%v", err)
+	}
+}
+
+func TestPreflightWorksOnGitWorktree(t *testing.T) {
+	main := newRepo(t)
+	writeFile(t, main, "docs/readme.md", "hello\n")
+	runGit(t, main, "add", "docs/readme.md")
+	runGit(t, main, "commit", "-q", "-m", "docs")
+
+	// Create a linked worktree with its own .git file (not a directory).
+	wt := filepath.Join(t.TempDir(), "wt")
+	runGit(t, main, "worktree", "add", "-q", wt, "HEAD")
+	if info, err := os.Lstat(filepath.Join(wt, ".git")); err != nil || info.IsDir() {
+		t.Fatalf("worktree .git Lstat = %v err=%v, want file not dir", info, err)
+	}
+
+	writeFile(t, wt, "docs/worktree.md", "wt\n")
+	stamp, err := Run(Context{Repo: wt, BroadVerifiers: []string{"go test ./..."}})
+	if err != nil {
+		t.Fatalf("Run(worktree) error = %v", err)
+	}
+	if stamp.Head == "" {
+		t.Fatalf("Run(worktree) returned empty head")
+	}
+	// Stamp lives under the worktree gitdir (outside wt/.git file), not at the
+	// literal wt/.git/... path which cannot be a directory.
+	resolved, err := stampPath(wt)
+	if err != nil {
+		t.Fatalf("stampPath(worktree) error = %v", err)
+	}
+	if _, err := os.Stat(resolved); err != nil {
+		t.Fatalf("resolved stamp missing at %q: %v", resolved, err)
+	}
+	if strings.HasPrefix(resolved, filepath.Join(wt, ".git")+string(filepath.Separator)) {
+		t.Fatalf("resolved stamp %q still under worktree .git file path", resolved)
+	}
+	got, err := CheckStamp(wt)
+	if err != nil {
+		t.Fatalf("CheckStamp(worktree) error = %v", err)
+	}
+	if got.Head != stamp.Head {
+		t.Fatalf("CheckStamp head = %q, want %q", got.Head, stamp.Head)
 	}
 }
 

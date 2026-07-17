@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -72,7 +73,8 @@ func Decide(ctx context.Context, p Payload, stamp StampChecker, pol policy.Provi
 	}
 	data, err := s.Marshal()
 	if err != nil {
-		return Outcome{}, err
+		// Fail closed: never leave host CLIs without an explicit deny decision.
+		return Outcome{Allow: false, Reason: fmt.Sprintf("stamp marshal failed: %v", err), Kind: kind}, nil
 	}
 	decision, err := pol.Decide(ctx, policy.Action{
 		Kind:          policy.ActionProtect,
@@ -80,7 +82,9 @@ func Decide(ctx context.Context, p Payload, stamp StampChecker, pol policy.Provi
 		Stamp:         strings.TrimSpace(string(data)),
 	})
 	if err != nil {
-		return Outcome{}, err
+		// Fail closed: policy/audit errors must deny protected actions so
+		// adapters emit Claude exit-2 / Codex deny JSON instead of exit 1.
+		return Outcome{Allow: false, Reason: fmt.Sprintf("policy decision failed: %v", err), Kind: kind}, nil
 	}
 	if !decision.Allowed {
 		return Outcome{Allow: false, Reason: decision.Reason, Kind: kind}, nil
@@ -98,11 +102,13 @@ var protectedPatterns = func() []struct {
 		kind policy.ProtectedKind
 		re   *regexp.Regexp
 	}{
+		// git.exe / git.cmd are normalized to git before matching.
 		{policy.ProtectedCommit, regexp.MustCompile(`\bgit\s+commit\b`)},
 		{policy.ProtectedPush, regexp.MustCompile(`\bgit\s+push\b`)},
 		{policy.ProtectedPullRequest, regexp.MustCompile(`\bgh\s+pr\b|\bpull[-_ ]request\b|\bcreate[-_ ]pr\b`)},
 		{policy.ProtectedRelease, regexp.MustCompile(`\bgh\s+release\b`)},
-		{policy.ProtectedDeploy, regexp.MustCompile(`\bdeploy\b|\bkubectl\s+apply\b|\bterraform\s+apply\b`)},
+		// Deploy verbs/CLIs only — not path tokens like ./internal/deploy.
+		{policy.ProtectedDeploy, regexp.MustCompile(`(?:^|[;&|]\s*|\s)deploy(?:\s|$)|(?:^|\s)(?:helm|kubectl|terraform)\s+apply\b|\bkubectl\s+apply\b|\bterraform\s+apply\b|\bhelm\s+(?:upgrade|install)\b`)},
 		{policy.ProtectedLiveSmoke, regexp.MustCompile(`\blive[-_ ]smoke\b|\bsmoke\s+live\b`)},
 	}
 	return p
@@ -119,11 +125,173 @@ var protectedPatterns = func() []struct {
 // call executes.
 func IsProtected(raw map[string]any) (policy.ProtectedKind, bool) {
 	for _, text := range commandTexts(raw) {
+		if kind, ok := detectGitLikeProtected(text); ok {
+			return kind, true
+		}
 		for _, pattern := range protectedPatterns {
 			if pattern.re.MatchString(text) {
 				return pattern.kind, true
 			}
 		}
+	}
+	return "", false
+}
+
+// detectGitLikeProtected finds git/gh/deploy-tool subcommands after global
+// flags so forms like `git -C repo push`, `gh -R o/r pr create`, and
+// `kubectl -n prod apply` still gate.
+func detectGitLikeProtected(text string) (policy.ProtectedKind, bool) {
+	tokens := shellTokens(text)
+	for i := 0; i < len(tokens); i++ {
+		tool := normalizeExeBase(tokens[i])
+		switch tool {
+		case "git":
+			sub, ok := nextSubcommand(tokens[i+1:], gitTakesArg)
+			if !ok {
+				continue
+			}
+			switch sub {
+			case "commit":
+				return policy.ProtectedCommit, true
+			case "push":
+				return policy.ProtectedPush, true
+			}
+		case "gh":
+			sub, ok := nextSubcommand(tokens[i+1:], ghTakesArg)
+			if !ok {
+				continue
+			}
+			switch sub {
+			case "pr":
+				return policy.ProtectedPullRequest, true
+			case "release":
+				return policy.ProtectedRelease, true
+			}
+		case "kubectl", "helm", "terraform":
+			sub, ok := nextSubcommand(tokens[i+1:], deployTakesArg[tool])
+			if !ok {
+				continue
+			}
+			switch tool {
+			case "kubectl":
+				if sub == "apply" {
+					return policy.ProtectedDeploy, true
+				}
+			case "helm":
+				if sub == "upgrade" || sub == "install" || sub == "apply" {
+					return policy.ProtectedDeploy, true
+				}
+			case "terraform":
+				if sub == "apply" {
+					return policy.ProtectedDeploy, true
+				}
+			}
+		}
+	}
+	return "", false
+}
+
+// Flag maps use lowercase keys because commandTexts lowercases input.
+// gitTakesArg lists git global options that consume a following argument.
+var gitTakesArg = map[string]struct{}{
+	"-c": {}, "--git-dir": {}, "--work-tree": {},
+	"--namespace": {}, "--config-env": {}, "--super-prefix": {},
+	"--list-cmds": {}, "-o": {}, "--exec-path": {}, "--attr-source": {},
+}
+
+// ghTakesArg lists common gh global options that consume a following argument.
+var ghTakesArg = map[string]struct{}{
+	"-r": {}, "--repo": {}, "-h": {}, "--hostname": {},
+}
+
+// deployTakesArg maps deploy CLIs to global options that take a following arg.
+var deployTakesArg = map[string]map[string]struct{}{
+	"kubectl": {
+		"-n": {}, "--namespace": {}, "-c": {}, "--cluster": {},
+		"--context": {}, "-s": {}, "--server": {}, "--kubeconfig": {},
+		"--user": {}, "-u": {}, "--as": {}, "--as-group": {},
+		"--request-timeout": {}, "--token": {}, "--cache-dir": {},
+	},
+	"helm": {
+		"-n": {}, "--namespace": {}, "--kube-context": {}, "--kubeconfig": {},
+		"--registry-config": {}, "--repository-config": {}, "--repository-cache": {},
+		"-f": {}, "--values": {}, "--set": {}, "--set-string": {}, "--set-file": {},
+	},
+	"terraform": {
+		"-chdir": {}, // also supports -chdir=path attached form
+	},
+}
+
+// shellTokens splits command text on spaces while keeping single- and
+// double-quoted segments intact (including paths with spaces).
+func shellTokens(text string) []string {
+	var out []string
+	var b strings.Builder
+	var quote rune // 0, '\'' or '"'
+	flush := func() {
+		if b.Len() == 0 {
+			return
+		}
+		out = append(out, b.String())
+		b.Reset()
+	}
+	for _, r := range text {
+		switch {
+		case quote != 0:
+			if r == quote {
+				quote = 0
+				continue
+			}
+			b.WriteRune(r)
+		case r == '\'' || r == '"':
+			quote = r
+		case r == ' ' || r == '\t' || r == '\n' || r == '\r':
+			flush()
+		default:
+			b.WriteRune(r)
+		}
+	}
+	flush()
+	return out
+}
+
+// stripQuotes removes one layer of matching single or double quotes.
+func stripQuotes(s string) string {
+	if len(s) >= 2 {
+		if (s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'') {
+			return s[1 : len(s)-1]
+		}
+	}
+	return s
+}
+
+// nextSubcommand skips global options (including those that take an argument)
+// and returns the first positional subcommand token.
+func nextSubcommand(tokens []string, takesArg map[string]struct{}) (string, bool) {
+	for i := 0; i < len(tokens); i++ {
+		tok := stripQuotes(tokens[i])
+		if tok == "" {
+			continue
+		}
+		if !strings.HasPrefix(tok, "-") {
+			return strings.ToLower(tok), true
+		}
+		// --flag=value and -Rowner/repo attached forms carry their own argument.
+		if strings.Contains(tok, "=") {
+			continue
+		}
+		// Short attached form: -Rowner/repo (flag letter + non-empty value).
+		if len(tok) > 2 && tok[0] == '-' && tok[1] != '-' {
+			letter := tok[:2]
+			if _, ok := takesArg[letter]; ok {
+				continue
+			}
+		}
+		if _, ok := takesArg[tok]; ok {
+			i++ // skip following argument token
+			continue
+		}
+		// Bare global flags: --no-pager, --bare, -p, etc.
 	}
 	return "", false
 }
@@ -139,17 +307,17 @@ func commandTexts(raw map[string]any) []string {
 			for key, val := range t {
 				switch strings.ToLower(key) {
 				case "command", "cmd", "malformed":
-					out = append(out, strings.ToLower(flatten(val)))
+					out = append(out, normalizeCommandText(flatten(val)))
 				}
 			}
 			if prog, ok := t["program"].(string); ok {
-				parts := []string{prog}
+				parts := []string{normalizeExeBase(prog)}
 				if args, ok := t["args"].([]any); ok {
 					for _, a := range args {
 						parts = append(parts, flatten(a))
 					}
 				}
-				out = append(out, strings.ToLower(strings.Join(parts, " ")))
+				out = append(out, normalizeCommandText(strings.Join(parts, " ")))
 			}
 			for _, val := range t {
 				walk(val)
@@ -162,6 +330,39 @@ func commandTexts(raw map[string]any) []string {
 	}
 	walk(raw)
 	return out
+}
+
+// normalizeExeBase strips quotes, Windows executable suffixes, and path
+// prefixes so git.exe / "C:\Program Files\Git\cmd\git.cmd" match as git.
+func normalizeExeBase(name string) string {
+	clean := strings.TrimSpace(stripQuotes(name))
+	// Accept both slash styles so Windows paths tokenize correctly on Linux CI.
+	clean = strings.ReplaceAll(clean, `\`, "/")
+	base := filepath.Base(clean)
+	lower := strings.ToLower(base)
+	for _, ext := range []string{".exe", ".cmd", ".bat", ".com"} {
+		if strings.HasSuffix(lower, ext) {
+			return lower[:len(lower)-len(ext)]
+		}
+	}
+	return lower
+}
+
+// normalizeCommandText lowercases and rewrites Windows git/gh host binaries
+// so protected-action patterns can stay simple and portable.
+func normalizeCommandText(s string) string {
+	lower := strings.ToLower(s)
+	// Replace bare and path-suffixed host tools with their base names.
+	for _, pair := range []struct{ from, to string }{
+		{"git.exe", "git"},
+		{"git.cmd", "git"},
+		{"git.bat", "git"},
+		{"gh.exe", "gh"},
+		{"gh.cmd", "gh"},
+	} {
+		lower = strings.ReplaceAll(lower, pair.from, pair.to)
+	}
+	return lower
 }
 
 // RawPayload decodes JSON stdin into a map.

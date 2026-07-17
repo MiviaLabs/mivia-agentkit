@@ -63,6 +63,20 @@ func TestWeightedThresholdDefaultsToHalf(t *testing.T) {
 	}
 }
 
+func TestWeightedFailsClosedOnZeroTotalWeight(t *testing.T) {
+	// Explicit zero weights: total=0 must not pass via 0>=0.
+	p := Policy{Mode: Weighted, Weights: map[string]float64{"a": 0, "b": 0}}
+	out := mustEvaluate(t, p, verdict("a", false), verdict("b", false))
+	if out.Pass {
+		t.Fatalf("Pass = true, want false for zero total weight")
+	}
+	// Empty verdict set with weighted mode.
+	out = mustEvaluate(t, Policy{Mode: Weighted})
+	if out.Pass {
+		t.Fatalf("Pass = true, want false for empty weighted verdicts")
+	}
+}
+
 func TestFirstPassPassesOnOne(t *testing.T) {
 	out := mustEvaluate(t, Policy{Mode: FirstPass}, verdict("a", false), verdict("b", true))
 	if !out.Pass {

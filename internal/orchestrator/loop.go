@@ -41,7 +41,10 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 	if err != nil {
 		return LoopResult{Err: err}, err
 	}
-	runID := e.Store.NewRun()
+	runID, err := e.Store.NewRun()
+	if err != nil {
+		return LoopResult{Err: err}, err
+	}
 	runDir := e.Store.Dir(runID)
 	max := loop.MaxIterations
 	if max <= 0 {
@@ -73,15 +76,26 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 	for iteration := 1; iteration <= max; iteration++ {
 		var last StepResult
 		var lastNode Node
+		// skipRemaining is set when a mid-loop review fails with on_fail:iterate
+		// so later nodes (including protect:) do not run in this iteration.
+		skipRemaining := false
 		for _, node := range nodes {
+			if skipRemaining {
+				break
+			}
 			lastNode = node
+			e.CurrentStamp = ""
 			if _, ok := protectedKind(node.Step); ok {
 				if e.Stamp == nil {
 					return result("", iteration, ErrStaleStamp)
 				}
-				if _, err := e.Stamp(e.Repo); err != nil {
-					return result("", iteration, fmt.Errorf("%w: %v", ErrStaleStamp, err))
+				stampVal, stampErr := e.Stamp(e.Repo)
+				if stampErr != nil {
+					// Keep both the orchestrator sentinel and the underlying
+					// preflight error (e.g. ErrNoStamp) for errors.Is checks.
+					return result("", iteration, fmt.Errorf("%w: %w", ErrStaleStamp, stampErr))
 				}
+				e.CurrentStamp = stampVal
 			}
 			e.PriorVerdicts = prior
 			e.CurrentArtifact = currentArtifact
@@ -96,22 +110,46 @@ func (e Engine) RunLoop(ctx context.Context, loop config.Loop, pb PromptBuilder)
 			if len(last.Verdicts) > 0 {
 				prior = last.Verdicts
 			}
+			// Apply review gates immediately so later protect steps never run
+			// after a failed review that demands fail or iterate.
+			if len(node.Step.Reviewers) > 0 && !last.Consensus {
+				failAction := stepOnFailValue(node.Step.OnFail, "fail")
+				switch failAction {
+				case "iterate":
+					skipRemaining = true
+				case "proceed":
+					// Continue to subsequent nodes despite the failed review.
+				default:
+					// Unknown/empty-default "fail" and any typo: fail closed.
+					return result("fail", iteration, errors.New("review gate failed"))
+				}
+			}
 		}
-		if last.Consensus && loop.ExitWhen == "review-pass" {
+		if skipRemaining {
+			continue
+		}
+		// Successful review-pass exit after all nodes in the iteration.
+		if len(lastNode.Step.Reviewers) > 0 && last.Consensus && loop.ExitWhen == "review-pass" {
 			return result("pass", iteration, nil)
 		}
-		if !last.Consensus {
-			failAction := stepOnFailValue(lastNode.Step.OnFail, "fail")
-			if failAction == "fail" {
-				return result("fail", iteration, errors.New("review gate failed"))
+		// Producer-final protected_action loops pass after a successful protect step.
+		if loop.ExitWhen == "protected_action" {
+			if _, ok := protectedKind(lastNode.Step); ok {
+				return result("pass", iteration, nil)
 			}
 		}
 	}
 	if loop.OnExhausted == "fail" {
 		return result("fail", max, errors.New("loop exhausted"))
 	}
-	_ = e.Store.AppendTrace(runID, runstore.TraceEvent{Kind: "loop.exhausted", Payload: map[string]any{"on_exhausted": loop.OnExhausted}})
-	return result("warn", max, nil)
+	outcome := "warn"
+	if loop.OnExhausted == "proceed" {
+		outcome = "proceed"
+	}
+	if err := e.Store.AppendTrace(runID, runstore.TraceEvent{Kind: "loop.exhausted", Payload: map[string]any{"on_exhausted": loop.OnExhausted}}); err != nil {
+		return result(outcome, max, fmt.Errorf("append exhaust trace: %w", err))
+	}
+	return result(outcome, max, nil)
 }
 
 func stepOnFailValue(onFail, fallback string) string {

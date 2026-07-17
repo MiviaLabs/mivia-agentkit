@@ -23,6 +23,30 @@ func TestPathPolicyRejectsSecretPaths(t *testing.T) {
 	}
 }
 
+func TestPathPolicyRejectsNestedEnvAndSecrets(t *testing.T) {
+	p := NewDefault()
+	root := t.TempDir()
+	for _, rel := range []string{
+		"config/.env",
+		".ai/.env",
+		"app/.env.local",
+		"backend/.env.production",
+		"services/api/secrets/token.pem",
+		"nested/secrets/db.pem",
+		"vendor/secrets",
+	} {
+		if err := p.Check(root, rel); err == nil {
+			t.Fatalf("Check(%q) error = nil, want nested forbidden path", rel)
+		}
+	}
+	// Non-secret nested paths remain allowed.
+	for _, rel := range []string{"config/app.yaml", ".ai/INDEX.md", "internal/deploy/handler.go"} {
+		if err := p.Check(root, rel); err != nil {
+			t.Fatalf("Check(%q) error = %v, want nil", rel, err)
+		}
+	}
+}
+
 func TestPathPolicyRejectsSymlinkEscape(t *testing.T) {
 	p := NewDefault()
 	root := t.TempDir()

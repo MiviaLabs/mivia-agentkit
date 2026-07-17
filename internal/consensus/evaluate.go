@@ -106,6 +106,10 @@ func weighted(p Policy, verdicts []adapter.Verdict) (bool, bool) {
 			passed += weight
 		}
 	}
+	// Fail closed: empty verdicts or all-zero weights must never pass (0 >= 0).
+	if total <= 0 {
+		return false, false
+	}
 	threshold := p.Threshold
 	if threshold == 0 {
 		threshold = 0.5 * total

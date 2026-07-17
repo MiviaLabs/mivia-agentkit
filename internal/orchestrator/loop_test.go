@@ -11,6 +11,8 @@ import (
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
 	"github.com/MiviaLabs/mivia-agentkit/internal/config"
+	"github.com/MiviaLabs/mivia-agentkit/internal/preflight"
+	"github.com/MiviaLabs/mivia-agentkit/internal/runstore"
 )
 
 func TestLoopExitsWhenGatePasses(t *testing.T) {
@@ -95,6 +97,17 @@ func TestLoopWarnsOnExhaustionWithOnExhaustedWarn(t *testing.T) {
 	AssertNoLeaks(t, e.Store.Dir(res.Trace))
 }
 
+func TestLoopProceedOnExhaustionDistinctFromWarn(t *testing.T) {
+	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}}, sequenceReviewer("claude", false))
+	res, err := e.RunLoop(context.Background(), testLoop(1, "iterate", "proceed"), nil)
+	if err != nil {
+		t.Fatalf("RunLoop error = %v", err)
+	}
+	if res.Outcome != "proceed" {
+		t.Fatalf("outcome = %q, want proceed (not warn)", res.Outcome)
+	}
+}
+
 func TestLoopRejectsBudgetBoundInMVP(t *testing.T) {
 	e := testEngine(t)
 	_, err := e.RunLoop(context.Background(), config.Loop{Bound: "budget", MaxIterations: 1}, nil)
@@ -110,6 +123,104 @@ func TestLoopRequiresFreshStampBeforeProtectedStep(t *testing.T) {
 	_, err := e.RunLoop(context.Background(), loop, nil)
 	if !errors.Is(err, ErrStaleStamp) {
 		t.Fatalf("RunLoop error = %v, want ErrStaleStamp", err)
+	}
+}
+
+func TestLoopPassesProtectedActionProducer(t *testing.T) {
+	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}})
+	e.Stamp = func(repo string) (string, error) { return "fresh-head", nil }
+	loop := config.Loop{
+		Bound: "iterations", MaxIterations: 1, ExitWhen: "protected_action", OnExhausted: "fail",
+		Steps: []config.Step{{ID: "protect", Producer: "codex", Approval: "protect:commit"}},
+	}
+	res, err := e.RunLoop(context.Background(), loop, nil)
+	if err != nil {
+		t.Fatalf("RunLoop error = %v", err)
+	}
+	if res.Outcome != "pass" || res.Iterations != 1 {
+		t.Fatalf("result = %#v, want pass in 1 iteration for protected_action producer", res)
+	}
+}
+
+func TestProtectDoesNotRunAfterFailedReview(t *testing.T) {
+	var protectRuns int
+	protect := scriptedAdapter{name: "protect", run: adapter.Result{Stdout: []byte("protected")}, runCalls: &protectRuns}
+	e := testEngine(t,
+		scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}},
+		sequenceReviewer("claude", false),
+		protect,
+	)
+	e.Stamp = func(repo string) (string, error) { return "fresh-head", nil }
+	loop := config.Loop{
+		Bound: "iterations", MaxIterations: 1, ExitWhen: "protected_action", OnExhausted: "fail",
+		Steps: []config.Step{
+			{ID: "produce", Producer: "codex"},
+			{ID: "review", Reviewers: []string{"claude"}, OnFail: "fail"},
+			{ID: "protect", Producer: "protect", Approval: "protect:commit"},
+		},
+	}
+	res, err := e.RunLoop(context.Background(), loop, nil)
+	if err == nil || res.Outcome != "fail" {
+		t.Fatalf("result=%#v err=%v, want fail after review gate", res, err)
+	}
+	if protectRuns != 0 {
+		t.Fatalf("protect runs = %d, want 0 (must not run after failed review)", protectRuns)
+	}
+}
+
+func TestInvalidOnFailDoesNotRunProtect(t *testing.T) {
+	var protectRuns int
+	protect := scriptedAdapter{name: "protect", run: adapter.Result{Stdout: []byte("protected")}, runCalls: &protectRuns}
+	e := testEngine(t,
+		scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}},
+		sequenceReviewer("claude", false),
+		protect,
+	)
+	e.Stamp = func(repo string) (string, error) { return "fresh-head", nil }
+	loop := config.Loop{
+		Bound: "iterations", MaxIterations: 1, ExitWhen: "protected_action", OnExhausted: "fail",
+		Steps: []config.Step{
+			{ID: "produce", Producer: "codex"},
+			{ID: "review", Reviewers: []string{"claude"}, OnFail: "typo"},
+			{ID: "protect", Producer: "protect", Approval: "protect:commit"},
+		},
+	}
+	res, err := e.RunLoop(context.Background(), loop, nil)
+	if err == nil || res.Outcome != "fail" {
+		t.Fatalf("result=%#v err=%v, want fail closed on unknown on_fail", res, err)
+	}
+	if protectRuns != 0 {
+		t.Fatalf("protect runs = %d, want 0 for invalid on_fail", protectRuns)
+	}
+}
+
+func TestProtectedStepPreservesErrNoStamp(t *testing.T) {
+	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}})
+	e.Stamp = func(repo string) (string, error) { return "", preflight.ErrNoStamp }
+	loop := config.Loop{
+		Bound: "iterations", MaxIterations: 1, ExitWhen: "protected_action", OnExhausted: "fail",
+		Steps: []config.Step{{ID: "protect", Producer: "codex", Approval: "protect:commit"}},
+	}
+	_, err := e.RunLoop(context.Background(), loop, nil)
+	if !errors.Is(err, ErrStaleStamp) {
+		t.Fatalf("RunLoop error = %v, want ErrStaleStamp", err)
+	}
+	if !errors.Is(err, preflight.ErrNoStamp) {
+		t.Fatalf("RunLoop error = %v, want errors.Is preflight.ErrNoStamp", err)
+	}
+}
+
+func TestRunLoopExhaustTraceWriteFailureSurfaces(t *testing.T) {
+	// Store root under a file path so NewRun/AppendTrace cannot create dirs.
+	badRoot := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(badRoot, []byte("x"), 0o644); err != nil {
+		t.Fatalf("write bad root: %v", err)
+	}
+	e := testEngine(t, scriptedAdapter{name: "codex", run: adapter.Result{Stdout: []byte("artifact")}}, sequenceReviewer("claude", false))
+	e.Store = runstore.Store{Root: filepath.Join(badRoot, "runs")}
+	_, err := e.RunLoop(context.Background(), testLoop(1, "iterate", "warn"), nil)
+	if err == nil {
+		t.Fatalf("RunLoop error = nil, want create run / exhaust-trace failure")
 	}
 }
 
