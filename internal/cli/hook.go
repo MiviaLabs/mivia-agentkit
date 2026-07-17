@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/hooks"
@@ -40,12 +41,19 @@ func newHookAdapterCommand(adapter string, repo *string) *cobra.Command {
 }
 
 func runHook(ctx context.Context, r io.Reader, adapter, event, repo string) error {
+	hookEvent := normalizeEvent(adapter, event)
+	// Fail closed for host CLIs: Claude treats bare exit 1 as non-blocking, so
+	// every setup failure must emit an adapter-native deny before returning.
+	failClosed := func(reason string) error {
+		return emitHookDeny(ctx, adapter, hookEvent, reason)
+	}
+
 	data, err := io.ReadAll(io.LimitReader(r, 4<<20+1)) // 4MB max
 	if err != nil {
-		return fmt.Errorf("read hook stdin: %w", err)
+		return failClosed(fmt.Sprintf("read hook stdin: %v", err))
 	}
 	if len(data) > 4<<20 {
-		return fmt.Errorf("hook payload exceeds 4MB limit")
+		return failClosed("hook payload exceeds 4MB limit")
 	}
 	raw, parseErr := hooks.RawPayload(data)
 	if parseErr != nil {
@@ -53,21 +61,41 @@ func runHook(ctx context.Context, r io.Reader, adapter, event, repo string) erro
 			"malformed": string(data),
 		}
 	}
+	absRepo := absRepoPath(repo)
 	p := hooks.Payload{
-		Event:   normalizeEvent(adapter, event),
+		Event:   hookEvent,
 		Adapter: adapter,
 		Tool:    toolName(raw),
-		Repo:    repo,
+		Repo:    absRepo,
 		Raw:     raw,
 	}
-	out, err := hooks.Decide(ctx, p, hooks.StampCheckerFunc(preflight.CheckStamp), policy.Noop{AuditPath: repo + "/.ai/audit.jsonl"})
+	pol, err := hookPolicy(absRepo)
 	if err != nil {
-		return err
+		return failClosed(fmt.Sprintf("governance: %v", err))
+	}
+	out, err := hooks.Decide(ctx, p, hooks.StampCheckerFunc(preflight.CheckStamp), pol)
+	if err != nil {
+		return failClosed(fmt.Sprintf("hook decision: %v", err))
 	}
 	if parseErr != nil && out.Allow {
 		fmt.Fprintln(os.Stderr, "warning: ignored malformed non-protected hook payload")
 		return nil
 	}
+	return emitHookOutcome(ctx, adapter, p, out)
+}
+
+// emitHookDeny emits an adapter-native deny for setup/policy failures so host
+// CLIs never treat a bare exit 1 as "continue with the protected tool".
+func emitHookDeny(ctx context.Context, adapter string, event hooks.Event, reason string) error {
+	if reason == "" {
+		reason = "blocked by repository policy"
+	}
+	p := hooks.Payload{Event: event, Adapter: adapter}
+	out := hooks.Outcome{Allow: false, Reason: reason}
+	return emitHookOutcome(ctx, adapter, p, out)
+}
+
+func emitHookOutcome(ctx context.Context, adapter string, p hooks.Payload, out hooks.Outcome) error {
 	switch adapter {
 	case "codex":
 		return hooks.EmitCodex(ctx, p.Event, p, out)
@@ -106,4 +134,24 @@ func toolName(raw map[string]any) string {
 		}
 	}
 	return ""
+}
+
+// hookPolicy loads the project governance provider for the hook surface.
+// Missing manifests fall back to defaults (noop). Unknown or unavailable
+// providers fail closed so hooks never silently ignore configured policy.
+func hookPolicy(repo string) (policy.Provider, error) {
+	manifest, err := loadManifest(repo)
+	if err != nil {
+		return nil, fmt.Errorf("load governance for hook: %w", err)
+	}
+	auditPath := filepath.Join(absRepoPath(repo), ".ai", "audit.jsonl")
+	if manifest.Governance.AuditLog != "" {
+		// Only accept project-relative .ai/audit.jsonl style paths via provider checks.
+		if filepath.IsAbs(manifest.Governance.AuditLog) {
+			auditPath = manifest.Governance.AuditLog
+		} else {
+			auditPath = filepath.Join(absRepoPath(repo), filepath.FromSlash(manifest.Governance.AuditLog))
+		}
+	}
+	return policy.New(manifest.Governance.Provider, auditPath)
 }

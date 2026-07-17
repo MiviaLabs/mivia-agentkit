@@ -189,7 +189,7 @@ func weakLoops(ctx Context) []report.Finding {
 			if len(step.Reviewers) > 0 {
 				hasReview = true
 			}
-			if step.Approval == "protected" {
+			if step.Approval == "protected" || strings.HasPrefix(step.Approval, "protect:") {
 				protectBound = true
 			}
 			if len(step.Reviewers) > 0 {

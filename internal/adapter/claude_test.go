@@ -32,6 +32,41 @@ func TestClaudeRunEnforcesNonInteractiveApproval(t *testing.T) {
 	}
 }
 
+func TestClaudeRejectsBypassPermissions(t *testing.T) {
+	r := claudeRunner([]byte("{}"), nil)
+	_, err := (Claude{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: "bypassPermissions"})
+	if err == nil || !strings.Contains(err.Error(), "bypassPermissions") {
+		t.Fatalf("Run() error = %v, want bypassPermissions rejection", err)
+	}
+	if len(r.Calls) != 0 {
+		t.Fatalf("runner calls = %d, want 0 when approval is rejected", len(r.Calls))
+	}
+}
+
+func TestClaudeMapsNeverToValidPermissionMode(t *testing.T) {
+	r := claudeRunner([]byte("{}"), nil)
+	_, err := (Claude{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: "never"})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	args := strings.Join(r.Calls[0].Args, " ")
+	if !strings.Contains(args, "--permission-mode acceptEdits") {
+		t.Fatalf("args = %q, want --permission-mode acceptEdits for never", args)
+	}
+	if strings.Contains(args, "--permission-mode never") {
+		t.Fatalf("args = %q, must not pass invalid Claude mode never", args)
+	}
+	// acceptEdits remains a first-class Claude mode.
+	r2 := claudeRunner([]byte("{}"), nil)
+	_, err = (Claude{Runner: r2}).Run(context.Background(), Request{Prompt: "x", Approval: "acceptEdits"})
+	if err != nil {
+		t.Fatalf("Run(acceptEdits) error = %v", err)
+	}
+	if !strings.Contains(strings.Join(r2.Calls[0].Args, " "), "--permission-mode acceptEdits") {
+		t.Fatalf("args = %q, want acceptEdits preserved", r2.Calls[0].Args)
+	}
+}
+
 func TestClaudeRunMapsExitCode(t *testing.T) {
 	r := claudeRunner(nil, nil)
 	r.Scripts["claude"] = FakeResponse{Result: RunResult{ExitCode: 5}}

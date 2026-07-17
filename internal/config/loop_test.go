@@ -35,6 +35,26 @@ loops:
 	}
 }
 
+func TestValidateRejectsBadTimeout(t *testing.T) {
+	loop := validLoop()
+	loop.Steps[0].Timeout = "not-a-duration"
+	if err := loop.Validate(enabledAdapters()); err == nil || !strings.Contains(err.Error(), "timeout") {
+		t.Fatalf("Validate() error = %v, want invalid timeout rejection", err)
+	}
+	loop.Steps[0].Timeout = "0s"
+	if err := loop.Validate(enabledAdapters()); err == nil || !strings.Contains(err.Error(), "positive") {
+		t.Fatalf("Validate() error = %v, want non-positive timeout rejection", err)
+	}
+}
+
+func TestLoopRejectsUnknownOnFail(t *testing.T) {
+	loop := validLoop()
+	loop.Steps[0].OnFail = "typo"
+	if err := loop.Validate(enabledAdapters()); err == nil || !strings.Contains(err.Error(), "on_fail") {
+		t.Fatalf("Validate() error = %v, want unknown on_fail rejection", err)
+	}
+}
+
 func TestLoopValidateRejectsUnknownAdapter(t *testing.T) {
 	loop := validLoop()
 	loop.Steps[0].Producer = "missing"

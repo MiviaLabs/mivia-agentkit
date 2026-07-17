@@ -59,8 +59,8 @@ func (c Crush) Run(ctx context.Context, req Request) (Result, error) {
 	res, err := c.runRaw(runCtx, req)
 	return Result{
 		ExitCode: res.ExitCode,
-		Stdout:   truncate(Scrub(res.Stdout)),
-		Stderr:   truncate(Scrub(res.Stderr)),
+		Stdout:   truncate(sanitizeProviderOutput(res.Stdout)),
+		Stderr:   truncate(sanitizeProviderOutput(res.Stderr)),
 	}, err
 }
 

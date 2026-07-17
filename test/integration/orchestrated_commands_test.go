@@ -80,5 +80,5 @@ func TestReviewProducesConsensusReport(t *testing.T) {
 		t.Fatalf("review stdout = %s, want structured consensus report", result.Stdout)
 	}
 	readLogContains(t, codexLog, `--config approval_policy="never"`)
-	readLogContains(t, claudeLog, "--permission-mode never")
+	readLogContains(t, claudeLog, "--permission-mode acceptEdits")
 }

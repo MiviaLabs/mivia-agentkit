@@ -36,7 +36,10 @@ type Engine struct {
 	Repo             string
 	PriorVerdicts    []adapter.Verdict
 	CurrentArtifact  string
-	MaxIterations    int
+	// CurrentStamp is the fresh quality stamp head/hash bound into protect
+	// policy decisions for the step currently under execution.
+	CurrentStamp  string
+	MaxIterations int
 }
 
 // StepResult is the output of one executed step.
@@ -52,7 +55,7 @@ type StepResult struct {
 
 // ExecuteStep executes one producer or review node.
 func (e Engine) ExecuteStep(ctx context.Context, runID runstore.RunID, node Node, iteration int) (StepResult, error) {
-	refs, decisions, err := e.decide(ctx, runID, node.Step, "")
+	refs, decisions, err := e.decide(ctx, runID, node.Step, e.CurrentStamp)
 	if err != nil {
 		return StepResult{}, err
 	}
@@ -79,7 +82,11 @@ func (e Engine) executeProducer(ctx context.Context, runID runstore.RunID, node 
 	if err != nil {
 		return StepResult{}, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, stepTimeout(node.Step))
+	timeout, err := parseStepTimeout(node.Step)
+	if err != nil {
+		return StepResult{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	req := e.requestFor(node.Step.Producer, node.Step, prompt, true)
 	path, err := e.Store.WriteArtifact(runID, node.Step.ID, iteration, artifactName(node.Step), nil)
@@ -98,6 +105,9 @@ func (e Engine) executeProducer(ctx context.Context, runID runstore.RunID, node 
 	if written, readErr := os.ReadFile(path); readErr == nil && len(written) > 0 {
 		content = written
 	}
+	// Always scrub before persisting under .ai/runs — adapter file writes may
+	// bypass stdout scrubbing (e.g. Codex --output-last-message).
+	content = adapter.Scrub(content)
 	path, err = e.Store.WriteArtifact(runID, node.Step.ID, iteration, artifactName(node.Step), content)
 	if err != nil {
 		return StepResult{}, err
@@ -109,7 +119,11 @@ func (e Engine) executeProducer(ctx context.Context, runID runstore.RunID, node 
 }
 
 func (e Engine) executeReview(ctx context.Context, runID runstore.RunID, node Node, iteration int) (StepResult, error) {
-	ctx, cancel := context.WithTimeout(ctx, stepTimeout(node.Step))
+	timeout, err := parseStepTimeout(node.Step)
+	if err != nil {
+		return StepResult{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	type item struct {
 		i        int
@@ -224,14 +238,29 @@ func (e Engine) now() time.Time {
 }
 
 func stepTimeout(step config.Step) time.Duration {
+	d, err := parseStepTimeout(step)
+	if err != nil {
+		// Callers that need hard rejection use parseStepTimeout; default only
+		// when timeout is empty (already handled). Invalid values fall back to
+		// a short cancel to avoid unbounded runs if validation was skipped.
+		return time.Millisecond
+	}
+	return d
+}
+
+// parseStepTimeout rejects empty-safe, non-positive, or unparseable timeouts.
+func parseStepTimeout(step config.Step) (time.Duration, error) {
 	if step.Timeout == "" {
-		return 5 * time.Minute
+		return 5 * time.Minute, nil
 	}
 	d, err := time.ParseDuration(step.Timeout)
 	if err != nil {
-		return 5 * time.Minute
+		return 0, fmt.Errorf("step %q timeout %q: %w", step.ID, step.Timeout, err)
 	}
-	return d
+	if d <= 0 {
+		return 0, fmt.Errorf("step %q timeout must be positive", step.ID)
+	}
+	return d, nil
 }
 
 func approval(step config.Step) string {
@@ -289,6 +318,17 @@ func stepConsensusPolicy(step config.Consensus, fallback consensus.Policy) conse
 			MinReviewers: step.MinReviewers,
 			TieBreaker:   consensus.TieBreaker(step.TieBreaker),
 			Weights:      config.WeightsToFloat(step.Weights),
+		}
+		// Inherit unset fields from the manifest/engine default so a step that
+		// only sets mode cannot silently drop min_reviewers or tie-breakers.
+		if p.MinReviewers == 0 {
+			p.MinReviewers = fallback.MinReviewers
+		}
+		if p.TieBreaker == "" {
+			p.TieBreaker = fallback.TieBreaker
+		}
+		if len(p.Weights) == 0 {
+			p.Weights = fallback.Weights
 		}
 		if step.Mode == "weighted" {
 			p.Threshold = fallback.Threshold

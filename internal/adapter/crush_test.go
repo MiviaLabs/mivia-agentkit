@@ -47,13 +47,14 @@ func TestCrushDetectRequiresRunHelpNoninteractiveSupport(t *testing.T) {
 }
 
 func TestCrushRunInvokesCrushRunWithCWDModelAndPrompt(t *testing.T) {
-	r := crushRunner([]byte("artifact"), nil)
+	// Structured JSON event without raw provider fields survives sanitization.
+	r := crushRunner([]byte(`{"type":"status","ok":true}`), nil)
 	got, err := (Crush{Runner: r}).Run(context.Background(), Request{Prompt: "long prompt", Workdir: "/repo", Approval: "never", Model: "ollama/qwen3:14b"})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
-	if string(got.Stdout) != "artifact" {
-		t.Fatalf("Stdout = %q, want artifact", got.Stdout)
+	if !bytes.Contains(got.Stdout, []byte(`"type":"status"`)) {
+		t.Fatalf("Stdout = %q, want sanitized status event", got.Stdout)
 	}
 	if len(r.Calls) != 1 {
 		t.Fatalf("runner calls = %d, want 1", len(r.Calls))
@@ -109,6 +110,30 @@ func TestCrushRunScrubsSecretsFromStdout(t *testing.T) {
 	}
 	if bytes.Contains(got.Stdout, []byte("AKIA")) || !bytes.Contains(got.Stdout, []byte("<redacted:aws>")) {
 		t.Fatalf("Stdout = %q, want redacted", got.Stdout)
+	}
+}
+
+func TestCrushRunRedactsProviderOutputAndPromptFields(t *testing.T) {
+	// Plain model text must be redacted like other adapters.
+	got, err := (Crush{Runner: crushRunner([]byte("raw assistant prose about the task"), nil)}).Run(context.Background(), Request{Prompt: "x", Approval: "never"})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if bytes.Contains(got.Stdout, []byte("raw assistant prose")) {
+		t.Fatalf("Stdout = %q, want plain provider output redacted", got.Stdout)
+	}
+	if !bytes.Contains(got.Stdout, []byte("<redacted:provider-output>")) {
+		t.Fatalf("Stdout = %q, want provider-output redaction marker", got.Stdout)
+	}
+
+	// JSON payloads with prompt fields must drop raw prompt content.
+	payload := []byte(`{"type":"result","prompt":"SECRET_PROMPT_VALUE","result":"done"}`)
+	got, err = (Crush{Runner: crushRunner(payload, nil)}).Run(context.Background(), Request{Prompt: "x", Approval: "never"})
+	if err != nil {
+		t.Fatalf("Run() JSON error = %v", err)
+	}
+	if bytes.Contains(got.Stdout, []byte("SECRET_PROMPT_VALUE")) {
+		t.Fatalf("Stdout = %q, want prompt field removed", got.Stdout)
 	}
 }
 

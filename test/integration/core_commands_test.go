@@ -59,6 +59,7 @@ func TestInitDoctorAuditPreflightFlow(t *testing.T) {
 		"--repo", env.repo,
 		"--contract-row", "ws14",
 		"--focused-verifier", "go test ./test/integration/... -count=1",
+		"--broad-verifier", "go test ./...",
 		"--mutation-proof", "ws14 integration flow coverage",
 		"--json",
 	)

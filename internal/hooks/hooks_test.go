@@ -5,6 +5,7 @@ package hooks
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/policy"
@@ -29,6 +30,206 @@ func TestIsProtectedDetectsDeploy(t *testing.T) {
 	got, ok := IsProtected(map[string]any{"command": "deploy production"})
 	if !ok || got != policy.ProtectedDeploy {
 		t.Fatalf("IsProtected() = %q, %v; want deploy, true", got, ok)
+	}
+}
+
+func TestIsProtectedDetectsGhWithGlobalFlags(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload map[string]any
+		want    policy.ProtectedKind
+	}{
+		{"gh -R repo pr", map[string]any{"command": "gh -R owner/repo pr create"}, policy.ProtectedPullRequest},
+		{"gh --repo pr", map[string]any{"command": "gh --repo owner/repo pr create"}, policy.ProtectedPullRequest},
+		{"gh -H host pr", map[string]any{"command": "gh -H github.example pr create"}, policy.ProtectedPullRequest},
+		{"gh -R attached pr", map[string]any{"command": "gh -Rowner/repo pr create"}, policy.ProtectedPullRequest},
+		{"gh -R release", map[string]any{"command": "gh -R owner/repo release create v1"}, policy.ProtectedRelease},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := IsProtected(tc.payload)
+			if !ok || got != tc.want {
+				t.Fatalf("IsProtected() = %q, %v; want %q, true", got, ok, tc.want)
+			}
+		})
+	}
+}
+
+func TestIsProtectedDetectsDeployWithGlobalFlags(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload map[string]any
+	}{
+		{"kubectl -n apply", map[string]any{"command": "kubectl -n prod apply -f m.yaml"}},
+		{"kubectl --namespace apply", map[string]any{"command": "kubectl --namespace prod apply -f m.yaml"}},
+		{"helm --namespace upgrade", map[string]any{"command": "helm --namespace prod upgrade myapp chart"}},
+		{"helm -n install", map[string]any{"command": "helm -n prod install myapp chart"}},
+		{"terraform -chdir= apply", map[string]any{"command": "terraform -chdir=infra apply"}},
+		{"terraform -chdir space apply", map[string]any{"command": "terraform -chdir infra apply"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := IsProtected(tc.payload)
+			if !ok || got != policy.ProtectedDeploy {
+				t.Fatalf("IsProtected() = %q, %v; want deploy, true", got, ok)
+			}
+		})
+	}
+}
+
+func TestIsProtectedDetectsQuotedGitAndGhPaths(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload map[string]any
+		want    policy.ProtectedKind
+	}{
+		{
+			"quoted unix git path push",
+			map[string]any{"command": `"/usr/bin/git" push origin main`},
+			policy.ProtectedPush,
+		},
+		{
+			"quoted windows git.exe path with spaces",
+			map[string]any{"command": `"C:\Program Files\Git\cmd\git.exe" push origin`},
+			policy.ProtectedPush,
+		},
+		{
+			"quoted subcommand",
+			map[string]any{"command": `git "commit" -m x`},
+			policy.ProtectedCommit,
+		},
+		{
+			"single-quoted git and push",
+			map[string]any{"command": `'/usr/bin/git' 'push' origin`},
+			policy.ProtectedPush,
+		},
+		{
+			"quoted gh path pr",
+			map[string]any{"command": `"/usr/local/bin/gh" pr create`},
+			policy.ProtectedPullRequest,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := IsProtected(tc.payload)
+			if !ok || got != tc.want {
+				t.Fatalf("IsProtected() = %q, %v; want %q, true", got, ok, tc.want)
+			}
+		})
+	}
+}
+
+func TestIsProtectedDetectsGitWithGlobalFlags(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload map[string]any
+		want    policy.ProtectedKind
+	}{
+		{
+			"git -C path push",
+			map[string]any{"command": "git -C /tmp/repo push origin main"},
+			policy.ProtectedPush,
+		},
+		{
+			"git --no-pager commit",
+			map[string]any{"command": "git --no-pager commit -m x"},
+			policy.ProtectedCommit,
+		},
+		{
+			"git -c commit.gpgsign=false commit",
+			map[string]any{"command": "git -c commit.gpgsign=false commit -m x"},
+			policy.ProtectedCommit,
+		},
+		{
+			"structured program git with -C and push",
+			map[string]any{"program": "git", "args": []any{"-C", "/tmp/repo", "push", "origin"}},
+			policy.ProtectedPush,
+		},
+		{
+			"git --git-dir=.git push",
+			map[string]any{"command": "git --git-dir=.git push"},
+			policy.ProtectedPush,
+		},
+		{
+			"git --exec-path space form push",
+			map[string]any{"command": "git --exec-path /usr/lib/git-core push origin"},
+			policy.ProtectedPush,
+		},
+		{
+			"git --attr-source space form commit",
+			map[string]any{"command": "git --attr-source HEAD commit -m x"},
+			policy.ProtectedCommit,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := IsProtected(tc.payload)
+			if !ok || got != tc.want {
+				t.Fatalf("IsProtected() = %q, %v; want %q, true", got, ok, tc.want)
+			}
+		})
+	}
+}
+
+func TestIsProtectedDetectsWindowsGitExe(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload map[string]any
+		want    policy.ProtectedKind
+	}{
+		{
+			"git.exe push command string",
+			map[string]any{"command": "git.exe push origin main"},
+			policy.ProtectedPush,
+		},
+		{
+			"git.cmd commit command string",
+			map[string]any{"command": "git.cmd commit -m x"},
+			policy.ProtectedCommit,
+		},
+		{
+			"program git.exe with push args",
+			map[string]any{"program": "git.exe", "args": []any{"push", "origin"}},
+			policy.ProtectedPush,
+		},
+		{
+			"program path with git.cmd",
+			map[string]any{"program": `C:\Program Files\Git\cmd\git.cmd`, "args": []any{"commit", "-m", "x"}},
+			policy.ProtectedCommit,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := IsProtected(tc.payload)
+			if !ok || got != tc.want {
+				t.Fatalf("IsProtected() = %q, %v; want %q, true", got, ok, tc.want)
+			}
+		})
+	}
+}
+
+func TestIsProtectedDoesNotTripOnDeployPathSegment(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload map[string]any
+	}{
+		{"go test package path", map[string]any{"command": "go test ./internal/deploy"}},
+		{"list deploy directory", map[string]any{"command": "ls ./deploy"}},
+		{"cat deploy yaml", map[string]any{"command": "cat charts/deploy/values.yaml"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got, ok := IsProtected(tc.payload); ok {
+				t.Fatalf("IsProtected() = %q, true; want false for path-only deploy token", got)
+			}
+		})
+	}
+	// Real deploy verbs still trip the gate.
+	if got, ok := IsProtected(map[string]any{"command": "deploy production"}); !ok || got != policy.ProtectedDeploy {
+		t.Fatalf("IsProtected(deploy production) = %q, %v; want deploy, true", got, ok)
+	}
+	if got, ok := IsProtected(map[string]any{"command": "kubectl apply -f manifest.yaml"}); !ok || got != policy.ProtectedDeploy {
+		t.Fatalf("IsProtected(kubectl apply) = %q, %v; want deploy, true", got, ok)
 	}
 }
 
@@ -162,6 +363,19 @@ func TestDecideAllowsProtectedWithFreshStampAndPolicyAllow(t *testing.T) {
 	}
 }
 
+func TestDecidePolicyErrorFailsClosed(t *testing.T) {
+	out, err := Decide(context.Background(), Payload{Raw: map[string]any{"command": "git push"}}, stampOK{}, errProvider{err: errors.New("audit write failed")})
+	if err != nil {
+		t.Fatalf("Decide() error = %v; want deny outcome without error", err)
+	}
+	if out.Allow {
+		t.Fatalf("Decide().Allow = true; want fail-closed deny")
+	}
+	if !strings.Contains(out.Reason, "policy decision failed") {
+		t.Fatalf("Decide().Reason = %q; want policy decision failed", out.Reason)
+	}
+}
+
 func TestMalformedPayloadFailsClosedForProtectedAction(t *testing.T) {
 	out, err := Decide(context.Background(), Payload{Raw: map[string]any{"tool": "bash", "malformed": "git commit"}}, stampOK{}, policy.Noop{AuditPath: tempAudit(t)})
 	if err != nil {
@@ -194,6 +408,18 @@ func (denyProvider) Decide(context.Context, policy.Action) (policy.Decision, err
 
 func (denyProvider) Record(context.Context, policy.Event) error {
 	return errors.New("not used")
+}
+
+type errProvider struct{ err error }
+
+func (e errProvider) Name() string { return "err" }
+
+func (e errProvider) Decide(context.Context, policy.Action) (policy.Decision, error) {
+	return policy.Decision{}, e.err
+}
+
+func (e errProvider) Record(context.Context, policy.Event) error {
+	return e.err
 }
 
 func tempAudit(t *testing.T) string {

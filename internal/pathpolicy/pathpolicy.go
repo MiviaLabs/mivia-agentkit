@@ -106,18 +106,23 @@ func resolveExistingPrefix(path string) string {
 func (p Policy) forbidden(rel string) bool {
 	slash := filepath.ToSlash(filepath.Clean(rel))
 	lower := strings.ToLower(slash)
+	base := filepath.Base(lower)
 	for _, pattern := range p.Forbidden {
 		switch pattern {
 		case ".env":
-			if lower == ".env" {
+			// Match .env at any depth (config/.env, .ai/.env), not only repo root.
+			if base == ".env" {
 				return true
 			}
 		case ".env.*":
-			if strings.HasPrefix(lower, ".env.") {
+			// Match .env.* basenames at any depth (.env.local, app/.env.production).
+			if strings.HasPrefix(base, ".env.") {
 				return true
 			}
 		case "secrets/**":
-			if lower == "secrets" || strings.HasPrefix(lower, "secrets/") {
+			// Match a secrets directory segment at any depth.
+			if lower == "secrets" || strings.HasPrefix(lower, "secrets/") ||
+				strings.Contains(lower, "/secrets/") || strings.HasSuffix(lower, "/secrets") {
 				return true
 			}
 		case "**/*private*key*":
