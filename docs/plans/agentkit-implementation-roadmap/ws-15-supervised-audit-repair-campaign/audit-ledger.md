@@ -15,6 +15,7 @@ Rules: no raw prompts, raw model output, secrets, absolute paths, or `.ai/runs/*
 | phase1-audit-fix-2 | prior..HEAD | independent deep-bug-audit cycle 2 | correctness; security; evidence/tests; docs + confirm | PASS after residual fix | live dual-CLI not in CI; worktree deferred; opaque path-id→path map not yet binding (stages allowlist ∩ actual staged; secrets under dir deny); MaxRepairAttempts unused (cycle/no_progress caps still bound) | this-commit | cumulative DurationUsedMS; confirm fingerprint bind; path-like verifier reject; staged secret under dir allowlist; verifier required |
 | phase1-stop-clean | 570afb1 | cycles 3+4 independent audit+confirm | multi-lens + independent confirmers | PASS; PASS | live dual-CLI cost/flakiness; worktree deferred; path-id map; MaxRepairAttempts unused under caps | 570afb1 | two consecutive empty full-scope rounds |
 | phase2-live | 570afb1 | live dual-CLI finite run | operator + product fail-closed | PASS (fail-closed evidence) | providers may not emit schema-valid evidence; cost/flaky; dogfood left disabled | n/a product | codex+claude approved; terminal verification_failed unknown field; self-confirm misconfig exit 2; dogfood disabled |
+| skeptic-repair | prior..HEAD | skeptic fail-open repair | tests + independent re-audit | PASS after fix | accepted residual unchanged | this-commit | ConfirmedFindings not clean; invent-confirm blocked; fix fp must match confirm |
 
 ## Phase 0 entry
 

@@ -440,4 +440,146 @@ func TestIsCleanEvidenceRejectsFingerprintOnly(t *testing.T) {
 	if isCleanEvidence(Evidence{Disposition: DispositionCandidate, FindingFingerprint: "x"}) {
 		t.Fatal("candidate must not be clean")
 	}
+	// ConfirmedFindings alone must not false-stop as clean (skeptic F-clean).
+	if isCleanEvidence(Evidence{
+		ConfirmedFindings: []FindingRef{{Fingerprint: "fp-list", Disposition: DispositionCandidate}},
+	}) {
+		t.Fatal("ConfirmedFindings without top-level disposition must not be clean")
+	}
+}
+
+func TestEngineConfirmedFindingsOnlyNotCleanStop(t *testing.T) {
+	dir := t.TempDir()
+	confirms := 0
+	c := testCampaign()
+	c.CommitEnabled = false
+	c.MaxCycles = 3
+	c.CleanPassThreshold = 2
+	eng := &Engine{
+		Campaign: c,
+		Store:    NewStore(dir, "c-cf", "o"),
+		Audit: func(ctx context.Context, phase Phase, cycle int) (Evidence, error) {
+			// Schema-valid envelope with ConfirmedFindings but empty top-level disposition.
+			return Evidence{
+				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
+				ConfirmedFindings: []FindingRef{{Fingerprint: "fp-list", Disposition: DispositionCandidate}},
+			}, nil
+		},
+		Confirm: func(ctx context.Context, phase Phase, cycle int) (Evidence, error) {
+			confirms++
+			return Evidence{
+				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
+				Disposition: DispositionRejected, FindingFingerprint: "fp-list",
+			}, nil
+		},
+		Fix: func(context.Context, Phase, int) (Evidence, error) {
+			t.Fatalf("fix must not run")
+			return Evidence{}, nil
+		},
+		Commit: func(context.Context, Evidence) (string, error) {
+			t.Fatalf("commit must not run")
+			return "", nil
+		},
+	}
+	res, err := eng.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if confirms == 0 {
+		t.Fatal("Confirm must run; ConfirmedFindings-only must not TerminalClean without confirm")
+	}
+	if res.Terminal == TerminalClean {
+		t.Fatalf("terminal=clean with ConfirmedFindings-only is a fail-open")
+	}
+}
+
+func TestEngineEmptyAuditFingerprintBlocksInventedConfirm(t *testing.T) {
+	dir := t.TempDir()
+	fixes := 0
+	commits := 0
+	eng := &Engine{
+		Campaign: testCampaign(),
+		Store:    NewStore(dir, "c-invent", "o"),
+		Audit: func(ctx context.Context, phase Phase, cycle int) (Evidence, error) {
+			// Non-clean candidate with empty fingerprint — confirmer must not invent commit authority.
+			return Evidence{
+				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
+				Disposition: DispositionCandidate,
+			}, nil
+		},
+		Confirm: func(ctx context.Context, phase Phase, cycle int) (Evidence, error) {
+			return Evidence{
+				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
+				Disposition: DispositionConfirmed, FindingFingerprint: "invented-fp",
+				ChangedPathIDs: []string{"p1"}, VerifierRef: "true",
+			}, nil
+		},
+		Fix: func(_ context.Context, _ Phase, cycle int) (Evidence, error) {
+			fixes++
+			return Evidence{
+				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
+				Disposition: DispositionFixed, FindingFingerprint: "invented-fp",
+				ChangedPathIDs: []string{"p1"}, VerifierRef: "true",
+			}, nil
+		},
+		Commit: func(context.Context, Evidence) (string, error) {
+			commits++
+			return "deadbeef", nil
+		},
+	}
+	res, err := eng.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if fixes != 0 || commits != 0 {
+		t.Fatalf("invented confirm must not fix/commit; fixes=%d commits=%d terminal=%s", fixes, commits, res.Terminal)
+	}
+}
+
+func TestEngineFixFingerprintMismatchRejectsCommit(t *testing.T) {
+	dir := t.TempDir()
+	commits := 0
+	var commitFP string
+	eng := &Engine{
+		Campaign: testCampaign(),
+		Store:    NewStore(dir, "c-fixfp", "o"),
+		Audit: func(ctx context.Context, phase Phase, cycle int) (Evidence, error) {
+			return Evidence{
+				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
+				Disposition: DispositionCandidate, FindingFingerprint: "audit-fp",
+			}, nil
+		},
+		Confirm: func(ctx context.Context, phase Phase, cycle int) (Evidence, error) {
+			return Evidence{
+				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
+				Disposition: DispositionConfirmed, FindingFingerprint: "audit-fp",
+				ChangedPathIDs: []string{"p1"}, VerifierRef: "true",
+			}, nil
+		},
+		Fix: func(ctx context.Context, phase Phase, cycle int) (Evidence, error) {
+			return Evidence{
+				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
+				Disposition: DispositionFixed, FindingFingerprint: "other-fp",
+				ChangedPathIDs: []string{"p1"}, VerifierRef: "true",
+			}, nil
+		},
+		Commit: func(_ context.Context, e Evidence) (string, error) {
+			commits++
+			commitFP = e.FindingFingerprint
+			return "deadbeef", nil
+		},
+	}
+	res, err := eng.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if commits != 0 {
+		t.Fatalf("commits=%d commitFP=%s, want 0 (fix fp must match confirm)", commits, commitFP)
+	}
+	if res.Terminal != TerminalVerificationFailed {
+		t.Fatalf("terminal=%s, want verification_failed", res.Terminal)
+	}
+	if !strings.Contains(res.Message, "fingerprint") {
+		t.Fatalf("message=%q, want fingerprint mismatch", res.Message)
+	}
 }

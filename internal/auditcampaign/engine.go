@@ -127,7 +127,7 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 		if !cev.CommitEligible() {
 			fp := cev.FindingFingerprint
 			if fp == "" {
-				fp = ev.FindingFingerprint
+				fp = auditFindingFingerprint(ev)
 			}
 			if fp != "" && RecordFingerprint(&snap, fp) {
 				if snap.NoProgressCount >= e.Campaign.NoProgressThreshold {
@@ -140,9 +140,15 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 			}
 			continue
 		}
-		// Bind confirmer finding to audit fingerprint: empty confirm fp or mismatch rejects.
-		if ev.FindingFingerprint != "" && cev.FindingFingerprint != ev.FindingFingerprint {
-			if RecordFingerprint(&snap, ev.FindingFingerprint) {
+		// Bind confirmer finding to audit fingerprint. Confirm cannot invent a
+		// commit-eligible finding that the auditor never fingerprinted.
+		auditFP := auditFindingFingerprint(ev)
+		if auditFP == "" || cev.FindingFingerprint != auditFP {
+			fp := auditFP
+			if fp == "" {
+				fp = cev.FindingFingerprint
+			}
+			if fp != "" && RecordFingerprint(&snap, fp) {
 				if snap.NoProgressCount >= e.Campaign.NoProgressThreshold {
 					return e.terminate(snap, TerminalNoProgress, "duplicate fingerprint", commits, start, usedBefore)
 				}
@@ -173,6 +179,10 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 		}
 		if !fixCommitReady(fev) {
 			return e.terminate(snap, TerminalVerificationFailed, "fix did not produce commit-ready evidence", commits, start, usedBefore)
+		}
+		// Fix evidence must rebind to the same confirmed fingerprint (no swap).
+		if fev.FindingFingerprint != cev.FindingFingerprint {
+			return e.terminate(snap, TerminalVerificationFailed, "fix fingerprint does not match confirmed finding", commits, start, usedBefore)
 		}
 		if err := e.setPhase(&snap, PhaseVerifying); err != nil {
 			return e.terminate(snap, TerminalMalformedState, err.Error(), commits, start, usedBefore)
@@ -289,8 +299,12 @@ func (e *Engine) terminate(snap Snapshot, reason TerminalReason, msg string, com
 
 // isCleanEvidence reports whether audit evidence is a clean pass (no finding).
 // Fingerprint without disposition is NOT clean (malformed partial finding).
+// ConfirmedFindings list entries are also non-clean even when top-level disposition is empty.
 func isCleanEvidence(e Evidence) bool {
 	if e.FindingFingerprint != "" {
+		return false
+	}
+	if len(e.ConfirmedFindings) > 0 {
 		return false
 	}
 	switch e.Disposition {
@@ -301,6 +315,20 @@ func isCleanEvidence(e Evidence) bool {
 	default:
 		return false
 	}
+}
+
+// auditFindingFingerprint returns the auditor-bound finding id for confirm binding.
+// Prefer top-level finding_fingerprint; else first ConfirmedFindings fingerprint.
+func auditFindingFingerprint(e Evidence) string {
+	if e.FindingFingerprint != "" {
+		return e.FindingFingerprint
+	}
+	for _, f := range e.ConfirmedFindings {
+		if f.Fingerprint != "" {
+			return f.Fingerprint
+		}
+	}
+	return ""
 }
 
 // fixCommitReady requires fixed disposition plus fingerprint, path IDs, and verifier ref.
