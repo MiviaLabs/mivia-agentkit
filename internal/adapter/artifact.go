@@ -46,17 +46,34 @@ func materializeArtifactOut(path string, rawStdout []byte) {
 // extractLastMessage returns the assistant last-message body from raw provider
 // stdout. Prefer a nested campaign-evidence envelope when present; otherwise the
 // last non-empty result/text/content string or the trimmed raw payload.
+//
+// When stdout is role-tagged JSONL (Zai), only assistant content is considered.
+// User-role echoes contain campaign prompt examples and must never become
+// commit authority if the model fails (auth error, empty reply).
 func extractLastMessage(raw []byte) []byte {
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) == 0 {
 		return nil
+	}
+	payloads := decodeProviderPayloads(trimmed)
+	if assistant, ok := lastAssistantRoleContent(payloads); ok {
+		if isProviderFailureMessage(assistant) {
+			return nil
+		}
+		if msg, ok := extractJSONObjectWithMarker(assistant, campaignEvidenceSchema); ok {
+			return msg
+		}
+		if len(bytes.TrimSpace(assistant)) == 0 {
+			return nil
+		}
+		return assistant
 	}
 	// Prefer an embedded campaign evidence object (schema marker).
 	if msg, ok := extractJSONObjectWithMarker(trimmed, campaignEvidenceSchema); ok {
 		return msg
 	}
 	// Provider envelopes: Claude {"result":"..."}, Codex NDJSON, etc.
-	for _, payload := range decodeProviderPayloads(trimmed) {
+	for _, payload := range payloads {
 		// Claude --json-schema places validated body in structured_output.
 		if so, ok := payload["structured_output"]; ok {
 			if b, err := json.Marshal(so); err == nil && len(bytes.TrimSpace(b)) > 0 {
@@ -102,6 +119,57 @@ func extractLastMessage(raw []byte) []byte {
 	}
 	// Bare last-message JSON or plain text on stdout.
 	return trimmed
+}
+
+// lastAssistantRoleContent returns the last role=assistant|model content body when
+// the payload stream is role-tagged (Zai JSONL). ok is false when no role field
+// appears (Claude/Codex envelopes).
+func lastAssistantRoleContent(payloads []map[string]any) ([]byte, bool) {
+	hasRole := false
+	var last []byte
+	for _, payload := range payloads {
+		role, _ := payload["role"].(string)
+		if role == "" {
+			continue
+		}
+		hasRole = true
+		if role != "assistant" && role != "model" {
+			continue
+		}
+		for _, key := range []string{"content", "text", "result"} {
+			if s, ok := payload[key].(string); ok && strings.TrimSpace(s) != "" {
+				last = []byte(s)
+				break
+			}
+		}
+	}
+	if !hasRole {
+		return nil, false
+	}
+	return last, true
+}
+
+// isProviderFailureMessage detects auth/API failures that some CLIs still emit
+// as assistant content with process exit 0 (notably zai 401).
+func isProviderFailureMessage(b []byte) bool {
+	s := strings.ToLower(string(bytes.TrimSpace(b)))
+	if s == "" {
+		return false
+	}
+	needles := []string{
+		"authentication failed",
+		"401 unauthorized",
+		"api error: 401",
+		"unauthorized:",
+		"invalid api key",
+		"invalid_api_key",
+	}
+	for _, n := range needles {
+		if strings.Contains(s, n) {
+			return true
+		}
+	}
+	return false
 }
 
 func extractJSONObjectWithMarker(raw []byte, marker string) ([]byte, bool) {

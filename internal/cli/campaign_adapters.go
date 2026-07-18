@@ -430,8 +430,24 @@ func (h *campaignHost) invokeOrchestrable(ctx context.Context, name string, phas
 	if timeout <= 0 {
 		timeout = 5 * time.Minute
 	}
-	if phase == auditcampaign.PhaseFixing && h.camp.CommitEnabled {
-		// Coding repairs need more wall time and tool rounds than audit/confirm.
+	// Commit-capable dual-CLI dogfood: confirmer/fixer tool loops (kimi/zai)
+	// routinely exceed the 5m default; fail closed only after a realistic budget.
+	if h.camp.CommitEnabled {
+		switch phase {
+		case auditcampaign.PhaseConfirming:
+			if timeout < 20*time.Minute {
+				timeout = 20 * time.Minute
+			}
+		case auditcampaign.PhaseFixing:
+			if timeout < 25*time.Minute {
+				timeout = 25 * time.Minute
+			}
+		case auditcampaign.PhaseAuditing:
+			if timeout < 12*time.Minute {
+				timeout = 12 * time.Minute
+			}
+		}
+	} else if phase == auditcampaign.PhaseFixing {
 		if timeout < 12*time.Minute {
 			timeout = 12 * time.Minute
 		}
@@ -566,6 +582,8 @@ func campaignPhasePrompt(phase auditcampaign.Phase, campaign, runID string, cycl
 			"Also set changed_path_ids (opaque) and verifier_ref (use the campaign verifier name when unsure).",
 			"If not real: disposition rejected with the SAME finding_fingerprint as PRIOR_AUDIT.",
 			"Do not invent a new finding_fingerprint. Do not copy unrelated example ids.",
+			"Be decisive and fast: at most a few targeted file reads. Do not spawn subagents or long tool loops.",
+			"Your final message MUST be exactly one campaign evidence JSON object (schema mivia-agent-campaign-evidence/v1).",
 		}
 		if prior.FindingFingerprint != "" || prior.Disposition != "" {
 			lines = append(lines, fmt.Sprintf(

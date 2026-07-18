@@ -53,13 +53,44 @@ func (z Zai) Run(ctx context.Context, req Request) (Result, error) {
 		defer cancel()
 	}
 	res, err := z.runRaw(runCtx, req)
+	if err != nil {
+		return Result{}, err
+	}
+	// Zai often exits 0 while assistant content reports API 401; fail closed so
+	// campaign hosts cannot decode prompt-example JSON from the user echo.
+	if fail, why := zaiProviderFailure(res); fail {
+		return Result{
+			ExitCode: 1,
+			Stdout:   truncate(sanitizeProviderOutput(res.Stdout)),
+			Stderr:   truncate(sanitizeProviderOutput(res.Stderr)),
+		}, fmt.Errorf("zai provider failure: %s", why)
+	}
 	materializeArtifactOut(req.ArtifactOut, res.Stdout)
 	return Result{
 		ExitCode:     res.ExitCode,
 		Stdout:       truncate(sanitizeProviderOutput(res.Stdout)),
 		Stderr:       truncate(sanitizeProviderOutput(res.Stderr)),
 		ProviderMeta: sanitizedMeta(res.Stdout),
-	}, err
+	}, nil
+}
+
+// zaiProviderFailure reports auth/API failures hidden behind exit 0.
+func zaiProviderFailure(res RunResult) (bool, string) {
+	// Role JSONL: check last assistant content only (never user echo / prompt examples).
+	if assistant, ok := lastAssistantRoleContent(decodeProviderPayloads(res.Stdout)); ok {
+		if isProviderFailureMessage(assistant) {
+			return true, "authentication or API error in assistant content"
+		}
+		return false, ""
+	}
+	// Non-role short failure replies on stderr/stdout.
+	if isShortProviderFailure(res.Stderr) {
+		return true, "authentication or API error in stderr"
+	}
+	if isShortProviderFailure(res.Stdout) {
+		return true, "authentication or API error in provider output"
+	}
+	return false, ""
 }
 
 // Review runs a structured zai review prompt.

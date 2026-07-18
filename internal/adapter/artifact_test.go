@@ -67,6 +67,47 @@ func TestExtractLastMessageFromZaiRoleEnvelope(t *testing.T) {
 	}
 }
 
+func TestExtractLastMessageIgnoresUserRolePromptExamples(t *testing.T) {
+	// Zai 401 path: user echo contains prompt examples with schema marker;
+	// assistant is an auth error. Must not materialize example as evidence.
+	example := campaignEvidenceBody("confirmed", "fp-example")
+	userLine, err := json.Marshal(map[string]any{
+		"role":    "user",
+		"content": "examples: " + string(example),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	asstLine, err := json.Marshal(map[string]any{
+		"role":    "assistant",
+		"content": "Sorry, I encountered an error:\n\n❌ An unexpected error occurred: Z.ai API error: 401 Authentication Failed",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := append(append(userLine, '\n'), asstLine...)
+	got := extractLastMessage(raw)
+	if len(bytes.TrimSpace(got)) != 0 {
+		t.Fatalf("got = %q, want empty (fail closed on auth / no assistant evidence)", got)
+	}
+}
+
+func TestExtractLastMessagePrefersAssistantOverUserExamples(t *testing.T) {
+	userEx := campaignEvidenceBody("confirmed", "fp-user-example")
+	asst := campaignEvidenceBody("rejected", "fp-real")
+	userLine, _ := json.Marshal(map[string]any{"role": "user", "content": string(userEx)})
+	asstEnc, _ := json.Marshal(string(asst))
+	asstLine := []byte(`{"role":"assistant","content":` + string(asstEnc) + `}`)
+	raw := append(append(userLine, '\n'), asstLine...)
+	got := extractLastMessage(raw)
+	if !bytes.Contains(got, []byte(`"fp-real"`)) {
+		t.Fatalf("got = %s, want assistant evidence", got)
+	}
+	if bytes.Contains(got, []byte(`"fp-user-example"`)) {
+		t.Fatalf("got user example: %s", got)
+	}
+}
+
 func TestExtractLastMessageFromClaudeResultEnvelope(t *testing.T) {
 	inner := campaignEvidenceBody("confirmed", "fp-claude")
 	// Claude --output-format json nests assistant text in result as a string.
@@ -180,5 +221,14 @@ func TestCodexRunMaterializesArtifactOutWhenCLIDidNotWrite(t *testing.T) {
 	args := strings.Join(r.Calls[0].Args, " ")
 	if !strings.Contains(args, "--output-last-message") || !strings.Contains(args, path) {
 		t.Fatalf("args = %q, want --output-last-message %s", args, path)
+	}
+}
+
+func TestExtractLastMessageFromKimiBulletPrefix(t *testing.T) {
+	inner := campaignEvidenceBody("confirmed", "fp-kimi")
+	raw := append([]byte("• "), inner...)
+	got := extractLastMessage(raw)
+	if !bytes.Contains(got, []byte("fp-kimi")) {
+		t.Fatalf("got = %s", got)
 	}
 }
