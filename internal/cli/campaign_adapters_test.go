@@ -331,6 +331,52 @@ func TestDecodeAdapterCampaignEvidenceExtractsWrappedSchema(t *testing.T) {
 	}
 }
 
+func TestDecodeAdapterCampaignEvidenceExtractsZaiRoleEnvelope(t *testing.T) {
+	// Live Zai JSONL puts evidence inside content with outer role field.
+	// Outer object must not fail closed as "unknown field role".
+	inner := evidenceJSON("confirmed", "fp-zai")
+	content, err := json.Marshal(string(inner))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wrapped := []byte(`{"role":"assistant","content":` + string(content) + `}`)
+	ev, err := decodeAdapterCampaignEvidence(wrapped, "run-zai", 2, "head1")
+	if err != nil {
+		t.Fatalf("decode zai role envelope: %v", err)
+	}
+	if ev.Disposition != auditcampaign.DispositionConfirmed || ev.FindingFingerprint != "fp-zai" {
+		t.Fatalf("ev = %+v", ev)
+	}
+	if ev.CampaignRun != "run-zai" || ev.Cycle != 2 || ev.BaselineHead != "head1" {
+		t.Fatalf("runtime bind = %+v", ev)
+	}
+}
+
+func TestCampaignHostZaiRoleArtifactStillDecodes(t *testing.T) {
+	inner := evidenceJSON("candidate", "fp-zai-host")
+	content, _ := json.Marshal(string(inner))
+	stdout := []byte(`{"role":"assistant","content":` + string(content) + `}`)
+	a := &scriptedCampaignAdapter{name: "zai", stdout: stdout}
+	reg, err := adapter.NewRegistry(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("zai", "codex", "zai")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	camp.Auditor = "zai"
+	h := &campaignHost{
+		repo: t.TempDir(), runID: "r-zai", name: "c", camp: camp, manifest: m,
+		adapters: reg, expectedHead: "unknown",
+	}
+	ev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	if err != nil {
+		t.Fatalf("Audit zai role envelope: %v", err)
+	}
+	if ev.Disposition != auditcampaign.DispositionCandidate || ev.FindingFingerprint != "fp-zai-host" {
+		t.Fatalf("ev = %+v", ev)
+	}
+}
+
 func TestNewCampaignHostFailsClosedWhenExternalNotApproved(t *testing.T) {
 	// Force Detect failures by pointing PATH at empty dir so codex/claude are missing.
 	empty := t.TempDir()

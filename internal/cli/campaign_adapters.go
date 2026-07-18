@@ -375,17 +375,28 @@ func (h *campaignHost) invokeOrchestrable(ctx context.Context, name string, phas
 		return auditcampaign.Evidence{}, fmt.Errorf("campaign adapter %q exited %d", name, res.ExitCode)
 	}
 
-	raw := res.Stdout
+	// Prefer ArtifactOut when it decodes as typed evidence; fall back to stdout
+	// (Zai/Claude provider envelopes often land role/content wrappers in ArtifactOut
+	// while a nested schema object is still recoverable from the same or stdout path).
+	var candidates [][]byte
 	if written, readErr := os.ReadFile(tmpPath); readErr == nil && len(bytes.TrimSpace(written)) > 0 {
-		// Prefer last-message artifact when present; still require typed evidence decode.
-		raw = written
+		candidates = append(candidates, written)
 	}
-	// Never accept raw Markdown/prose as commit authority.
-	ev, err := decodeAdapterCampaignEvidence(raw, h.runID, cycle, h.expectedHead)
-	if err != nil {
-		return auditcampaign.Evidence{}, fmt.Errorf("campaign adapter %q: %w", name, err)
+	if len(bytes.TrimSpace(res.Stdout)) > 0 {
+		candidates = append(candidates, res.Stdout)
 	}
-	return ev, nil
+	var lastErr error
+	for _, raw := range candidates {
+		ev, err := decodeAdapterCampaignEvidence(raw, h.runID, cycle, h.expectedHead)
+		if err == nil {
+			return ev, nil
+		}
+		lastErr = err
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("typed campaign evidence required (empty adapter output)")
+	}
+	return auditcampaign.Evidence{}, fmt.Errorf("campaign adapter %q: %w", name, lastErr)
 }
 
 func campaignPhasePrompt(phase auditcampaign.Phase, campaign, runID string, cycle int, head string, camp config.Campaign) string {
@@ -465,22 +476,55 @@ func extractCampaignEvidenceBytes(raw []byte) ([]byte, error) {
 	if _, err := auditcampaign.DecodeEvidence(raw); err == nil {
 		return raw, nil
 	}
-	// Locate schema marker inside provider wrappers / mixed stdout.
 	marker := []byte(auditcampaign.EvidenceSchema)
-	idx := bytes.Index(raw, marker)
-	if idx < 0 {
+	if !bytes.Contains(raw, marker) {
 		return nil, fmt.Errorf("typed campaign evidence required (schema %s not found; raw Markdown is not commit authority)", auditcampaign.EvidenceSchema)
 	}
-	start := bytes.LastIndex(raw[:idx], []byte("{"))
-	if start < 0 {
-		return nil, fmt.Errorf("typed campaign evidence required (malformed JSON envelope)")
+	// Provider wrappers (Zai JSONL role/content, Claude result, etc.) often place the
+	// schema marker inside a string. Try every JSON object that contains the marker
+	// until DecodeEvidence accepts one; also recurse into string fields.
+	if msg, ok := findValidCampaignEvidenceJSON(raw); ok {
+		return msg, nil
 	}
-	dec := json.NewDecoder(bytes.NewReader(raw[start:]))
-	var msg json.RawMessage
-	if err := dec.Decode(&msg); err != nil {
-		return nil, fmt.Errorf("typed campaign evidence required: %w", err)
+	return nil, fmt.Errorf("typed campaign evidence required (schema %s found but no valid envelope; raw Markdown is not commit authority)", auditcampaign.EvidenceSchema)
+}
+
+// findValidCampaignEvidenceJSON walks candidate JSON objects and nested string
+// fields for a payload that DecodeEvidence accepts.
+func findValidCampaignEvidenceJSON(raw []byte) ([]byte, bool) {
+	marker := []byte(auditcampaign.EvidenceSchema)
+	for i := 0; i < len(raw); i++ {
+		if raw[i] != '{' {
+			continue
+		}
+		rest := raw[i:]
+		if !bytes.Contains(rest, marker) {
+			continue
+		}
+		dec := json.NewDecoder(bytes.NewReader(rest))
+		var msg json.RawMessage
+		if err := dec.Decode(&msg); err != nil {
+			continue
+		}
+		if _, err := auditcampaign.DecodeEvidence(msg); err == nil {
+			return msg, true
+		}
+		// Nested evidence may live inside string fields (provider content/result/text).
+		var obj map[string]any
+		if err := json.Unmarshal(msg, &obj); err != nil {
+			continue
+		}
+		for _, v := range obj {
+			s, ok := v.(string)
+			if !ok || !strings.Contains(s, auditcampaign.EvidenceSchema) {
+				continue
+			}
+			if nested, ok := findValidCampaignEvidenceJSON([]byte(s)); ok {
+				return nested, true
+			}
+		}
 	}
-	return msg, nil
+	return nil, false
 }
 
 type fixWrites struct {

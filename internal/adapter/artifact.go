@@ -92,20 +92,48 @@ func extractLastMessage(raw []byte) []byte {
 }
 
 func extractJSONObjectWithMarker(raw []byte, marker string) ([]byte, bool) {
-	idx := bytes.Index(raw, []byte(marker))
-	if idx < 0 {
-		return nil, false
+	// Prefer the innermost/valid campaign-evidence object, not an outer provider
+	// wrapper (e.g. {"role":"assistant","content":"...schema..."}).
+	var best []byte
+	for i := 0; i < len(raw); i++ {
+		if raw[i] != '{' {
+			continue
+		}
+		rest := raw[i:]
+		if !bytes.Contains(rest, []byte(marker)) {
+			continue
+		}
+		dec := json.NewDecoder(bytes.NewReader(rest))
+		var msg json.RawMessage
+		if err := dec.Decode(&msg); err != nil {
+			continue
+		}
+		// Prefer objects that look like the campaign evidence envelope.
+		var probe map[string]any
+		if err := json.Unmarshal(msg, &probe); err != nil {
+			continue
+		}
+		if sch, _ := probe["schema"].(string); sch == marker {
+			// Exact evidence envelope wins immediately.
+			return msg, true
+		}
+		// Keep last decoded object containing the marker as weak fallback.
+		best = msg
+		// Also search string fields for nested evidence JSON.
+		for _, v := range probe {
+			s, ok := v.(string)
+			if !ok || !strings.Contains(s, marker) {
+				continue
+			}
+			if nested, ok := extractJSONObjectWithMarker([]byte(s), marker); ok {
+				return nested, true
+			}
+		}
 	}
-	start := bytes.LastIndex(raw[:idx], []byte("{"))
-	if start < 0 {
-		return nil, false
+	if len(best) > 0 {
+		return best, true
 	}
-	dec := json.NewDecoder(bytes.NewReader(raw[start:]))
-	var msg json.RawMessage
-	if err := dec.Decode(&msg); err != nil {
-		return nil, false
-	}
-	return msg, true
+	return nil, false
 }
 
 func mustMarshal(v any) []byte {

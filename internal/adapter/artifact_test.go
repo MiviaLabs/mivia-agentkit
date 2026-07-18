@@ -28,6 +28,26 @@ func campaignEvidenceBody(disposition, fingerprint string) []byte {
 	return []byte(`{"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"r","cycle":1,"baseline_head":"h"` + disp + fp + extra + `}`)
 }
 
+func TestExtractLastMessageFromZaiRoleEnvelope(t *testing.T) {
+	inner := campaignEvidenceBody("confirmed", "fp-zai")
+	enc, err := json.Marshal(string(inner))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Zai JSONL assistant line wraps evidence in content; outer has role.
+	raw := []byte(`{"role":"assistant","content":` + string(enc) + `}`)
+	got := extractLastMessage(raw)
+	if !bytes.Contains(got, []byte(`"schema":"mivia-agent-campaign-evidence/v1"`)) {
+		t.Fatalf("got = %s, want campaign evidence schema", got)
+	}
+	if bytes.Contains(got, []byte(`"role"`)) {
+		t.Fatalf("got outer role wrapper instead of evidence: %s", got)
+	}
+	if !bytes.Contains(got, []byte(`"fp-zai"`)) {
+		t.Fatalf("got = %s, want fingerprint", got)
+	}
+}
+
 func TestExtractLastMessageFromClaudeResultEnvelope(t *testing.T) {
 	inner := campaignEvidenceBody("confirmed", "fp-claude")
 	// Claude --output-format json nests assistant text in result as a string.
