@@ -30,6 +30,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.SetErr(io.Discard)
 	cmd.AddCommand(newAuditCommand())
 	cmd.AddCommand(newAdaptersCommand())
+	cmd.AddCommand(newCampaignCommand())
 	cmd.AddCommand(newDoctorCommand())
 	cmd.AddCommand(newHookCommand())
 	cmd.AddCommand(newImportCommand())

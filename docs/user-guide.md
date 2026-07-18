@@ -311,6 +311,34 @@ Current adapter runtime support:
 
 Loop authoring details live in [loop-authoring.md](./loop-authoring.md).
 
+## Run A Supervised Campaign
+
+Optional finite audit→confirm→fix→verify→scoped-commit campaigns are configured under `campaigns:` in `mivia-agent.yaml` and are **disabled by default**.
+
+```bash
+./mivia-agent campaign run --repo . --campaign deep-bug-audit-repair --json
+./mivia-agent campaign status --repo . --run <id> --json
+./mivia-agent campaign resume --repo . --run <id> --json
+```
+
+Current campaign behavior:
+
+- Separate from `run` loops and from the host audit-loop hook.
+- Finite cycle/duration/no-progress caps; stops clean after two consecutive clean audits.
+- `--continuous` requires an interactive TTY and rejects CI/noninteractive environments.
+- Commit-capable mode requires an independent confirmer different from the auditor.
+- Auditor findings with disposition `candidate` always go through a separate confirmer invocation; bare `confirmed` without path IDs and `verifier_ref` does not fix/commit.
+- When `commit_enabled: false`, the campaign runs audit→confirm only (no fix/commit failure).
+- Only the coordinator stages allowlisted **literal** paths and commits after a named verifier profile (`true`, `go-test`, or a single PATH token), quality stamp, and policy gates. Multi-word free-form `verifier_profile` values fail closed.
+- Scoped commits run in the `--repo` worktree (path allowlist isolation). Dedicated campaign worktrees are not required for first release.
+- `campaign resume` continues a non-terminal run id with remaining cycle/duration budget from a cycle boundary (mid-phase work restarts at the next audit). Terminal runs and HEAD mismatch fail closed. CI/noninteractive resume is rejected.
+- Non-success terminals (`commit_failed`, `verification_failed`, `policy_denied`, `unauthorized_head_advance`, …) exit non-zero; expected finite stops (`clean`, `cycle_cap`, `duration_cap`, `no_progress`) exit zero.
+- No auto-push, force, reset, clean, or auto-PR.
+- Local fixture adapters (`local` / `local-*` with `.ai/campaign-fixtures/`) support offline integration tests.
+- Orchestrable adapters configured as auditor/confirmer (and the fix-workflow producer) are invoked for typed `mivia-agent-campaign-evidence/v1` only; missing, unapproved, or non-evidence outputs fail closed.
+
+Ordinary deep-bug-audit remains report-only. A one-adapter self-hosted setup cannot run a commit-capable independent-confirmation campaign.
+
 ## Run A One-Off Review
 
 PRD: `FR-5.1` to `FR-5.3`

@@ -7,6 +7,11 @@ import re
 import sys
 from pathlib import Path
 
+import sys
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+import agent_contract_lib as contracts  # noqa: E402
+
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / ".ai" / "templates" / "agent-report-v1.md"
@@ -104,7 +109,7 @@ def test_verify_and_make_run_skill_contracts() -> None:
     for needle in [
         "skill-contract-test:",
         "scripts/test_skill_contracts.py",
-        "verify: verify-agent semgrep-validate semgrep-test hook-test agent-hook-test audit-loop-test plan-contract-test skill-contract-test semgrep go-check",
+        "verify: verify-agent semgrep-validate semgrep-test hook-test agent-hook-test audit-loop-test plan-contract-test skill-contract-test telemetry-contract-test semgrep go-check",
     ]:
         if needle not in makefile:
             fail(f"Makefile missing skill contract gate: {needle}")
@@ -113,6 +118,7 @@ def test_verify_and_make_run_skill_contracts() -> None:
     for needle in [
         "verify_skill_report_contract",
         "scripts/test_skill_contracts.py",
+        "scripts/test_report_telemetry_contracts.py",
         ".ai/templates/agent-report-v1.md",
         REPORT_FORMAT,
         RESULT_ENUM,
@@ -122,8 +128,18 @@ def test_verify_and_make_run_skill_contracts() -> None:
             fail(f"scripts/verify_agent_config.py missing skill contract guard: {needle}")
 
 
+def test_main_invokes_all_tests() -> None:
+    content = Path(__file__).read_text(encoding="utf-8")
+    missing = contracts.missing_main_test_calls(content)
+    if missing:
+        raise AssertionError(f"main() missing real AST calls for: {', '.join(missing)}")
+    if not contracts.entrypoint_calls_main(content):
+        raise AssertionError("entrypoint must unconditionally call main()/sys.exit(main())")
+
+
 def main() -> int:
     test_report_template_has_required_contract()
+    test_main_invokes_all_tests()
     test_canonical_skills_require_report_v1_template()
     test_claude_adapters_delegate_report_contract()
     test_verify_and_make_run_skill_contracts()

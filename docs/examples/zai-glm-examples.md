@@ -52,7 +52,7 @@ For a single prompt with no loop, invoke `zai` directly. Use this for quick
 tasks where you do not need review/iteration:
 
 ```bash
-# Read-only research — note: no approval: commit, short rounds.
+# Read-only research — note: no approval: protect:commit, short rounds.
 zai -m glm-5.2 -d /path/to/repo --max-tool-rounds 4 --no-color \
   -p "Summarize the auth timeout risk in internal/auth. Do not modify files."
 
@@ -79,9 +79,10 @@ validation will reject it.
 
 ## 4. Write loop — produce a patch, then review it (GLM-5-Turbo)
 
-This is the **common case**: the producer writes files, the reviewer is
-read-only. The producer needs `approval: commit` because the artifact is meant
-to land in the repo. Put this in `.ai/workflows/zai-patch-review.yaml`:
+This is the **common case**: the producer writes run artifacts, the reviewer is
+read-only. Use `approval: protect:commit` when the producer step needs the
+stamp/policy gate before it runs. That gate does **not** stage or `git commit`;
+artifacts stay under `.ai/runs/`. Put this in `.ai/workflows/zai-patch-review.yaml`:
 
 ```yaml
 version: 1
@@ -96,7 +97,7 @@ steps:
     producer: zai
     model: glm-5-turbo
     artifact: patch.md
-    approval: commit          # WRITE step: artifact may persist to the repo
+    approval: protect:commit   # stamp+policy gate before adapter; not a Git commit
     max_turns: 12
     timeout: 15m
   - id: review
@@ -122,14 +123,16 @@ go run ./cmd/mivia-agent run --repo /path/to/repo \
   --var objective="harden ParseDuration against negative values" --json
 ```
 
-`patch.md` (and any files the producer edited) land under
-`.ai/runs/<run-id>/patch/iter-NNN/`. `approval: commit` is a protected action —
-`mivia-agent` requires a fresh quality stamp before it allows the commit.
+The named run artifact `patch.md` is written under
+`.ai/runs/<run-id>/patch/iter-NNN/` by the orchestrator. Adapter worktree edits
+are separate and are not automatically confined to `.ai/runs/`.
+`approval: protect:commit` requires a fresh quality stamp and policy decision
+before the adapter runs; it is not itself a Git stage or commit.
 
 ## 5. Read-only review loop (GLM-5.2 only)
 
 Use this when an artifact already exists and you only want a verdict — **no
-file writing anywhere**. Neither step gets `approval: commit`:
+file writing anywhere**. Neither step gets `approval: protect:commit`:
 
 ```yaml
 version: 1
@@ -160,7 +163,7 @@ repo is approved for merge or release.
 ## 6. Research loop (read-only notes, then review)
 
 Research produces notes, not repo changes. The producer is **read-only**: no
-`approval: commit`, low `max_turns`, and its artifact is a notes file rather
+`approval: protect:commit`, low `max_turns`, and its artifact is a notes file rather
 than a patch:
 
 ```yaml
@@ -176,7 +179,7 @@ steps:
     producer: zai
     model: glm-5-turbo
     artifact: research.md      # notes artifact, not a repo patch
-    max_turns: 6               # READ-ONLY: no approval: commit
+    max_turns: 6               # READ-ONLY: no approval: protect:commit
     timeout: 10m
   - id: review
     reviewers:

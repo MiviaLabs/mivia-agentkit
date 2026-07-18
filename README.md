@@ -100,7 +100,7 @@ ZAI/GLM-5-Turbo smoke workflows (all use `model: glm-5-turbo`, no thinking):
 | --- | --- | --- |
 | `zai-smoke-research` | Read-only research + review | no |
 | `zai-smoke-review` | Review-only of an existing artifact | no |
-| `zai-smoke-patch` | Write a patch (`approval: commit`) + review | yes |
+| `zai-smoke-patch` | Write a patch artifact (`approval: protect:commit` stamp/policy gate, not a Git commit) + review | yes |
 
 ## Current Capabilities
 

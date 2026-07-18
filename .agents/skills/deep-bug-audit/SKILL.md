@@ -13,6 +13,8 @@ Read `.ai/skills/deep-bug-audit/SKILL.md` first. Follow `AGENTS.md` and `.ai/rul
 
 Use `mivia-agent-report/v1` from `.ai/templates/agent-report-v1.md`; do not define a Codex-specific report shape.
 
+Ordinary deep-bug-audit stays report-only. Commit-capable repair requires explicit `mivia-agent campaign run` with a disabled-by-default campaign and an independent confirmer.
+
 Codex-specific behavior:
 
 - Inspect the live diff before findings.

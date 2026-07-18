@@ -6,29 +6,62 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os/exec"
+	"runtime"
 	"testing"
 	"time"
 )
 
 func TestOSRunnerRespectsTimeout(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
-	_, err := (OSRunner{}).Run(ctx, []string{"sleep", "30"}, nil, "")
+	_, err := (OSRunner{}).Run(ctx, longSleepArgs(), nil, "")
 	if !errors.Is(err, ErrCommandTimeout) {
 		t.Fatalf("Run() error = %v, want ErrCommandTimeout", err)
 	}
 }
 
 func TestOSRunnerTruncatesLargeStdout(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	// Windows CI cannot rely on Unix `yes | head`; generate ~1.2MiB portably.
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	res, err := (OSRunner{}).Run(ctx, []string{"sh", "-c", "yes x | head -c 1200000"}, nil, "")
+	res, err := (OSRunner{}).Run(ctx, largeStdoutArgs(t), nil, "")
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 	if len(res.Stdout) != maxCapturedBytes {
 		t.Fatalf("stdout len = %d, want %d", len(res.Stdout), maxCapturedBytes)
 	}
+}
+
+// longSleepArgs returns a portable command that sleeps longer than the test timeout.
+func longSleepArgs() []string {
+	if runtime.GOOS == "windows" {
+		// PowerShell sleep; available on GitHub windows-latest runners.
+		return []string{"powershell", "-NoProfile", "-Command", "Start-Sleep -Seconds 30"}
+	}
+	return []string{"sleep", "30"}
+}
+
+// largeStdoutArgs returns a portable command that writes > maxCapturedBytes to stdout.
+func largeStdoutArgs(t *testing.T) []string {
+	t.Helper()
+	// Prefer Python when available (common on GHA linux/mac/windows images).
+	if path, err := exec.LookPath("python3"); err == nil {
+		return []string{path, "-c", "import sys; sys.stdout.buffer.write(b'x'*1200000)"}
+	}
+	if path, err := exec.LookPath("python"); err == nil {
+		return []string{path, "-c", "import sys; sys.stdout.buffer.write(b'x'*1200000)"}
+	}
+	if runtime.GOOS == "windows" {
+		// Fall back to PowerShell without Unix pipeline tools (fast fill, no per-byte loop).
+		return []string{
+			"powershell", "-NoProfile", "-Command",
+			"$b = [byte[]]::new(1200000); [Array]::Fill($b, [byte]120); " +
+				"[Console]::OpenStandardOutput().Write($b, 0, $b.Length)",
+		}
+	}
+	return []string{"sh", "-c", "yes x | head -c 1200000"}
 }
 
 func TestOSRunnerMissingCommandReturnsError(t *testing.T) {

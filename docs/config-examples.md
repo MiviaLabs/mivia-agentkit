@@ -98,7 +98,8 @@ loops:
       - id: patch
         producer: codex
         artifact: patch.md
-        approval: commit
+        # protect:commit = stamp/policy gate only; not a Git commit
+        approval: protect:commit
         max_turns: 4
         timeout: 10m
       - id: review

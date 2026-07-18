@@ -93,6 +93,7 @@ func TestListStandardProfileReturnsExpectedFiles(t *testing.T) {
 		".ai/skills/deep-bug-audit/SKILL.md",
 		".ai/skills/mivia-agent-workflows/SKILL.md",
 		".ai/skills/test-coverage-audit/SKILL.md",
+		".ai/templates/agent-report-v1.md",
 		".ai/workflows/bug-audit-loop.yaml",
 		".ai/workflows/research-loop.yaml",
 		".claude/settings.json",

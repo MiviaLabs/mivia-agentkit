@@ -51,6 +51,27 @@ Model/effort precedence is:
 
 Strict-profile loops that end in a protected action must use `majority` or `unanimous`; `first-pass` is rejected.
 
+## Supervised Campaigns (Not Loops)
+
+`config.Loop` remains the bounded `mivia-agent run` surface. Supervised audit-repair campaigns are a separate, disabled-by-default contract under `campaigns:` in `mivia-agent.yaml`.
+
+```bash
+./mivia-agent campaign run --repo . --campaign deep-bug-audit-repair --json
+./mivia-agent campaign status --repo . --run <id> --json
+./mivia-agent campaign resume --repo . --run <id> --json
+```
+
+Operator rules:
+
+- Finite cycles, duration caps, and no-progress stops; never an unbounded self-loop.
+- `--continuous` is interactive TTY only; CI/noninteractive environments are rejected.
+- Ordinary deep-bug-audit and the host audit-loop hook stay **report-only** and do not commit.
+- Commit-capable campaigns require an independently configured confirmer different from the auditor. A one-adapter self-hosted setup fails closed.
+- Candidates always go through the independent confirmer; `commit_enabled: false` is audit→confirm only (no fix/commit failure).
+- Only the coordinator performs scoped commits (`CommitScoped`) on literal `allowed_paths` in the `--repo` worktree; no auto-push, force, reset, clean, or PR. Multi-word `verifier_profile` values fail closed (`true` / `go-test` / single PATH token only).
+- `campaign resume --run <id>` continues a non-terminal run with remaining budget from the next audit boundary; it is not inspect-only status.
+- Local fixture adapters (`local`, `local-*`) support offline integration tests. Configured orchestrable adapters (codex, claude, and other approved runtime adapters) are invoked for campaign auditor/confirmer/fix and must return typed `mivia-agent-campaign-evidence/v1`; missing, unapproved, or non-evidence outputs fail closed.
+
 ## Consensus Modes
 
 - `majority`

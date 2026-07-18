@@ -20,6 +20,7 @@ This sets `core.hooksPath=.githooks`, so Git runs the committed hooks in this re
 - `make audit-loop-test` runs audit loop Stop-hook contract tests.
 - `make plan-contract-test` runs agent plan contract and planning hook tests.
 - `make skill-contract-test` runs skill report contract tests.
+- `make telemetry-contract-test` runs report telemetry / false-commit contract tests (`scripts/test_report_telemetry_contracts.py`).
 - `make go-check` runs Go format/test/vet/build checks when `go.mod` exists.
 
 ## Pre-Commit
@@ -34,6 +35,7 @@ This sets `core.hooksPath=.githooks`, so Git runs the committed hooks in this re
 - Audit loop Stop-hook contract tests
 - Agent plan contract and planning hook tests
 - Skill report contract tests
+- Report telemetry contract tests (`scripts/test_report_telemetry_contracts.py`)
 - `semgrep --config semgrep/agent-standards.yml --error --skip-unknown-extensions --metrics off` on staged files
 - writes a fresh `.git/mivia-agent-precommit-summary` record for `prepare-commit-msg`
 - records the exact `agent config verification passed` result in the commit-message `Quality:` line
@@ -41,6 +43,7 @@ This sets `core.hooksPath=.githooks`, so Git runs the committed hooks in this re
 - records `audit loop tests passed` in the commit-message `Quality:` line
 - records `plan contract tests passed` in the commit-message `Quality:` line
 - records `skill contract tests passed` in the commit-message `Quality:` line
+- records `telemetry contract tests passed` in the commit-message `Quality:` line
 
 ## Prepare-Commit-Msg
 
@@ -68,6 +71,7 @@ This sets `core.hooksPath=.githooks`, so Git runs the committed hooks in this re
 - Audit loop Stop-hook contract tests
 - Agent plan contract and planning hook tests
 - Skill report contract tests
+- Report telemetry contract tests (`scripts/test_report_telemetry_contracts.py`)
 - full-repo Semgrep policy scan
 - when `go.mod` exists: `gofmt -l`, `go test ./...`, `go vet ./...`, and `go build ./cmd/mivia-agent` once that command exists
 
@@ -90,6 +94,12 @@ Planning hook details live in `docs/agent-planning.md`. Update `.ai/policy/agent
 Audit, coverage, review, delivery, and handoff skills must emit `mivia-agent-report/v1` from `.ai/templates/agent-report-v1.md`. Keep the result enum, finding table, command table, residual risk, and next action stable so reports stay easy to parse.
 
 Update `.ai/templates/agent-report-v1.md`, `.ai/skills/*/SKILL.md`, `.claude/skills/*/SKILL.md`, and `scripts/test_skill_contracts.py` together when the report contract changes.
+
+## Report Telemetry Contracts
+
+Report surfaces must not invent elapsed time, tokens, cost, throughput, or efficiency. Use runtime-owned metrics or render `NOT_MEASURED`.
+
+Update `.ai/templates/agent-report-v1.md`, `.ai/skills/*/SKILL.md`, `scripts/test_report_telemetry_contracts.py`, git hooks, and `scripts/verify_agent_config.py` together when the telemetry contract changes.
 
 ## Policy Shape
 
