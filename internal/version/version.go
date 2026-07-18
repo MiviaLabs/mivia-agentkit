@@ -3,7 +3,7 @@
 package version
 
 // Version is the mivia-agent version and can be overridden with -ldflags.
-var Version = "v0.3.2-dev"
+var Version = "v0.5.0"
 
 // Commit is the source revision embedded at link time for release builds.
 var Commit = "unknown"
