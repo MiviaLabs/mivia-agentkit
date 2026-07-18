@@ -3,6 +3,8 @@
 package auditcampaign
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -90,5 +92,105 @@ func TestEvidenceCandidateNotCommitEligible(t *testing.T) {
 	}
 	if e.CommitEligible() {
 		t.Fatalf("candidate must not be commit eligible")
+	}
+}
+
+func TestEvidenceAcceptsReverifiableHandoff(t *testing.T) {
+	raw := []byte(`{
+  "schema": "mivia-agent-campaign-evidence/v1",
+  "campaign_run": "run-1",
+  "cycle": 1,
+  "baseline_head": "abc123",
+  "disposition": "candidate",
+  "finding_fingerprint": "fpdeadbeef",
+  "finding_claim": "nil deref on empty verifier argv under internal/cli",
+  "path_hints": ["internal/cli/campaign_adapters.go"],
+  "changed_path_ids": ["p1"],
+  "progress": 0
+}`)
+	e, err := DecodeEvidence(raw)
+	if err != nil {
+		t.Fatalf("DecodeEvidence() error = %v", err)
+	}
+	if !e.HasReverifiableHandoff() {
+		t.Fatalf("HasReverifiableHandoff() = false, want true")
+	}
+	if e.FindingClaim == "" || len(e.PathHints) != 1 {
+		t.Fatalf("handoff fields = claim %q paths %v", e.FindingClaim, e.PathHints)
+	}
+	if e.CommitEligible() {
+		t.Fatalf("candidate with handoff must not be commit eligible")
+	}
+}
+
+func TestEvidenceRejectsSecretLikeFindingClaim(t *testing.T) {
+	raw := []byte(`{
+  "schema": "mivia-agent-campaign-evidence/v1",
+  "campaign_run": "run-1",
+  "cycle": 0,
+  "baseline_head": "abc",
+  "finding_claim": "leaked Bearer abcdefghijklmnop token"
+}`)
+	_, err := DecodeEvidence(raw)
+	if err == nil || !strings.Contains(err.Error(), "secret-like") {
+		t.Fatalf("error = %v, want secret-like claim rejection", err)
+	}
+}
+
+func TestEvidenceRejectsOverlongFindingClaim(t *testing.T) {
+	claim := strings.Repeat("a", MaxFindingClaimBytes+1)
+	raw := []byte(fmt.Sprintf(`{
+  "schema": "mivia-agent-campaign-evidence/v1",
+  "campaign_run": "run-1",
+  "cycle": 0,
+  "baseline_head": "abc",
+  "finding_claim": %q
+}`, claim))
+	_, err := DecodeEvidence(raw)
+	if err == nil || !strings.Contains(err.Error(), "finding_claim exceeds") {
+		t.Fatalf("error = %v, want overlong claim rejection", err)
+	}
+}
+
+func TestEvidenceRejectsAbsolutePathHints(t *testing.T) {
+	raw := []byte(`{
+  "schema": "mivia-agent-campaign-evidence/v1",
+  "campaign_run": "run-1",
+  "cycle": 0,
+  "baseline_head": "abc",
+  "path_hints": ["/home/user/secret.go"]
+}`)
+	_, err := DecodeEvidence(raw)
+	if err == nil || !strings.Contains(err.Error(), "repo-relative") {
+		t.Fatalf("error = %v, want repo-relative path_hints rejection", err)
+	}
+}
+
+func TestEvidenceRejectsSecretPathHints(t *testing.T) {
+	raw := []byte(`{
+  "schema": "mivia-agent-campaign-evidence/v1",
+  "campaign_run": "run-1",
+  "cycle": 0,
+  "baseline_head": "abc",
+  "path_hints": [".env.local"]
+}`)
+	_, err := DecodeEvidence(raw)
+	if err == nil || !strings.Contains(err.Error(), "secret-like") {
+		t.Fatalf("error = %v, want secret-like path_hints rejection", err)
+	}
+}
+
+func TestEvidenceRejectsTooManyPathHints(t *testing.T) {
+	hints := make([]string, MaxPathHints+1)
+	for i := range hints {
+		hints[i] = fmt.Sprintf("internal/file%d.go", i)
+	}
+	b, _ := json.Marshal(map[string]any{
+		"schema": EvidenceSchema, "campaign_run": "r", "cycle": 0, "baseline_head": "h",
+		"path_hints": hints,
+	})
+	_, err := DecodeEvidence(b)
+	if err == nil || !strings.Contains(err.Error(), "path_hints exceeds") {
+		t.Fatalf("error = %v, want path_hints exceeds rejection", err)
 	}
 }

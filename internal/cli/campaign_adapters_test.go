@@ -701,10 +701,21 @@ func TestCampaignPhasePromptIncludesPriorFinding(t *testing.T) {
 		Disposition:        auditcampaign.DispositionCandidate,
 		FindingFingerprint: "fp-prior-1",
 		ChangedPathIDs:     []string{"p1"},
+		FindingClaim:       "nil deref in verifier argv builder",
+		PathHints:          []string{"internal/cli/campaign_adapters.go"},
 	}
 	confirmPrompt := campaignPhasePrompt(auditcampaign.PhaseConfirming, "c", "run1", 2, "abc", camp, prior)
 	if !strings.Contains(confirmPrompt, "PRIOR_AUDIT") || !strings.Contains(confirmPrompt, "fp-prior-1") {
 		t.Fatalf("confirm prompt missing prior finding: %s", confirmPrompt)
+	}
+	if !strings.Contains(confirmPrompt, "PRIOR_FINDING_CLAIM=nil deref in verifier argv builder") {
+		t.Fatalf("confirm prompt missing PRIOR_FINDING_CLAIM: %s", confirmPrompt)
+	}
+	if !strings.Contains(confirmPrompt, "PRIOR_PATH_HINTS=internal/cli/campaign_adapters.go") {
+		t.Fatalf("confirm prompt missing PRIOR_PATH_HINTS: %s", confirmPrompt)
+	}
+	if !strings.Contains(confirmPrompt, "finding_claim") || !strings.Contains(confirmPrompt, "path_hints") {
+		t.Fatalf("confirm prompt missing handoff field names in examples: %s", confirmPrompt)
 	}
 	if !strings.Contains(confirmPrompt, "mivia-agent-campaign-evidence/v1") {
 		t.Fatalf("confirm prompt missing schema example")
@@ -716,8 +727,15 @@ func TestCampaignPhasePromptIncludesPriorFinding(t *testing.T) {
 	if !strings.Contains(fixPrompt, "PRIOR_CONFIRM") || !strings.Contains(fixPrompt, "fp-prior-1") {
 		t.Fatalf("fix prompt missing prior confirm: %s", fixPrompt)
 	}
+	if !strings.Contains(fixPrompt, "PRIOR_FINDING_CLAIM=") || !strings.Contains(fixPrompt, "PRIOR_PATH_HINTS=") {
+		t.Fatalf("fix prompt missing handoff priors: %s", fixPrompt)
+	}
 	if !strings.Contains(fixPrompt, "allowed_paths=internal") {
 		t.Fatalf("fix prompt missing allowed_paths")
+	}
+	auditPrompt := campaignPhasePrompt(auditcampaign.PhaseAuditing, "c", "run1", 1, "abc", camp, auditcampaign.Evidence{})
+	if !strings.Contains(auditPrompt, "finding_claim") || !strings.Contains(auditPrompt, "path_hints") {
+		t.Fatalf("audit prompt must require handoff for candidates: %s", auditPrompt)
 	}
 }
 
@@ -741,6 +759,7 @@ func TestCampaignHostConfirmPromptReceivesAuditPrior(t *testing.T) {
 	prior := auditcampaign.Evidence{
 		Schema: auditcampaign.EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: 1,
 		Disposition: auditcampaign.DispositionCandidate, FindingFingerprint: "fp-prior-1",
+		FindingClaim: "nil deref in host confirm path", PathHints: []string{"internal/cli/campaign_adapters.go"},
 	}
 	_, err = h.Confirm(context.Background(), auditcampaign.PhaseConfirming, 1, prior)
 	if err != nil {
@@ -751,6 +770,62 @@ func TestCampaignHostConfirmPromptReceivesAuditPrior(t *testing.T) {
 	}
 	if !strings.Contains(confirmer.prompts[0], "fp-prior-1") {
 		t.Fatalf("confirmer prompt missing prior fingerprint: %q", confirmer.prompts[0])
+	}
+	if !strings.Contains(confirmer.prompts[0], "PRIOR_FINDING_CLAIM=nil deref in host confirm path") {
+		t.Fatalf("confirmer prompt missing claim handoff: %q", confirmer.prompts[0])
+	}
+	if !strings.Contains(confirmer.prompts[0], "PRIOR_PATH_HINTS=internal/cli/campaign_adapters.go") {
+		t.Fatalf("confirmer prompt missing path_hints handoff: %q", confirmer.prompts[0])
+	}
+}
+
+func TestCampaignHostHandoffRoundTripCommitEligible(t *testing.T) {
+	// Shipped host path: audit candidate with re-verifiable handoff → confirm
+	// bound to same fingerprint becomes CommitEligible (paths/verifier filled).
+	auditBody := []byte(`{"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"placeholder","cycle":0,"baseline_head":"placeholder","disposition":"candidate","finding_fingerprint":"fp-handoff-1","finding_claim":"off-by-one in path policy join","path_hints":["internal/pathpolicy/pathpolicy.go"],"changed_path_ids":["p1"],"verifier_ref":"","progress":0}`)
+	// Confirmer omits claim/path_hints; normalize must rebind from prior for handoff continuity
+	// and fill verifier for commit eligibility.
+	confirmBody := []byte(`{"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"placeholder","cycle":0,"baseline_head":"placeholder","disposition":"confirmed","finding_fingerprint":"fp-handoff-1","finding_claim":"","path_hints":[],"changed_path_ids":["p1"],"verifier_ref":"","progress":1}`)
+	auditor := &scriptedCampaignAdapter{name: "codex", stdout: auditBody}
+	confirmer := &scriptedCampaignAdapter{name: "kimi", stdout: confirmBody}
+	reg, err := adapter.NewRegistry(auditor, confirmer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("codex", "kimi", "kimi")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	camp.CommitEnabled = true
+	camp.VerifierProfile = "go-test"
+	camp.AllowedPaths = []string{"internal", "cmd"}
+	h := &campaignHost{
+		repo: t.TempDir(), runID: "r-handoff", name: "c", camp: camp, manifest: m,
+		adapters: reg, expectedHead: "unknown",
+	}
+	aud, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1, auditcampaign.Evidence{})
+	if err != nil {
+		t.Fatalf("Audit: %v", err)
+	}
+	if !aud.HasReverifiableHandoff() {
+		t.Fatalf("audit missing handoff: %+v", aud)
+	}
+	cev, err := h.Confirm(context.Background(), auditcampaign.PhaseConfirming, 1, aud)
+	if err != nil {
+		t.Fatalf("Confirm: %v", err)
+	}
+	if !cev.CommitEligible() {
+		t.Fatalf("confirm not CommitEligible after handoff path: %+v", cev)
+	}
+	if cev.FindingFingerprint != "fp-handoff-1" {
+		t.Fatalf("fingerprint rebind failed: %+v", cev)
+	}
+	if cev.FindingClaim != "off-by-one in path policy join" {
+		t.Fatalf("finding_claim not carried from prior: %+v", cev)
+	}
+	if len(cev.PathHints) != 1 || cev.PathHints[0] != "internal/pathpolicy/pathpolicy.go" {
+		t.Fatalf("path_hints not carried from prior: %+v", cev)
+	}
+	if !strings.Contains(confirmer.prompts[0], "PRIOR_FINDING_CLAIM=off-by-one in path policy join") {
+		t.Fatalf("confirm prompt missing audit claim: %q", confirmer.prompts[0])
 	}
 }
 
@@ -915,6 +990,9 @@ func TestCampaignEvidenceSchemaTwinsMatch(t *testing.T) {
 	}
 	if !bytes.Contains(cliSchema, []byte(`"required"`)) {
 		t.Fatal("schema missing required (OpenAI strict needs all properties required)")
+	}
+	if !bytes.Contains(cliSchema, []byte(`"finding_claim"`)) || !bytes.Contains(cliSchema, []byte(`"path_hints"`)) {
+		t.Fatal("schema missing handoff fields finding_claim/path_hints")
 	}
 }
 

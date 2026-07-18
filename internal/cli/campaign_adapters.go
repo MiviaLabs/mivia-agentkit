@@ -372,6 +372,14 @@ func (h *campaignHost) normalizeCommitEvidence(ev, prior auditcampaign.Evidence,
 			ev.FindingFingerprint = prior.FindingFingerprint
 		}
 	}
+	// Carry re-verifiable handoff from prior even when commit is disabled
+	// (confirm-only campaigns still need claim/path continuity for the next phase).
+	if strings.TrimSpace(ev.FindingClaim) == "" && strings.TrimSpace(prior.FindingClaim) != "" {
+		ev.FindingClaim = prior.FindingClaim
+	}
+	if len(ev.PathHints) == 0 && len(prior.PathHints) > 0 {
+		ev.PathHints = append([]string(nil), prior.PathHints...)
+	}
 	if !h.camp.CommitEnabled {
 		return ev
 	}
@@ -548,50 +556,62 @@ func campaignPhasePrompt(phase auditcampaign.Phase, campaign, runID string, cycl
 		fpEx = prior.FindingFingerprint
 	}
 	cycleS := fmt.Sprintf("%d", cycle)
+	// Full-key skeleton required by OpenAI/Claude structured outputs (empty string/[] ok).
+	fullKeys := `"finding_fingerprint":"","disposition":"","finding_claim":"","path_hints":[],"changed_path_ids":[],"verifier_ref":"","progress":0`
 	base := []string{
 		"CRITICAL: Your entire final response must be exactly one JSON object. No Markdown fences, no prose before/after.",
 		`Schema must be exactly: "mivia-agent-campaign-evidence/v1"`,
 		"Do not invent telemetry numbers. Do not stage, commit, push, open a PR, or rewrite git history.",
 		fmt.Sprintf("campaign=%s campaign_run=%s cycle=%s baseline_head=%s", campaign, runID, cycleS, head),
-		"Use opaque finding_fingerprint and changed_path_ids only (no raw filesystem paths or secrets in those fields).",
+		"Use opaque finding_fingerprint and changed_path_ids (no raw secrets in those fields).",
+		"finding_claim is a short non-secret re-verifiable claim (single line, <=240 chars). path_hints are repo-relative paths the confirmer may open (no .env/secrets).",
 		// OpenAI/Claude structured outputs require all property keys present (empty string/[] ok).
-		`Clean example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"` + runID + `","cycle":` + cycleS + `,"baseline_head":"` + head + `","finding_fingerprint":"","disposition":"","changed_path_ids":[],"verifier_ref":"","progress":0}`,
+		`Clean example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"` + runID + `","cycle":` + cycleS + `,"baseline_head":"` + head + `",` + fullKeys + `}`,
 	}
 	// Phase-specific examples avoid teaching the wrong disposition/fingerprint.
 	switch phase {
 	case auditcampaign.PhaseAuditing:
 		base = append(base,
-			`Candidate example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"candidate","finding_fingerprint":"`+fpEx+`","changed_path_ids":[],"verifier_ref":"","progress":0}`,
+			`Candidate example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"candidate","finding_fingerprint":"`+fpEx+`","finding_claim":"nil deref in error path under internal package","path_hints":["internal/cli/campaign_adapters.go"],"changed_path_ids":["p1"],"verifier_ref":"","progress":0}`,
 		)
 		return strings.Join(append([]string{
 			"You are the campaign auditor for supervised deep-bug-audit repair.",
 			"Inspect the repository for one concrete, high-confidence bug if present.",
-			"If no concrete finding: emit the clean example (omit disposition, empty fingerprint).",
-			"If a finding is present: disposition candidate with a unique opaque finding_fingerprint (do not use placeholder text like OPAQUE_FP literally if you invent one — mint a short opaque id).",
+			"If no concrete finding: emit the clean example (empty disposition and fingerprint).",
+			"If a finding is present: disposition candidate with a unique opaque finding_fingerprint (do not use placeholder text like OPAQUE_FP literally — mint a short opaque id).",
+			"REQUIRED for candidates: set finding_claim (short non-secret bug class/location claim) AND path_hints (1+ repo-relative files under allowed product paths) so the independent confirmer can re-verify without only a fingerprint.",
 			"Prefer real correctness/security bugs in allowed product code; skip style-only nits.",
 		}, base...), "\n")
 	case auditcampaign.PhaseConfirming:
+		vref := strings.TrimSpace(camp.VerifierProfile)
 		base = append(base,
-			`Confirmed example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"confirmed","finding_fingerprint":"`+fpEx+`","changed_path_ids":["p1"],"verifier_ref":"`+strings.TrimSpace(camp.VerifierProfile)+`","progress":1}`,
-			`Rejected example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"rejected","finding_fingerprint":"`+fpEx+`","changed_path_ids":[],"verifier_ref":"","progress":0}`,
+			`Confirmed example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"confirmed","finding_fingerprint":"`+fpEx+`","finding_claim":"nil deref in error path under internal package","path_hints":["internal/cli/campaign_adapters.go"],"changed_path_ids":["p1"],"verifier_ref":"`+vref+`","progress":1}`,
+			`Rejected example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"rejected","finding_fingerprint":"`+fpEx+`","finding_claim":"","path_hints":[],"changed_path_ids":[],"verifier_ref":"","progress":0}`,
 		)
 		lines := []string{
 			"You are the independent confirmer for supervised deep-bug-audit repair (separate invocation from the auditor).",
-			"Independently re-check the PRIOR_AUDIT finding against the live repo.",
-			"If the finding is real: disposition confirmed. finding_fingerprint MUST equal PRIOR_AUDIT finding_fingerprint exactly.",
-			"Also set changed_path_ids (opaque) and verifier_ref (use the campaign verifier name when unsure).",
+			"Independently re-check the PRIOR_AUDIT finding against the live repo using finding_claim and path_hints (not fingerprint alone).",
+			"Open the path_hints files and validate the claim. If the finding is real: disposition confirmed. finding_fingerprint MUST equal PRIOR_AUDIT finding_fingerprint exactly.",
+			"Also set changed_path_ids (opaque), verifier_ref (use the campaign verifier name when unsure), and copy finding_claim/path_hints from PRIOR_AUDIT when still accurate.",
 			"If not real: disposition rejected with the SAME finding_fingerprint as PRIOR_AUDIT.",
 			"Do not invent a new finding_fingerprint. Do not copy unrelated example ids.",
 			"Be decisive and fast: at most a few targeted file reads. Do not spawn subagents or long tool loops.",
 			"Your final message MUST be exactly one campaign evidence JSON object (schema mivia-agent-campaign-evidence/v1).",
 		}
-		if prior.FindingFingerprint != "" || prior.Disposition != "" {
+		if prior.FindingFingerprint != "" || prior.Disposition != "" || prior.FindingClaim != "" || len(prior.PathHints) > 0 {
 			lines = append(lines, fmt.Sprintf(
-				"PRIOR_AUDIT disposition=%s finding_fingerprint=%s changed_path_ids=%s",
+				"PRIOR_AUDIT disposition=%s finding_fingerprint=%s changed_path_ids=%s finding_claim=%q path_hints=%s",
 				prior.Disposition, prior.FindingFingerprint, strings.Join(prior.ChangedPathIDs, ","),
+				prior.FindingClaim, strings.Join(prior.PathHints, ","),
 			))
 			if prior.FindingFingerprint != "" {
 				lines = append(lines, "REQUIRED_FINDING_FINGERPRINT="+prior.FindingFingerprint)
+			}
+			if prior.FindingClaim != "" {
+				lines = append(lines, "PRIOR_FINDING_CLAIM="+prior.FindingClaim)
+			}
+			if len(prior.PathHints) > 0 {
+				lines = append(lines, "PRIOR_PATH_HINTS="+strings.Join(prior.PathHints, ","))
 			}
 		}
 		return strings.Join(append(lines, base...), "\n")
@@ -605,7 +625,7 @@ func campaignPhasePrompt(phase auditcampaign.Phase, campaign, runID string, cycl
 			vref = "true"
 		}
 		base = append(base,
-			`Fixed example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"fixed","finding_fingerprint":"`+fpEx+`","changed_path_ids":["p1"],"verifier_ref":"`+vref+`","progress":1}`,
+			`Fixed example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"fixed","finding_fingerprint":"`+fpEx+`","finding_claim":"nil deref in error path under internal package","path_hints":["internal/cli/campaign_adapters.go"],"changed_path_ids":["p1"],"verifier_ref":"`+vref+`","progress":1}`,
 		)
 		lines := []string{
 			"You are the campaign fixer for supervised deep-bug-audit repair.",
@@ -613,15 +633,22 @@ func campaignPhasePrompt(phase auditcampaign.Phase, campaign, runID string, cycl
 			fmt.Sprintf("allowed_paths=%s verifier_profile=%s", paths, camp.VerifierProfile),
 			"Do not git commit (coordinator commits). After editing files, emit Fixed evidence.",
 			"finding_fingerprint MUST equal PRIOR_CONFIRM finding_fingerprint exactly.",
-			"Set disposition fixed with changed_path_ids and verifier_ref.",
+			"Use PRIOR_FINDING_CLAIM and PRIOR_PATH_HINTS to locate the bug. Set disposition fixed with changed_path_ids and verifier_ref.",
 		}
-		if prior.FindingFingerprint != "" || prior.Disposition != "" {
+		if prior.FindingFingerprint != "" || prior.Disposition != "" || prior.FindingClaim != "" || len(prior.PathHints) > 0 {
 			lines = append(lines, fmt.Sprintf(
-				"PRIOR_CONFIRM disposition=%s finding_fingerprint=%s changed_path_ids=%s verifier_ref=%s",
+				"PRIOR_CONFIRM disposition=%s finding_fingerprint=%s changed_path_ids=%s verifier_ref=%s finding_claim=%q path_hints=%s",
 				prior.Disposition, prior.FindingFingerprint, strings.Join(prior.ChangedPathIDs, ","), prior.VerifierRef,
+				prior.FindingClaim, strings.Join(prior.PathHints, ","),
 			))
 			if prior.FindingFingerprint != "" {
 				lines = append(lines, "REQUIRED_FINDING_FINGERPRINT="+prior.FindingFingerprint)
+			}
+			if prior.FindingClaim != "" {
+				lines = append(lines, "PRIOR_FINDING_CLAIM="+prior.FindingClaim)
+			}
+			if len(prior.PathHints) > 0 {
+				lines = append(lines, "PRIOR_PATH_HINTS="+strings.Join(prior.PathHints, ","))
 			}
 		}
 		return strings.Join(append(lines, base...), "\n")
