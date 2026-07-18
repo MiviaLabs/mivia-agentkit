@@ -16,6 +16,7 @@ import (
 	"github.com/MiviaLabs/mivia-agentkit/internal/auditcampaign"
 	"github.com/MiviaLabs/mivia-agentkit/internal/config"
 	"github.com/MiviaLabs/mivia-agentkit/internal/gitstate"
+	"github.com/MiviaLabs/mivia-agentkit/internal/pathpolicy"
 	"github.com/MiviaLabs/mivia-agentkit/internal/policy"
 	"github.com/MiviaLabs/mivia-agentkit/internal/preflight"
 )
@@ -511,7 +512,11 @@ func (h *campaignHost) applyFixWrites(cycle int) error {
 		if strings.HasPrefix(clean, ".ai/runs/") || clean == ".ai/runs" || strings.HasPrefix(clean, ".git/") {
 			return fmt.Errorf("fix write path %q is denied", clean)
 		}
-		abs := filepath.Join(h.repo, filepath.FromSlash(clean))
+		// pathpolicy Abs rejects secret paths and symlink escape outside repo.
+		abs, err := pathpolicy.NewDefault().Abs(h.repo, clean)
+		if err != nil {
+			return fmt.Errorf("fix write path %q: %w", clean, err)
+		}
 		if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
 			return err
 		}
@@ -545,7 +550,10 @@ func (h *campaignHost) Commit(ctx context.Context, e auditcampaign.Evidence) (st
 	if e.BaselineHead != "" && e.BaselineHead != "unknown" && e.BaselineHead != head {
 		return "", fmt.Errorf("%s: baseline %s != HEAD %s", auditcampaign.TerminalUnauthorizedHead, e.BaselineHead, head)
 	}
-	verifier := verifierArgv(h.camp.VerifierProfile)
+	verifier, err := verifierArgv(h.camp.VerifierProfile)
+	if err != nil {
+		return "", err
+	}
 	auditPath := filepath.Join(h.repo, ".ai", "audit.jsonl")
 	if h.manifest.Governance.AuditLog != "" {
 		auditPath = filepath.Join(h.repo, filepath.FromSlash(h.manifest.Governance.AuditLog))
@@ -610,19 +618,22 @@ func (h *campaignHost) Commit(ctx context.Context, e auditcampaign.Evidence) (st
 }
 
 // verifierArgv maps a campaign verifier_profile to an argv array (no shell).
-func verifierArgv(profile string) []string {
+// Multi-word free-form profiles fail closed; they never silently map to true.
+func verifierArgv(profile string) ([]string, error) {
 	profile = strings.TrimSpace(profile)
 	switch profile {
 	case "", "true", "noop", "true-cmd":
-		return []string{"true"}
+		return []string{"true"}, nil
 	case "go-test":
-		return []string{"go", "test", "./..."}
+		return []string{"go", "test", "./..."}, nil
 	default:
-		// Single token profile names run as a bare command (must be on PATH).
+		// Multi-word profiles are not shell-expanded; fail closed (no silent true).
 		if strings.ContainsAny(profile, " \t\n\r") {
-			// Multi-word profiles are not shell-expanded; reject for safety.
-			return []string{"true"}
+			return nil, fmt.Errorf("verifier_profile %q is multi-word; use a named profile (true, go-test) or a single PATH token", profile)
 		}
-		return []string{profile}
+		if strings.ContainsAny(profile, "*?[]{}") {
+			return nil, fmt.Errorf("verifier_profile %q contains shell/glob metacharacters", profile)
+		}
+		return []string{profile}, nil
 	}
 }

@@ -3,7 +3,6 @@
 package gitstate
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -57,6 +56,14 @@ func CommitScoped(ctx context.Context, req CommitRequest) (CommitResult, error) 
 	if strings.TrimSpace(req.Message) == "" || strings.ContainsAny(req.Message, "\n\r") {
 		return CommitResult{}, fmt.Errorf("%w: invalid message", ErrScopedCommit)
 	}
+	// Fail closed: stamp and policy gates are required for production callers.
+	// Tests must inject explicit no-op checks rather than omitting them.
+	if req.StampCheck == nil {
+		return CommitResult{}, fmt.Errorf("%w: stamp check required", ErrScopedCommit)
+	}
+	if req.PolicyCheck == nil {
+		return CommitResult{}, fmt.Errorf("%w: policy check required", ErrScopedCommit)
+	}
 	repo, err := filepath.Abs(req.Repo)
 	if err != nil {
 		return CommitResult{}, err
@@ -84,10 +91,11 @@ func CommitScoped(ctx context.Context, req CommitRequest) (CommitResult, error) 
 		paths = append(paths, np)
 	}
 
-	// Stage only allowlisted paths.
+	// Stage only allowlisted paths (literal pathspecs; globs rejected in normalize).
+	// Never use git add -A.
 	args := append([]string{"-C", repo, "add", "--"}, paths...)
-	if out, err := exec.CommandContext(ctx, "git", args...).CombinedOutput(); err != nil {
-		return CommitResult{}, fmt.Errorf("%w: git add: %v: %s", ErrScopedCommit, err, bytes.TrimSpace(out))
+	if _, err := exec.CommandContext(ctx, "git", args...).CombinedOutput(); err != nil {
+		return CommitResult{}, fmt.Errorf("%w: git add: %v", ErrScopedCommit, err)
 	}
 
 	indexHash, err := indexTreeHash(ctx, repo)
@@ -95,7 +103,7 @@ func CommitScoped(ctx context.Context, req CommitRequest) (CommitResult, error) 
 		return CommitResult{}, err
 	}
 
-	// Verifier as argv only.
+	// Verifier as argv only; empty verifier is allowed only when caller opts into true-profile.
 	if len(req.Verifier) > 0 {
 		timeout := req.VerifierTimeout
 		if timeout <= 0 {
@@ -106,20 +114,17 @@ func CommitScoped(ctx context.Context, req CommitRequest) (CommitResult, error) 
 		cmd := exec.CommandContext(vctx, req.Verifier[0], req.Verifier[1:]...)
 		cmd.Dir = repo
 		cmd.Env = safeEnv()
-		if out, err := cmd.CombinedOutput(); err != nil {
-			return CommitResult{}, fmt.Errorf("%w: verifier failed: %v: %s", ErrScopedCommit, err, bytes.TrimSpace(out))
+		if _, err := cmd.CombinedOutput(); err != nil {
+			// Do not embed raw verifier stdout/stderr (may contain secrets).
+			return CommitResult{}, fmt.Errorf("%w: verifier failed", ErrScopedCommit)
 		}
 	}
 
-	if req.StampCheck != nil {
-		if err := req.StampCheck(repo, head, indexHash, paths); err != nil {
-			return CommitResult{}, fmt.Errorf("%w: stamp: %v", ErrScopedCommit, err)
-		}
+	if err := req.StampCheck(repo, head, indexHash, paths); err != nil {
+		return CommitResult{}, fmt.Errorf("%w: stamp: %v", ErrScopedCommit, err)
 	}
-	if req.PolicyCheck != nil {
-		if err := req.PolicyCheck(repo, head, indexHash); err != nil {
-			return CommitResult{}, fmt.Errorf("%w: policy: %v", ErrScopedCommit, err)
-		}
+	if err := req.PolicyCheck(repo, head, indexHash); err != nil {
+		return CommitResult{}, fmt.Errorf("%w: policy: %v", ErrScopedCommit, err)
 	}
 
 	// Ensure index still matches accepted hash (detect mutation after stamp).
@@ -132,9 +137,9 @@ func CommitScoped(ctx context.Context, req CommitRequest) (CommitResult, error) 
 	}
 
 	commitArgs := []string{"-C", repo, "commit", "--no-verify", "-m", req.Message, "--"}
-	// commit only what is staged; still pass nothing else
-	if out, err := exec.CommandContext(ctx, "git", commitArgs...).CombinedOutput(); err != nil {
-		return CommitResult{}, fmt.Errorf("%w: commit: %v: %s", ErrScopedCommit, err, bytes.TrimSpace(out))
+	// commit only what is staged; do not embed raw git output (may leak paths/env).
+	if _, err := exec.CommandContext(ctx, "git", commitArgs...).CombinedOutput(); err != nil {
+		return CommitResult{}, fmt.Errorf("%w: commit: %v", ErrScopedCommit, err)
 	}
 	newHead, err := Head(repo)
 	if err != nil {
@@ -154,6 +159,10 @@ func normalizeScopedPath(p string) (string, error) {
 	if strings.HasPrefix(p, "/") || strings.HasPrefix(p, "~") || strings.Contains(p, "..") {
 		return "", fmt.Errorf("unsafe path %q", p)
 	}
+	// Literal paths only — pathspec globs expand staging beyond intended scope.
+	if strings.ContainsAny(p, "*?[]") || strings.Contains(p, ":(") {
+		return "", fmt.Errorf("unsafe path %q: globs not allowed", p)
+	}
 	clean := filepath.ToSlash(filepath.Clean(p))
 	if clean == ".git" || strings.HasPrefix(clean, ".git/") || clean == ".ai/runs" || strings.HasPrefix(clean, ".ai/runs/") {
 		return "", fmt.Errorf("denied path %q", p)
@@ -162,6 +171,19 @@ func normalizeScopedPath(p string) (string, error) {
 		if seg == ".git" {
 			return "", fmt.Errorf("denied path %q", p)
 		}
+	}
+	// Secret-aware deny list (aligned with pathpolicy defaults).
+	base := strings.ToLower(filepath.Base(clean))
+	lower := strings.ToLower(clean)
+	if base == ".env" || strings.HasPrefix(base, ".env.") {
+		return "", fmt.Errorf("denied path %q", p)
+	}
+	if lower == "secrets" || strings.HasPrefix(lower, "secrets/") ||
+		strings.Contains(lower, "/secrets/") || strings.HasSuffix(lower, "/secrets") {
+		return "", fmt.Errorf("denied path %q", p)
+	}
+	if strings.Contains(lower, "private") && strings.Contains(lower, "key") {
+		return "", fmt.Errorf("denied path %q", p)
 	}
 	return clean, nil
 }

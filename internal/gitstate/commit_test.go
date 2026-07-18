@@ -77,6 +77,8 @@ func TestCommitScopedRejectsDeniedPaths(t *testing.T) {
 	dir := initTempRepo(t)
 	_, err := CommitScoped(context.Background(), CommitRequest{
 		Repo: dir, AllowedPaths: []string{".ai/runs/x"}, Message: "fix(quality): x",
+		StampCheck:  func(string, string, string, []string) error { return nil },
+		PolicyCheck: func(string, string, string) error { return nil },
 	})
 	if err == nil || !strings.Contains(err.Error(), "denied") {
 		t.Fatalf("error = %v, want denied", err)
@@ -87,6 +89,8 @@ func TestCommitScopedRejectsBroadStagingBypass(t *testing.T) {
 	// Ensure API never accepts empty allowlist (would encourage broad staging).
 	_, err := CommitScoped(context.Background(), CommitRequest{
 		Repo: t.TempDir(), AllowedPaths: nil, Message: "fix(quality): x",
+		StampCheck:  func(string, string, string, []string) error { return nil },
+		PolicyCheck: func(string, string, string) error { return nil },
 	})
 	if err == nil || !strings.Contains(err.Error(), "allowed paths") {
 		t.Fatalf("error = %v, want allowed paths required", err)
@@ -112,6 +116,62 @@ func TestCommitScopedRejectsStaleStampAndPolicyDenial(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "policy") {
 		t.Fatalf("error = %v, want policy rejection", err)
+	}
+}
+
+func TestCommitScopedRejectsMissingStampAndPolicyHooks(t *testing.T) {
+	dir := initTempRepo(t)
+	_ = os.WriteFile(filepath.Join(dir, "a.go"), []byte("package a\n"), 0o644)
+	head, _ := Head(dir)
+	_, err := CommitScoped(context.Background(), CommitRequest{
+		Repo: dir, AllowedPaths: []string{"a.go"}, Message: "fix(quality): x", BaseHead: head,
+		PolicyCheck: func(string, string, string) error { return nil },
+	})
+	if err == nil || !strings.Contains(err.Error(), "stamp check required") {
+		t.Fatalf("error = %v, want stamp check required", err)
+	}
+	_, err = CommitScoped(context.Background(), CommitRequest{
+		Repo: dir, AllowedPaths: []string{"a.go"}, Message: "fix(quality): x", BaseHead: head,
+		StampCheck: func(string, string, string, []string) error { return nil },
+	})
+	if err == nil || !strings.Contains(err.Error(), "policy check required") {
+		t.Fatalf("error = %v, want policy check required", err)
+	}
+}
+
+func TestCommitScopedRejectsFailedVerifier(t *testing.T) {
+	dir := initTempRepo(t)
+	_ = os.WriteFile(filepath.Join(dir, "a.go"), []byte("package a\n"), 0o644)
+	head, _ := Head(dir)
+	_, err := CommitScoped(context.Background(), CommitRequest{
+		Repo: dir, AllowedPaths: []string{"a.go"}, Message: "fix(quality): x", BaseHead: head,
+		Verifier:    []string{"false"},
+		StampCheck:  func(string, string, string, []string) error { return nil },
+		PolicyCheck: func(string, string, string) error { return nil },
+	})
+	if err == nil || !strings.Contains(err.Error(), "verifier failed") {
+		t.Fatalf("error = %v, want verifier failed", err)
+	}
+}
+
+func TestCommitScopedRejectsGlobAndSecretPaths(t *testing.T) {
+	dir := initTempRepo(t)
+	head, _ := Head(dir)
+	_, err := CommitScoped(context.Background(), CommitRequest{
+		Repo: dir, AllowedPaths: []string{"*.go"}, Message: "fix(quality): x", BaseHead: head,
+		StampCheck:  func(string, string, string, []string) error { return nil },
+		PolicyCheck: func(string, string, string) error { return nil },
+	})
+	if err == nil || !strings.Contains(err.Error(), "glob") {
+		t.Fatalf("error = %v, want glob rejection", err)
+	}
+	_, err = CommitScoped(context.Background(), CommitRequest{
+		Repo: dir, AllowedPaths: []string{".env"}, Message: "fix(quality): x", BaseHead: head,
+		StampCheck:  func(string, string, string, []string) error { return nil },
+		PolicyCheck: func(string, string, string) error { return nil },
+	})
+	if err == nil || !strings.Contains(err.Error(), "denied") {
+		t.Fatalf("error = %v, want denied secret path", err)
 	}
 }
 

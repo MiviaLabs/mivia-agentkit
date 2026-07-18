@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/auditcampaign"
@@ -113,12 +114,17 @@ func runCampaign(cmd *cobra.Command, opt campaignOptions) error {
 	if err != nil {
 		return ExitError{Code: 1, Err: err}
 	}
+	baseline := ""
+	if head, err := gitstate.Head(repo); err == nil {
+		baseline = head
+	}
 	eng := &auditcampaign.Engine{
 		Campaign:              camp,
 		Store:                 store,
 		Continuous:            opt.continuous,
 		InteractiveContinuous: opt.confirmContinuous,
 		SelfConfirm:           camp.Auditor != "" && camp.Auditor == camp.Confirmer,
+		BaselineHead:          baseline,
 		Audit:                 host.Audit,
 		Confirm:               host.Confirm,
 		Fix:                   host.Fix,
@@ -128,7 +134,13 @@ func runCampaign(cmd *cobra.Command, opt campaignOptions) error {
 	if err != nil {
 		return ExitError{Code: 1, Err: err}
 	}
-	return writeCampaignResult(cmd, opt.jsonOut, res)
+	if err := writeCampaignResult(cmd, opt.jsonOut, res); err != nil {
+		return err
+	}
+	if !auditcampaign.SuccessTerminal(res.Terminal) {
+		return ExitError{Code: 1, Err: fmt.Errorf("campaign terminal %s: %s", res.Terminal, res.Message)}
+	}
+	return nil
 }
 
 func statusCampaign(cmd *cobra.Command, opt campaignOptions) error {
@@ -162,31 +174,75 @@ func resumeCampaign(cmd *cobra.Command, opt campaignOptions) error {
 		return ExitError{Code: 2, Err: fmt.Errorf("resume rejected in CI/noninteractive environment")}
 	}
 	repo := absRepoPath(opt.repo)
+	manifest, err := loadCampaignManifest(repo)
+	if err != nil {
+		return ExitError{Code: 2, Err: err}
+	}
+	// Campaign name is the prefix of run id: <name>-<timestamp>.
+	name := opt.runID
+	if i := strings.LastIndex(opt.runID, "-"); i > 0 {
+		// run ids are name + "-" + 20060102T150405Z; name itself may contain dashes.
+		// Prefer longest campaign key match from manifest.
+		name = matchCampaignName(manifest, opt.runID)
+	}
+	camp, ok := manifest.Campaigns[name]
+	if !ok {
+		return ExitError{Code: 2, Err: fmt.Errorf("unknown campaign for run %q", opt.runID)}
+	}
+	if !camp.Enabled {
+		return ExitError{Code: 2, Err: fmt.Errorf("campaign %q is disabled", name)}
+	}
 	store := auditcampaign.NewStore(repo, opt.runID, "cli")
 	wantHead := ""
-	wantBranch := ""
 	if head, err := gitstate.Head(repo); err == nil {
 		wantHead = head
 	}
-	if err := store.ResumePreconditions(wantBranch, wantHead, "cli"); err != nil {
-		// Empty branch skips branch check when unknown; head mismatch still fails.
-		if wantHead != "" || err.Error() != "resume rejected: head mismatch" {
-			if err.Error() == "resume rejected: branch mismatch" && wantBranch == "" {
-				// skip empty branch
-			} else if err.Error() != "resume rejected: branch mismatch" {
-				// allow load for status-like resume when only branch empty and head empty
-				if wantHead != "" {
-					return ExitError{Code: 1, Err: err}
-				}
-			}
-		}
+	if err := store.ResumePreconditions("", wantHead, "cli"); err != nil {
+		return ExitError{Code: 1, Err: err}
 	}
-	snap, err := store.Load()
+	host, err := newCampaignHost(cmd.Context(), repo, opt.runID, name, camp, manifest)
 	if err != nil {
 		return ExitError{Code: 1, Err: err}
 	}
-	out := map[string]any{"campaign_id": snap.CampaignID, "phase": snap.Phase, "resumable": snap.Phase != auditcampaign.PhaseTerminal}
-	return writeJSONOrText(cmd, opt.jsonOut, out)
+	eng := &auditcampaign.Engine{
+		Campaign:              camp,
+		Store:                 store,
+		Continuous:            false,
+		InteractiveContinuous: false,
+		SelfConfirm:           camp.Auditor != "" && camp.Auditor == camp.Confirmer,
+		BaselineHead:          wantHead,
+		Audit:                 host.Audit,
+		Confirm:               host.Confirm,
+		Fix:                   host.Fix,
+		Commit:                host.Commit,
+	}
+	res, err := eng.Run(cmd.Context())
+	if err != nil {
+		return ExitError{Code: 1, Err: err}
+	}
+	if err := writeCampaignResult(cmd, opt.jsonOut, res); err != nil {
+		return err
+	}
+	if !auditcampaign.SuccessTerminal(res.Terminal) {
+		return ExitError{Code: 1, Err: fmt.Errorf("campaign terminal %s: %s", res.Terminal, res.Message)}
+	}
+	return nil
+}
+
+// matchCampaignName finds the manifest campaign whose name is a prefix of runID.
+func matchCampaignName(manifest config.Manifest, runID string) string {
+	best := ""
+	for name := range manifest.Campaigns {
+		if runID == name || strings.HasPrefix(runID, name+"-") {
+			if len(name) > len(best) {
+				best = name
+			}
+		}
+	}
+	if best == "" {
+		return runID
+	}
+	return best
 }
 
 func loadCampaignManifest(repo string) (config.Manifest, error) {

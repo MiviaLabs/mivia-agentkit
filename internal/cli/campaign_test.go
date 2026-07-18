@@ -136,7 +136,16 @@ func TestCampaignCLIBuiltBinaryScopedCommit(t *testing.T) {
 	if err := os.MkdirAll(fixtureDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// Auditor emits candidate; independent confirmer supplies commit-eligible evidence.
 	audit1 := `{
+  "schema": "mivia-agent-campaign-evidence/v1",
+  "campaign_run": "placeholder",
+  "cycle": 1,
+  "baseline_head": "placeholder",
+  "disposition": "candidate",
+  "finding_fingerprint": "fp-scoped-1"
+}`
+	confirm1 := `{
   "schema": "mivia-agent-campaign-evidence/v1",
   "campaign_run": "placeholder",
   "cycle": 1,
@@ -159,7 +168,7 @@ func TestCampaignCLIBuiltBinaryScopedCommit(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(fixtureDir, "audit-cycle-1.json"), []byte(audit1), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(fixtureDir, "confirm-cycle-1.json"), []byte(audit1), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(fixtureDir, "confirm-cycle-1.json"), []byte(confirm1), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(fixtureDir, "fix-cycle-1.json"), []byte(fix1), 0o644); err != nil {

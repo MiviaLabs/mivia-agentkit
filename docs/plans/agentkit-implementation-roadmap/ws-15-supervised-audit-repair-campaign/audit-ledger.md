@@ -11,6 +11,7 @@ Rules: no raw prompts, raw model output, secrets, absolute paths, or `.ai/runs/*
 | 1–3 | prior tip..a51238b | implementation | tests | PASS | none | a51238b | config/evidence/state/CommitScoped; Windows runner fix |
 | 4–6 | a51238b..HEAD | implementation+suite | tests; correctness self-check; security self-check | PASS; PASS; PASS | live dual-CLI install not exercised in CI (wiring covered by fakes) | this-commit | local + orchestrable adapters + scoped commit + built-binary |
 | adapters | prior..HEAD | orchestrable wiring | tests; correctness self-check | PASS; PASS | live dual-CLI install not exercised in CI | this-commit | codex/claude/etc. invoke path + typed evidence; local fixtures retained |
+| phase1-audit-fix | prior..HEAD | independent deep-bug-audit cycle 1 | correctness; security; evidence; tests; docs + independent confirm | PASS after fix | live dual-CLI not in CI; dedicated campaign worktree deferred (commits in --repo + allowlist); mid-phase resume restarts at audit boundary | this-commit | candidate→confirm gate; commit_enabled=false; multi-word verifier fail-closed; pathpolicy+globs; non-zero exit on fail; resume re-runs engine |
 
 ## Phase 0 entry
 
@@ -91,6 +92,36 @@ MutationProofs:
   TestCampaignHostRejectsMissingAdapterInRegistry
   TestNewCampaignHostFailsClosedWhenExternalNotApproved
   TestCampaignHostLocalFixtureStillWorks
+```
+
+## Phase 1 independent deep-bug-audit repair entry
+
+```text
+Phase: phase1-audit-fix
+CommitRange: prior..HEAD
+AuditRound: 1 (parallel auditors + independent confirmer)
+Auditors: correctness | security | evidence | tests | docs
+Confirmer: independent subagent (code proof)
+Results: PASS after fix (12 confirmed findings repaired)
+ResidualRisk: live dual-CLI install not exercised in CI; dedicated worktree lifecycle deferred (scoped commits in --repo); mid-phase resume restarts at next audit boundary with cumulative budget
+FindingsFixed:
+  F-CORR-3 candidates always Confirm
+  F-CORR-1 commit_enabled=false audit→confirm only
+  F-CORR-2 bare confirmed requires CommitEligible
+  F-SEC-5 Fixed requires paths+verifier
+  F-SEC-1 multi-word verifier_profile fail-closed
+  F-SEC-2/3 pathpolicy secrets + literal paths only
+  F-CORR-6 non-success terminal exit non-zero
+  F-CORR-9 fingerprint-only not clean
+  F-CORR-8 unauthorized HEAD test
+  F-DOC-1 resume re-enters Engine.Run
+  CommitScoped requires stamp+policy hooks; failed verifier redacted
+Verification:
+  go test ./internal/cli ./internal/adapter ./internal/auditcampaign ./internal/gitstate ./internal/config -count=1
+  go test ./... -count=1
+  go vet ./...
+  go build ./cmd/mivia-agent
+  python3 scripts/verify_agent_config.py
 ```
 
 ## Entry template

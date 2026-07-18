@@ -234,3 +234,40 @@ func TestCampaignAcceptsCommitCapableIndependentSetup(t *testing.T) {
 		t.Fatalf("Validate() error = %v, want nil", err)
 	}
 }
+
+func TestCampaignRejectsMultiWordVerifierProfile(t *testing.T) {
+	c := validEnabledCampaign()
+	c.CommitEnabled = true
+	c.VerifierProfile = "go test ./..."
+	c.AllowedPaths = []string{"internal/config"}
+	c.CommitMessageTemplate = "fix(quality): campaign repair"
+	err := c.Validate("c", enabledOrchestrable(), knownWorkflows())
+	if err == nil || !strings.Contains(err.Error(), "multi-word") {
+		t.Fatalf("Validate() error = %v, want multi-word rejection", err)
+	}
+}
+
+func TestCampaignRejectsSecretAndGlobAllowedPaths(t *testing.T) {
+	cases := []struct {
+		path string
+		want string
+	}{
+		{".env", "denied"},
+		{"secrets/token", "denied"},
+		{"*.go", "literal"},
+		{"internal/**", "literal"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.path, func(t *testing.T) {
+			c := validEnabledCampaign()
+			c.CommitEnabled = true
+			c.VerifierProfile = "go-test"
+			c.CommitMessageTemplate = "fix(quality): campaign repair"
+			c.AllowedPaths = []string{tc.path}
+			err := c.Validate("c", enabledOrchestrable(), knownWorkflows())
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Validate() error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}

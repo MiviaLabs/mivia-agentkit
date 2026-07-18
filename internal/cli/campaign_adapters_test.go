@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -15,6 +16,7 @@ import (
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
 	"github.com/MiviaLabs/mivia-agentkit/internal/auditcampaign"
 	"github.com/MiviaLabs/mivia-agentkit/internal/config"
+	"github.com/MiviaLabs/mivia-agentkit/internal/gitstate"
 )
 
 // scriptedCampaignAdapter is a test double that records Run calls and returns scripted stdout.
@@ -425,6 +427,105 @@ func TestCampaignHostRealClaudeAdapterEnvelope(t *testing.T) {
 	if len(r.Calls) != 1 {
 		t.Fatalf("claude Run calls = %d, want 1", len(r.Calls))
 	}
+}
+
+func TestVerifierArgvRejectsMultiWord(t *testing.T) {
+	_, err := verifierArgv("go test ./...")
+	if err == nil || !strings.Contains(err.Error(), "multi-word") {
+		t.Fatalf("error = %v, want multi-word rejection", err)
+	}
+	argv, err := verifierArgv("go-test")
+	if err != nil {
+		t.Fatalf("go-test: %v", err)
+	}
+	if len(argv) < 2 || argv[0] != "go" {
+		t.Fatalf("argv = %v, want go test ...", argv)
+	}
+	argv, err = verifierArgv("true")
+	if err != nil || len(argv) != 1 || argv[0] != "true" {
+		t.Fatalf("true argv = %v err=%v", argv, err)
+	}
+}
+
+func TestCampaignHostRejectsUnauthorizedHeadAdvance(t *testing.T) {
+	repo := t.TempDir()
+	// Minimal git repo so Head works and assertHeadUnchanged can detect advance.
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
+			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
+		)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+	run("init")
+	run("config", "user.email", "t@example.com")
+	run("config", "user.name", "t")
+	if err := os.WriteFile(filepath.Join(repo, "README"), []byte("hi\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run("add", "README")
+	run("commit", "-m", "init")
+	head, err := gitstate.Head(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Adapter that advances HEAD during Run (simulates unauthorized commit).
+	advancing := &headAdvancingAdapter{name: "codex", repo: repo, stdout: evidenceJSON("candidate", "fp-head")}
+	reg, err := adapter.NewRegistry(advancing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("codex", "claude", "local")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	h := &campaignHost{
+		repo: repo, runID: "run-head", name: "c", camp: camp, manifest: m,
+		adapters: reg, expectedHead: head,
+	}
+	_, err = h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	if err == nil || !strings.Contains(err.Error(), string(auditcampaign.TerminalUnauthorizedHead)) {
+		t.Fatalf("error = %v, want unauthorized_head_advance", err)
+	}
+}
+
+// headAdvancingAdapter is a test double that commits during Run to simulate unauthorized HEAD advance.
+type headAdvancingAdapter struct {
+	name   string
+	repo   string
+	stdout []byte
+}
+
+func (a *headAdvancingAdapter) Name() string                  { return a.name }
+func (a *headAdvancingAdapter) Role() config.AdapterRole      { return config.AdapterRoleOrchestrable }
+func (a *headAdvancingAdapter) Detect(context.Context) (adapter.Detection, error) {
+	return adapter.Detection{Name: a.name, Version: "test", HeadlessCapable: true}, nil
+}
+func (a *headAdvancingAdapter) Run(_ context.Context, req adapter.Request) (adapter.Result, error) {
+	// Unauthorized commit inside adapter.
+	_ = os.WriteFile(filepath.Join(a.repo, "rogue.txt"), []byte("x\n"), 0o644)
+	cmd := exec.Command("git", "-C", a.repo, "add", "rogue.txt")
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
+		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
+	)
+	_ = cmd.Run()
+	cmd = exec.Command("git", "-C", a.repo, "commit", "-m", "rogue")
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
+		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
+	)
+	_ = cmd.Run()
+	if req.ArtifactOut != "" && len(a.stdout) > 0 {
+		_ = os.WriteFile(req.ArtifactOut, a.stdout, 0o644)
+	}
+	return adapter.Result{ExitCode: 0, Stdout: a.stdout}, nil
+}
+func (a *headAdvancingAdapter) Review(context.Context, adapter.Request) (adapter.Verdict, error) {
+	return adapter.Verdict{Adapter: a.name, Pass: true}, nil
 }
 
 // TestCampaignHostRealCodexAndClaudeIndependentConfirm drives real Codex+Claude adapters

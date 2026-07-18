@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/MiviaLabs/mivia-agentkit/internal/pathpolicy"
 )
 
 // Campaign is a named, disabled-by-default supervised audit-repair campaign.
@@ -110,6 +112,9 @@ func (c *Campaign) Validate(name string, enabledAdapters map[string]AdapterRole,
 			return fmt.Errorf("campaign %q commit_enabled requires verifier_profile", name)
 		}
 		c.VerifierProfile = strings.TrimSpace(c.VerifierProfile)
+		if err := validateVerifierProfile(name, c.VerifierProfile); err != nil {
+			return err
+		}
 		if len(c.AllowedPaths) == 0 {
 			return fmt.Errorf("campaign %q commit_enabled requires allowed_paths", name)
 		}
@@ -205,6 +210,10 @@ func validateCampaignPath(name, p string) error {
 	if strings.Contains(p, "..") {
 		return fmt.Errorf("campaign %q allowed_paths path %q must not contain ..", name, p)
 	}
+	// Literal pathspecs only — git pathspec metacharacters would expand staging scope.
+	if strings.ContainsAny(p, "*?[]") || strings.Contains(p, ":(") {
+		return fmt.Errorf("campaign %q allowed_paths path %q must be a literal path (no globs)", name, p)
+	}
 	cleaned := filepath.ToSlash(filepath.Clean(p))
 	if cleaned == "." || cleaned == "" {
 		return fmt.Errorf("campaign %q allowed_paths path %q is invalid", name, p)
@@ -222,6 +231,30 @@ func validateCampaignPath(name, p string) error {
 		if seg == ".git" {
 			return fmt.Errorf("campaign %q allowed_paths path %q is denied", name, p)
 		}
+	}
+	// Apply default secret-aware path policy (.env, secrets/**, private keys).
+	if err := pathpolicy.NewDefault().Check("", cleaned); err != nil {
+		return fmt.Errorf("campaign %q allowed_paths path %q is denied: %w", name, p, err)
+	}
+	return nil
+}
+
+// validateVerifierProfile rejects multi-word free-form profiles that would
+// otherwise be shell-expanded or silently no-op. Named profiles and single PATH tokens only.
+func validateVerifierProfile(name, profile string) error {
+	profile = strings.TrimSpace(profile)
+	if profile == "" {
+		return fmt.Errorf("campaign %q verifier_profile is empty", name)
+	}
+	switch profile {
+	case "true", "noop", "true-cmd", "go-test":
+		return nil
+	}
+	if strings.ContainsAny(profile, " \t\n\r") {
+		return fmt.Errorf("campaign %q verifier_profile %q is multi-word; use a named profile (true, go-test) or a single PATH token", name, profile)
+	}
+	if strings.ContainsAny(profile, "*?[]{}") {
+		return fmt.Errorf("campaign %q verifier_profile %q contains metacharacters", name, profile)
 	}
 	return nil
 }
