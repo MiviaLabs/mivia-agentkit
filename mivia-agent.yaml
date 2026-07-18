@@ -106,11 +106,19 @@ campaigns:
     auditor: codex
     confirmer: zai
     clean_pass_threshold: 2
-    max_cycles: 4
-    max_duration: 30m
+    max_cycles: 6
+    max_duration: 45m
     max_repair_attempts: 3
     no_progress_threshold: 2
-    commit_enabled: false
+    # Scoped commits: codex finds, zai confirms, zai codes, coordinator CommitScoped only.
+    commit_enabled: true
+    verifier_profile: go-test
+    allowed_paths:
+      - internal
+      - cmd
+      - scripts
+      - docs
+    commit_message_template: "fix(quality): campaign scoped repair"
     on_exhausted: fail
 
 global:
