@@ -233,14 +233,37 @@ func (s *Store) ResumePreconditions(wantBranch, wantHead, wantOwner string) erro
 	return nil
 }
 
-// RecordFingerprint tracks progress; returns true if duplicate (no progress).
+// RecordFingerprint records a finding fingerprint for diagnostics.
+// Returns true if the fingerprint was already seen (duplicate).
+// It does not alone decide campaign stop; use noteNoCommitProgress for that.
 func RecordFingerprint(snap *Snapshot, fp string) bool {
+	if fp == "" {
+		return false
+	}
 	for _, existing := range snap.Fingerprints {
 		if existing == fp {
-			snap.NoProgressCount++
 			return true
 		}
 	}
 	snap.Fingerprints = append(snap.Fingerprints, fp)
 	return false
+}
+
+// noteNoCommitProgress counts a non-clean cycle that did not produce a commit
+// (confirm rejected/non-eligible, fingerprint bind failed, etc.).
+// Unique invent-a-new-fingerprint thrashing must still stop at NoProgressThreshold,
+// not only exact fingerprint duplicates. Returns true when the threshold is reached.
+func noteNoCommitProgress(snap *Snapshot, fp string, threshold int) bool {
+	if threshold <= 0 {
+		threshold = 1
+	}
+	_ = RecordFingerprint(snap, fp)
+	snap.NoProgressCount++
+	return snap.NoProgressCount >= threshold
+}
+
+// resetNoCommitProgress clears the no-progress counter after real progress
+// (clean audit streak step or successful commit).
+func resetNoCommitProgress(snap *Snapshot) {
+	snap.NoProgressCount = 0
 }

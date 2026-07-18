@@ -104,6 +104,8 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 		}
 		if isCleanEvidence(ev) {
 			snap.CleanStreak++
+			// Clean audits are progress toward TerminalClean; clear no-commit thrash counter.
+			resetNoCommitProgress(&snap)
 			e.persistDuration(&snap, start, usedBefore)
 			if snap.CleanStreak >= cleanNeed {
 				return e.terminate(snap, TerminalClean, "two consecutive clean audits", commits, start, usedBefore)
@@ -130,10 +132,9 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 			if fp == "" {
 				fp = auditFindingFingerprint(ev)
 			}
-			if fp != "" && RecordFingerprint(&snap, fp) {
-				if snap.NoProgressCount >= e.Campaign.NoProgressThreshold {
-					return e.terminate(snap, TerminalNoProgress, "duplicate fingerprint", commits, start, usedBefore)
-				}
+			// Non-eligible confirm is no commit progress — even if codex invents a new fp each cycle.
+			if noteNoCommitProgress(&snap, fp, e.Campaign.NoProgressThreshold) {
+				return e.terminate(snap, TerminalNoProgress, "no commit progress (confirm not eligible)", commits, start, usedBefore)
 			}
 			e.persistDuration(&snap, start, usedBefore)
 			if err := e.setPhase(&snap, PhaseCompletedCycle); err != nil {
@@ -149,10 +150,8 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 			if fp == "" {
 				fp = cev.FindingFingerprint
 			}
-			if fp != "" && RecordFingerprint(&snap, fp) {
-				if snap.NoProgressCount >= e.Campaign.NoProgressThreshold {
-					return e.terminate(snap, TerminalNoProgress, "duplicate fingerprint", commits, start, usedBefore)
-				}
+			if noteNoCommitProgress(&snap, fp, e.Campaign.NoProgressThreshold) {
+				return e.terminate(snap, TerminalNoProgress, "no commit progress (fingerprint bind failed)", commits, start, usedBefore)
 			}
 			e.persistDuration(&snap, start, usedBefore)
 			if err := e.setPhase(&snap, PhaseCompletedCycle); err != nil {
@@ -163,6 +162,11 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 
 		// Audit/confirm-only campaigns: do not fix or commit; do not fail closed as commit_failed.
 		if !e.Campaign.CommitEnabled {
+			// Confirmed finding without commit enablement is still "no commit progress"
+			// toward the repair goal; stop thrashing after threshold.
+			if noteNoCommitProgress(&snap, cev.FindingFingerprint, e.Campaign.NoProgressThreshold) {
+				return e.terminate(snap, TerminalNoProgress, "no commit progress (commit_enabled=false)", commits, start, usedBefore)
+			}
 			e.persistDuration(&snap, start, usedBefore)
 			if err := e.setPhase(&snap, PhaseCompletedCycle); err != nil {
 				return e.terminate(snap, TerminalMalformedState, err.Error(), commits, start, usedBefore)
@@ -212,6 +216,7 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 		commits++
 		snap.LastCommitSHA = sha
 		snap.BaselineHead = sha
+		resetNoCommitProgress(&snap)
 		e.persistDuration(&snap, start, usedBefore)
 		if err := e.setPhase(&snap, PhaseCompletedCycle); err != nil {
 			return e.terminate(snap, TerminalMalformedState, err.Error(), commits, start, usedBefore)

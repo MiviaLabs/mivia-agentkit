@@ -164,6 +164,56 @@ func TestEngineStopsNoProgressOnDuplicateFingerprint(t *testing.T) {
 	}
 }
 
+func TestEngineStopsNoProgressOnUniqueFingerprintsWithoutCommit(t *testing.T) {
+	// Live failure mode: auditor invents a new fingerprint each cycle, confirmer
+	// never unlocks commit → must not burn all max_cycles (was cycle_cap with 6 fps).
+	dir := t.TempDir()
+	c := testCampaign()
+	c.NoProgressThreshold = 2
+	c.MaxCycles = 6
+	c.CommitEnabled = true
+	n := 0
+	eng := &Engine{
+		Campaign: c,
+		Store:    NewStore(dir, "c-thrash", "o"),
+		Audit: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
+			n++
+			return Evidence{
+				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
+				Disposition: DispositionCandidate, FindingFingerprint: "fp-unique-" + time.Now().Format("150405.000000000"),
+			}, nil
+		},
+		Confirm: func(context.Context, Phase, int, Evidence) (Evidence, error) {
+			// Reject / non-eligible every time.
+			return Evidence{
+				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h",
+				Disposition: DispositionRejected,
+			}, nil
+		},
+		Fix: func(context.Context, Phase, int, Evidence) (Evidence, error) {
+			t.Fatalf("fix must not run when confirm rejects")
+			return Evidence{}, nil
+		},
+		Commit: func(context.Context, Evidence) (string, error) {
+			t.Fatalf("commit must not run")
+			return "", nil
+		},
+	}
+	res, err := eng.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if res.Terminal != TerminalNoProgress {
+		t.Fatalf("terminal = %s, want no_progress (not cycle_cap thrash)", res.Terminal)
+	}
+	if res.Cycles > c.NoProgressThreshold {
+		t.Fatalf("cycles = %d, want <= no_progress_threshold %d", res.Cycles, c.NoProgressThreshold)
+	}
+	if res.Commits != 0 {
+		t.Fatalf("commits = %d", res.Commits)
+	}
+}
+
 func TestEngineRespectsCycleAndDurationCaps(t *testing.T) {
 	dir := t.TempDir()
 	c := testCampaign()

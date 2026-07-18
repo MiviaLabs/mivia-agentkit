@@ -73,8 +73,24 @@ func TestStateNoProgressOnDuplicateFingerprint(t *testing.T) {
 	if !RecordFingerprint(&snap, "fp1") {
 		t.Fatalf("second identical fingerprint should be duplicate")
 	}
-	if snap.NoProgressCount != 1 {
-		t.Fatalf("NoProgressCount = %d, want 1", snap.NoProgressCount)
+	// RecordFingerprint tracks only; no-progress counting is noteNoCommitProgress.
+	if snap.NoProgressCount != 0 {
+		t.Fatalf("NoProgressCount = %d, want 0 after RecordFingerprint alone", snap.NoProgressCount)
+	}
+	if !noteNoCommitProgress(&snap, "fp1", 2) {
+		// first failed cycle: count=1 < 2
+		if snap.NoProgressCount != 1 {
+			t.Fatalf("NoProgressCount = %d after first note", snap.NoProgressCount)
+		}
+	}
+	if !noteNoCommitProgress(&snap, "fp-other", 2) {
+		t.Fatalf("second unique fp without commit should hit threshold 2")
+	}
+	if snap.NoProgressCount != 2 {
+		t.Fatalf("NoProgressCount = %d, want 2", snap.NoProgressCount)
+	}
+	if len(snap.Fingerprints) < 2 {
+		t.Fatalf("fingerprints = %v, want both recorded", snap.Fingerprints)
 	}
 }
 
