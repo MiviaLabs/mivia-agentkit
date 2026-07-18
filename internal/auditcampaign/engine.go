@@ -12,7 +12,8 @@ import (
 )
 
 // AdapterFunc runs one campaign phase and returns evidence.
-type AdapterFunc func(ctx context.Context, phase Phase, cycle int) (Evidence, error)
+// prior carries the previous phase's evidence (zero for audit; audit for confirm; confirm for fix).
+type AdapterFunc func(ctx context.Context, phase Phase, cycle int, prior Evidence) (Evidence, error)
 
 // CommitFunc performs a scoped commit for confirmed findings.
 type CommitFunc func(ctx context.Context, e Evidence) (string, error)
@@ -97,7 +98,7 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 		if err := e.setPhase(&snap, PhaseAuditing); err != nil {
 			return e.terminate(snap, TerminalMalformedState, err.Error(), commits, start, usedBefore)
 		}
-		ev, err := e.Audit(ctx, PhaseAuditing, snap.Cycle)
+		ev, err := e.Audit(ctx, PhaseAuditing, snap.Cycle, Evidence{})
 		if err != nil {
 			return e.terminate(snap, classifyAdapterErr(err), err.Error(), commits, start, usedBefore)
 		}
@@ -119,7 +120,7 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 		if err := e.setPhase(&snap, PhaseConfirming); err != nil {
 			return e.terminate(snap, TerminalMalformedState, err.Error(), commits, start, usedBefore)
 		}
-		cev, err := e.Confirm(ctx, PhaseConfirming, snap.Cycle)
+		cev, err := e.Confirm(ctx, PhaseConfirming, snap.Cycle, ev)
 		if err != nil {
 			return e.terminate(snap, classifyAdapterErr(err), err.Error(), commits, start, usedBefore)
 		}
@@ -173,7 +174,7 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 		if err := e.setPhase(&snap, PhaseFixing); err != nil {
 			return e.terminate(snap, TerminalMalformedState, err.Error(), commits, start, usedBefore)
 		}
-		fev, err := e.Fix(ctx, PhaseFixing, snap.Cycle)
+		fev, err := e.Fix(ctx, PhaseFixing, snap.Cycle, cev)
 		if err != nil {
 			return e.terminate(snap, classifyAdapterErr(err), err.Error(), commits, start, usedBefore)
 		}

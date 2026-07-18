@@ -45,13 +45,18 @@ func newCampaignHost(ctx context.Context, repo, runID, name string, camp config.
 	if err != nil {
 		return nil, err
 	}
+	phaseTimeout := 5 * time.Minute
+	if camp.CommitEnabled {
+		// Commit-capable campaigns need longer fixer tool loops.
+		phaseTimeout = 15 * time.Minute
+	}
 	h := &campaignHost{
 		repo:         abs,
 		runID:        runID,
 		name:         name,
 		camp:         camp,
 		manifest:     manifest,
-		phaseTimeout: 5 * time.Minute,
+		phaseTimeout: phaseTimeout,
 		expectedHead: "unknown",
 	}
 	head, err := gitstate.Head(abs)
@@ -190,7 +195,7 @@ func (h *campaignHost) loadFixture(phase auditcampaign.Phase, cycle int) (auditc
 }
 
 // Audit produces audit-phase evidence from local fixtures or an orchestrable auditor.
-func (h *campaignHost) Audit(ctx context.Context, phase auditcampaign.Phase, cycle int) (auditcampaign.Evidence, error) {
+func (h *campaignHost) Audit(ctx context.Context, phase auditcampaign.Phase, cycle int, _ auditcampaign.Evidence) (auditcampaign.Evidence, error) {
 	if err := ctx.Err(); err != nil {
 		return auditcampaign.Evidence{}, err
 	}
@@ -215,7 +220,7 @@ func (h *campaignHost) Audit(ctx context.Context, phase auditcampaign.Phase, cyc
 		// Default: clean audit (no findings).
 		return h.baseEvidence(cycle), nil
 	}
-	ev, err := h.invokeOrchestrable(ctx, name, phase, cycle)
+	ev, err := h.invokeOrchestrable(ctx, name, phase, cycle, auditcampaign.Evidence{})
 	if err != nil {
 		return auditcampaign.Evidence{}, err
 	}
@@ -226,7 +231,8 @@ func (h *campaignHost) Audit(ctx context.Context, phase auditcampaign.Phase, cyc
 }
 
 // Confirm produces confirmation evidence from local fixtures or an independent confirmer adapter.
-func (h *campaignHost) Confirm(ctx context.Context, phase auditcampaign.Phase, cycle int) (auditcampaign.Evidence, error) {
+// prior is the audit-phase evidence to independently re-check.
+func (h *campaignHost) Confirm(ctx context.Context, phase auditcampaign.Phase, cycle int, prior auditcampaign.Evidence) (auditcampaign.Evidence, error) {
 	if err := ctx.Err(); err != nil {
 		return auditcampaign.Evidence{}, err
 	}
@@ -254,7 +260,7 @@ func (h *campaignHost) Confirm(ctx context.Context, phase auditcampaign.Phase, c
 		return ev, nil
 	}
 	// Independent confirmer is always a separate adapter invocation from audit.
-	ev, err := h.invokeOrchestrable(ctx, name, phase, cycle)
+	ev, err := h.invokeOrchestrable(ctx, name, phase, cycle, prior)
 	if err != nil {
 		return auditcampaign.Evidence{}, err
 	}
@@ -265,7 +271,8 @@ func (h *campaignHost) Confirm(ctx context.Context, phase auditcampaign.Phase, c
 }
 
 // Fix applies optional local write fixtures or invokes the fix-workflow producer adapter.
-func (h *campaignHost) Fix(ctx context.Context, phase auditcampaign.Phase, cycle int) (auditcampaign.Evidence, error) {
+// prior is the confirm-phase evidence describing the finding to repair.
+func (h *campaignHost) Fix(ctx context.Context, phase auditcampaign.Phase, cycle int, prior auditcampaign.Evidence) (auditcampaign.Evidence, error) {
 	if err := ctx.Err(); err != nil {
 		return auditcampaign.Evidence{}, err
 	}
@@ -291,18 +298,28 @@ func (h *campaignHost) Fix(ctx context.Context, phase auditcampaign.Phase, cycle
 		if !ok {
 			base := h.baseEvidence(cycle)
 			base.Disposition = auditcampaign.DispositionFixed
-			if len(h.camp.AllowedPaths) > 0 {
+			if prior.FindingFingerprint != "" {
+				base.FindingFingerprint = prior.FindingFingerprint
+			} else {
+				base.FindingFingerprint = "p1"
+			}
+			if len(prior.ChangedPathIDs) > 0 {
+				base.ChangedPathIDs = append([]string(nil), prior.ChangedPathIDs...)
+			} else if len(h.camp.AllowedPaths) > 0 {
 				base.ChangedPathIDs = []string{"p1"}
-				base.VerifierRef = strings.TrimSpace(h.camp.VerifierProfile)
-				if base.VerifierRef == "" {
-					base.VerifierRef = "true"
-				}
+			}
+			base.VerifierRef = strings.TrimSpace(h.camp.VerifierProfile)
+			if base.VerifierRef == "" {
+				base.VerifierRef = "true"
+			}
+			if prior.VerifierRef != "" {
+				base.VerifierRef = prior.VerifierRef
 			}
 			return base, nil
 		}
 		return ev, nil
 	}
-	ev, err := h.invokeOrchestrable(ctx, fixName, phase, cycle)
+	ev, err := h.invokeOrchestrable(ctx, fixName, phase, cycle, prior)
 	if err != nil {
 		return auditcampaign.Evidence{}, err
 	}
@@ -314,7 +331,7 @@ func (h *campaignHost) Fix(ctx context.Context, phase auditcampaign.Phase, cycle
 }
 
 // invokeOrchestrable runs an approved adapter and decodes typed campaign evidence only.
-func (h *campaignHost) invokeOrchestrable(ctx context.Context, name string, phase auditcampaign.Phase, cycle int) (auditcampaign.Evidence, error) {
+func (h *campaignHost) invokeOrchestrable(ctx context.Context, name string, phase auditcampaign.Phase, cycle int, prior auditcampaign.Evidence) (auditcampaign.Evidence, error) {
 	if h.adapters == nil {
 		return auditcampaign.Evidence{}, fmt.Errorf("campaign adapter %q is not wired: registry unavailable", name)
 	}
@@ -337,19 +354,34 @@ func (h *campaignHost) invokeOrchestrable(ctx context.Context, name string, phas
 		return auditcampaign.Evidence{}, fmt.Errorf("campaign adapter %q is disabled", name)
 	}
 
-	prompt := campaignPhasePrompt(phase, h.name, h.runID, cycle, h.expectedHead, h.camp)
+	prompt := campaignPhasePrompt(phase, h.name, h.runID, cycle, h.expectedHead, h.camp, prior)
 	timeout := h.phaseTimeout
 	if timeout <= 0 {
 		timeout = 5 * time.Minute
+	}
+	if phase == auditcampaign.PhaseFixing && h.camp.CommitEnabled {
+		// Coding repairs need more wall time and tool rounds than audit/confirm.
+		if timeout < 12*time.Minute {
+			timeout = 12 * time.Minute
+		}
+	}
+	maxTurns := 12
+	if phase == auditcampaign.PhaseFixing {
+		maxTurns = 32
+	}
+	// Codex effort is optional; zai rejects effort — clear for non-codex adapters.
+	effort := cfg.Effort
+	if name != "codex" {
+		effort = ""
 	}
 	req := adapter.Request{
 		Prompt:   prompt,
 		Workdir:  h.repo,
 		Approval: "never",
 		Model:    cfg.Model,
-		Effort:   cfg.Effort,
+		Effort:   effort,
 		Timeout:  timeout,
-		MaxTurns: 8,
+		MaxTurns: maxTurns,
 	}
 	// Temp artifact only for adapters that write last-message files; never used as
 	// commit authority unless schema-decoded, and never persisted under .ai/runs.
@@ -399,44 +431,64 @@ func (h *campaignHost) invokeOrchestrable(ctx context.Context, name string, phas
 	return auditcampaign.Evidence{}, fmt.Errorf("campaign adapter %q: %w", name, lastErr)
 }
 
-func campaignPhasePrompt(phase auditcampaign.Phase, campaign, runID string, cycle int, head string, camp config.Campaign) string {
+func campaignPhasePrompt(phase auditcampaign.Phase, campaign, runID string, cycle int, head string, camp config.Campaign, prior auditcampaign.Evidence) string {
 	head = strings.TrimSpace(head)
 	if head == "" {
 		head = "unknown"
 	}
 	base := []string{
-		"Emit ONLY one JSON object with schema mivia-agent-campaign-evidence/v1.",
-		"Do not emit Markdown reports as commit authority. Do not invent telemetry numbers.",
+		"CRITICAL: Your entire final response must be exactly one JSON object. No Markdown fences, no prose before/after.",
+		`Schema must be exactly: "mivia-agent-campaign-evidence/v1"`,
+		"Do not invent telemetry numbers. Do not stage, commit, push, open a PR, or rewrite git history.",
 		fmt.Sprintf("campaign=%s campaign_run=%s cycle=%d baseline_head=%s", campaign, runID, cycle, head),
-		"Fields must use opaque finding_fingerprint and changed_path_ids (no raw paths or secrets).",
-		"Do not stage, commit, push, open a PR, or rewrite git history.",
+		"Use opaque finding_fingerprint and changed_path_ids only (no raw filesystem paths or secrets in those fields).",
+		`Clean example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"` + runID + `","cycle":` + fmt.Sprintf("%d", cycle) + `,"baseline_head":"` + head + `"}`,
+		`Candidate example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"` + runID + `","cycle":` + fmt.Sprintf("%d", cycle) + `,"baseline_head":"` + head + `","disposition":"candidate","finding_fingerprint":"fp1"}`,
+		`Confirmed example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"` + runID + `","cycle":` + fmt.Sprintf("%d", cycle) + `,"baseline_head":"` + head + `","disposition":"confirmed","finding_fingerprint":"fp1","changed_path_ids":["p1"],"verifier_ref":"go-test"}`,
+		`Fixed example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"` + runID + `","cycle":` + fmt.Sprintf("%d", cycle) + `,"baseline_head":"` + head + `","disposition":"fixed","finding_fingerprint":"fp1","changed_path_ids":["p1"],"verifier_ref":"go-test"}`,
 	}
 	switch phase {
 	case auditcampaign.PhaseAuditing:
 		return strings.Join(append([]string{
 			"You are the campaign auditor for supervised deep-bug-audit repair.",
-			"Follow the deep-bug-audit skill contract: findings only; ordinary audit is report-only outside this campaign evidence channel.",
-			"If no concrete finding: omit disposition (clean) or set disposition rejected with empty fingerprint.",
-			"If a finding is present: set disposition candidate (or confirmed only with verifier_ref and changed_path_ids) and opaque finding_fingerprint.",
+			"Inspect the repository for one concrete, high-confidence bug if present.",
+			"If no concrete finding: emit the clean example (omit disposition, empty fingerprint).",
+			"If a finding is present: disposition candidate with opaque finding_fingerprint (and optional path ids).",
+			"Prefer real correctness/security bugs in allowed product code; skip style-only nits.",
 		}, base...), "\n")
 	case auditcampaign.PhaseConfirming:
-		return strings.Join(append([]string{
-			"You are the independent confirmer for supervised deep-bug-audit repair (separate adapter invocation from the auditor).",
-			"Independently verify the candidate finding. Do not self-confirm without re-checking evidence.",
-			"Set disposition confirmed only when independently verified, with opaque finding_fingerprint, changed_path_ids, and verifier_ref.",
-			"Otherwise set disposition rejected.",
-		}, base...), "\n")
+		lines := []string{
+			"You are the independent confirmer for supervised deep-bug-audit repair (separate invocation from the auditor).",
+			"Independently re-check the candidate below against the live repo. Do not rubber-stamp.",
+			"If verified: disposition confirmed with the SAME finding_fingerprint, opaque changed_path_ids, and verifier_ref.",
+			"If not verified: disposition rejected with the same finding_fingerprint when known.",
+		}
+		if prior.FindingFingerprint != "" || prior.Disposition != "" {
+			lines = append(lines, fmt.Sprintf(
+				"PRIOR_AUDIT disposition=%s finding_fingerprint=%s changed_path_ids=%s",
+				prior.Disposition, prior.FindingFingerprint, strings.Join(prior.ChangedPathIDs, ","),
+			))
+		}
+		return strings.Join(append(lines, base...), "\n")
 	case auditcampaign.PhaseFixing:
 		paths := strings.Join(camp.AllowedPaths, ",")
 		if paths == "" {
 			paths = "(none)"
 		}
-		return strings.Join(append([]string{
+		lines := []string{
 			"You are the campaign fixer for supervised deep-bug-audit repair.",
-			"Apply a minimal scoped repair only under allowed paths; return typed evidence with disposition fixed.",
+			"Apply a minimal scoped code repair using your tools. Write real file changes under allowed paths only.",
 			fmt.Sprintf("allowed_paths=%s verifier_profile=%s", paths, camp.VerifierProfile),
+			"Do not git commit (coordinator commits). After editing files, emit Fixed evidence with the SAME finding_fingerprint.",
 			"Set disposition fixed with opaque finding_fingerprint, changed_path_ids, and verifier_ref.",
-		}, base...), "\n")
+		}
+		if prior.FindingFingerprint != "" || prior.Disposition != "" {
+			lines = append(lines, fmt.Sprintf(
+				"PRIOR_CONFIRM disposition=%s finding_fingerprint=%s changed_path_ids=%s verifier_ref=%s",
+				prior.Disposition, prior.FindingFingerprint, strings.Join(prior.ChangedPathIDs, ","), prior.VerifierRef,
+			))
+		}
+		return strings.Join(append(lines, base...), "\n")
 	default:
 		return strings.Join(base, "\n")
 	}

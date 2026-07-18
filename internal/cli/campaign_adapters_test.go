@@ -137,7 +137,7 @@ func TestCampaignHostInvokesIndependentOrchestrableAdapters(t *testing.T) {
 		expectedHead: "unknown", // non-git unit path; built-binary tests cover real HEAD checks
 	}
 
-	aev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	aev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1, auditcampaign.Evidence{})
 	if err != nil {
 		t.Fatalf("Audit: %v", err)
 	}
@@ -148,7 +148,7 @@ func TestCampaignHostInvokesIndependentOrchestrableAdapters(t *testing.T) {
 		t.Fatalf("audit runtime bind = %+v", aev)
 	}
 
-	cev, err := h.Confirm(context.Background(), auditcampaign.PhaseConfirming, 1)
+	cev, err := h.Confirm(context.Background(), auditcampaign.PhaseConfirming, 1, auditcampaign.Evidence{})
 	if err != nil {
 		t.Fatalf("Confirm: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestCampaignHostInvokesFixOrchestrableAdapter(t *testing.T) {
 		repo: repo, runID: "run-fix", name: "c", camp: camp, manifest: m,
 		adapters: reg, expectedHead: "unknown",
 	}
-	ev, err := h.Fix(context.Background(), auditcampaign.PhaseFixing, 1)
+	ev, err := h.Fix(context.Background(), auditcampaign.PhaseFixing, 1, auditcampaign.Evidence{})
 	if err != nil {
 		t.Fatalf("Fix: %v", err)
 	}
@@ -217,7 +217,7 @@ func TestCampaignHostLocalFixtureStillWorks(t *testing.T) {
 		repo: repo, runID: "run-local", name: "deep-bug-audit-repair",
 		camp: camp, manifest: m, expectedHead: "unknown",
 	}
-	ev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	ev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1, auditcampaign.Evidence{})
 	if err != nil {
 		t.Fatalf("Audit local: %v", err)
 	}
@@ -225,7 +225,7 @@ func TestCampaignHostLocalFixtureStillWorks(t *testing.T) {
 		t.Fatalf("ev = %+v", ev)
 	}
 	// Confirmer without fixture rejects.
-	cev, err := h.Confirm(context.Background(), auditcampaign.PhaseConfirming, 1)
+	cev, err := h.Confirm(context.Background(), auditcampaign.PhaseConfirming, 1, auditcampaign.Evidence{})
 	if err != nil {
 		t.Fatalf("Confirm local: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestCampaignHostRejectsMissingAdapterInRegistry(t *testing.T) {
 		repo: t.TempDir(), runID: "r", name: "c", camp: camp, manifest: m,
 		adapters: reg, expectedHead: "unknown",
 	}
-	_, err = h.Confirm(context.Background(), auditcampaign.PhaseConfirming, 1)
+	_, err = h.Confirm(context.Background(), auditcampaign.PhaseConfirming, 1, auditcampaign.Evidence{})
 	if err == nil || !strings.Contains(err.Error(), "not installed or not approved") {
 		t.Fatalf("error = %v, want not approved/installed", err)
 	}
@@ -270,7 +270,7 @@ func TestCampaignHostRejectsNonOrchestrableRole(t *testing.T) {
 		repo: t.TempDir(), runID: "r", name: "c", camp: camp, manifest: m,
 		adapters: reg, expectedHead: "unknown",
 	}
-	_, err = h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	_, err = h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1, auditcampaign.Evidence{})
 	if err == nil || !strings.Contains(err.Error(), "not orchestrable") {
 		t.Fatalf("error = %v, want not orchestrable", err)
 	}
@@ -291,7 +291,7 @@ func TestCampaignHostRejectsRawMarkdownAsEvidence(t *testing.T) {
 		repo: t.TempDir(), runID: "r", name: "c", camp: camp, manifest: m,
 		adapters: reg, expectedHead: "unknown",
 	}
-	_, err = h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	_, err = h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1, auditcampaign.Evidence{})
 	if err == nil || !strings.Contains(err.Error(), "typed campaign evidence") {
 		t.Fatalf("error = %v, want typed campaign evidence rejection", err)
 	}
@@ -309,7 +309,7 @@ func TestCampaignHostRejectsNonZeroExit(t *testing.T) {
 		repo: t.TempDir(), runID: "r", name: "c", camp: camp, manifest: m,
 		adapters: reg, expectedHead: "unknown",
 	}
-	_, err = h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	_, err = h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1, auditcampaign.Evidence{})
 	if err == nil || !strings.Contains(err.Error(), "exited 2") {
 		t.Fatalf("error = %v, want exited 2", err)
 	}
@@ -368,7 +368,7 @@ func TestCampaignHostZaiRoleArtifactStillDecodes(t *testing.T) {
 		repo: t.TempDir(), runID: "r-zai", name: "c", camp: camp, manifest: m,
 		adapters: reg, expectedHead: "unknown",
 	}
-	ev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	ev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1, auditcampaign.Evidence{})
 	if err != nil {
 		t.Fatalf("Audit zai role envelope: %v", err)
 	}
@@ -463,7 +463,7 @@ func TestCampaignHostRealClaudeAdapterEnvelope(t *testing.T) {
 		repo: t.TempDir(), runID: "run-claude", name: "c", camp: camp, manifest: m,
 		adapters: reg, expectedHead: "unknown",
 	}
-	ev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	ev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1, auditcampaign.Evidence{})
 	if err != nil {
 		t.Fatalf("Audit through real Claude adapter: %v", err)
 	}
@@ -472,6 +472,67 @@ func TestCampaignHostRealClaudeAdapterEnvelope(t *testing.T) {
 	}
 	if len(r.Calls) != 1 {
 		t.Fatalf("claude Run calls = %d, want 1", len(r.Calls))
+	}
+}
+
+func TestCampaignPhasePromptIncludesPriorFinding(t *testing.T) {
+	camp := config.CampaignDefaults()
+	camp.AllowedPaths = []string{"internal"}
+	camp.VerifierProfile = "go-test"
+	prior := auditcampaign.Evidence{
+		Disposition:        auditcampaign.DispositionCandidate,
+		FindingFingerprint: "fp-prior-1",
+		ChangedPathIDs:     []string{"p1"},
+	}
+	confirmPrompt := campaignPhasePrompt(auditcampaign.PhaseConfirming, "c", "run1", 2, "abc", camp, prior)
+	if !strings.Contains(confirmPrompt, "PRIOR_AUDIT") || !strings.Contains(confirmPrompt, "fp-prior-1") {
+		t.Fatalf("confirm prompt missing prior finding: %s", confirmPrompt)
+	}
+	if !strings.Contains(confirmPrompt, "mivia-agent-campaign-evidence/v1") {
+		t.Fatalf("confirm prompt missing schema example")
+	}
+	fixPrior := prior
+	fixPrior.Disposition = auditcampaign.DispositionConfirmed
+	fixPrior.VerifierRef = "go-test"
+	fixPrompt := campaignPhasePrompt(auditcampaign.PhaseFixing, "c", "run1", 2, "abc", camp, fixPrior)
+	if !strings.Contains(fixPrompt, "PRIOR_CONFIRM") || !strings.Contains(fixPrompt, "fp-prior-1") {
+		t.Fatalf("fix prompt missing prior confirm: %s", fixPrompt)
+	}
+	if !strings.Contains(fixPrompt, "allowed_paths=internal") {
+		t.Fatalf("fix prompt missing allowed_paths")
+	}
+}
+
+func TestCampaignHostConfirmPromptReceivesAuditPrior(t *testing.T) {
+	confirmer := &scriptedCampaignAdapter{
+		name:   "zai",
+		stdout: evidenceJSON("confirmed", "fp-prior-1"),
+	}
+	reg, err := adapter.NewRegistry(confirmer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("codex", "zai", "zai")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	camp.Auditor = "codex"
+	camp.Confirmer = "zai"
+	h := &campaignHost{
+		repo: t.TempDir(), runID: "r", name: "c", camp: camp, manifest: m,
+		adapters: reg, expectedHead: "unknown",
+	}
+	prior := auditcampaign.Evidence{
+		Schema: auditcampaign.EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: 1,
+		Disposition: auditcampaign.DispositionCandidate, FindingFingerprint: "fp-prior-1",
+	}
+	_, err = h.Confirm(context.Background(), auditcampaign.PhaseConfirming, 1, prior)
+	if err != nil {
+		t.Fatalf("Confirm: %v", err)
+	}
+	if confirmer.callCount() != 1 {
+		t.Fatalf("calls = %d", confirmer.callCount())
+	}
+	if !strings.Contains(confirmer.prompts[0], "fp-prior-1") {
+		t.Fatalf("confirmer prompt missing prior fingerprint: %q", confirmer.prompts[0])
 	}
 }
 
@@ -532,7 +593,7 @@ func TestCampaignHostRejectsUnauthorizedHeadAdvance(t *testing.T) {
 		repo: repo, runID: "run-head", name: "c", camp: camp, manifest: m,
 		adapters: reg, expectedHead: head,
 	}
-	_, err = h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	_, err = h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1, auditcampaign.Evidence{})
 	if err == nil || !strings.Contains(err.Error(), string(auditcampaign.TerminalUnauthorizedHead)) {
 		t.Fatalf("error = %v, want unauthorized_head_advance", err)
 	}
@@ -604,14 +665,14 @@ func TestCampaignHostRealCodexAndClaudeIndependentConfirm(t *testing.T) {
 		camp: camp, manifest: m, adapters: reg, expectedHead: "unknown",
 	}
 
-	aev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1)
+	aev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1, auditcampaign.Evidence{})
 	if err != nil {
 		t.Fatalf("Audit codex: %v", err)
 	}
 	if aev.Disposition != auditcampaign.DispositionCandidate {
 		t.Fatalf("audit = %+v", aev)
 	}
-	cev, err := h.Confirm(context.Background(), auditcampaign.PhaseConfirming, 1)
+	cev, err := h.Confirm(context.Background(), auditcampaign.PhaseConfirming, 1, auditcampaign.Evidence{})
 	if err != nil {
 		t.Fatalf("Confirm claude: %v", err)
 	}
