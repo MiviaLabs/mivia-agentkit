@@ -11,8 +11,8 @@ adapters:
     role: orchestrable
     effort: medium
   claude:
-    enabled: true
-    role: orchestrable
+    enabled: false
+    role: guidance
   copilot:
     enabled: true
     role: guidance
@@ -81,6 +81,7 @@ governance:
   audit_log: .ai/audit.jsonl
 
 # Supervised audit-repair campaign (operator-enabled for live dual-CLI run).
+# auditor=codex finds bugs; confirmer=zai independently confirms; fixer=zai codes repairs.
 # Launch: mivia-agent campaign run --repo . --campaign deep-bug-audit-repair --json
 # Commit-capable mode requires independent auditor/confirmer and explicit allowed_paths.
 loops:
@@ -95,7 +96,7 @@ loops:
     max_iterations: 1
     steps:
       - id: fix
-        producer: codex
+        producer: zai
 
 campaigns:
   deep-bug-audit-repair:
@@ -103,7 +104,7 @@ campaigns:
     audit_workflow: bug-audit-loop
     fix_workflow: fix-loop
     auditor: codex
-    confirmer: claude
+    confirmer: zai
     clean_pass_threshold: 2
     max_cycles: 4
     max_duration: 30m
