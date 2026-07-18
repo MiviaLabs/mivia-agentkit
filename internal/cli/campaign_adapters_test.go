@@ -79,9 +79,17 @@ func evidenceJSON(disposition, fingerprint string) []byte {
 	if disposition == "confirmed" || disposition == "fixed" {
 		extra = `,"changed_path_ids":["p1"],"verifier_ref":"true"`
 	}
+	// Re-verifiable handoff so engine hard-gate and host allowlist path stay green in fixtures.
+	handoff := ""
+	switch disposition {
+	case "candidate", "confirmed", "fixed":
+		handoff = `,"finding_claim":"test re-verifiable finding claim","path_hints":["internal/seed.go"]`
+	default:
+		handoff = `,"finding_claim":"","path_hints":[]`
+	}
 	return []byte(fmt.Sprintf(
-		`{"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"placeholder","cycle":0,"baseline_head":"placeholder"%s%s%s}`,
-		disp, fp, extra,
+		`{"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"placeholder","cycle":0,"baseline_head":"placeholder"%s%s%s%s}`,
+		disp, fp, handoff, extra,
 	))
 }
 
@@ -537,7 +545,7 @@ func TestCampaignHostEngineOrchestrableScopedCommit(t *testing.T) {
 	// Confirmed without verifier_ref/paths — normalize must fill from campaign.
 	confirmer := &scriptedCampaignAdapter{
 		name:   "zai",
-		stdout: []byte(`{"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"placeholder","cycle":0,"baseline_head":"placeholder","disposition":"confirmed","finding_fingerprint":"fp-orch-1"}`),
+		stdout: evidenceJSON("confirmed", "fp-orch-1"),
 	}
 	fixer := &writingFixAdapter{
 		scriptedCampaignAdapter: scriptedCampaignAdapter{name: "zai-fix", stdout: evidenceJSON("fixed", "fp-orch-1")},
@@ -551,7 +559,7 @@ func TestCampaignHostEngineOrchestrableScopedCommit(t *testing.T) {
 		scriptedCampaignAdapter: scriptedCampaignAdapter{
 			name: "zai",
 			// default stdout for confirm path
-			stdout: []byte(`{"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"placeholder","cycle":0,"baseline_head":"placeholder","disposition":"confirmed","finding_fingerprint":"fp-orch-1"}`),
+			stdout: evidenceJSON("confirmed", "fp-orch-1"),
 		},
 		writeRel: "internal/repair.go",
 		body:     "package internal\n// repaired\n",
@@ -776,6 +784,90 @@ func TestCampaignHostConfirmPromptReceivesAuditPrior(t *testing.T) {
 	}
 	if !strings.Contains(confirmer.prompts[0], "PRIOR_PATH_HINTS=internal/cli/campaign_adapters.go") {
 		t.Fatalf("confirmer prompt missing path_hints handoff: %q", confirmer.prompts[0])
+	}
+}
+
+func TestCampaignHostFiltersPathHintsToAllowedPaths(t *testing.T) {
+	body := []byte(`{"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"placeholder","cycle":0,"baseline_head":"placeholder","disposition":"candidate","finding_fingerprint":"fp-scope","finding_claim":"","path_hints":["internal/cli/x.go","docs/out.md","cmd/mivia-agent/main.go"],"changed_path_ids":["p1"],"verifier_ref":"","progress":0}`)
+	auditor := &scriptedCampaignAdapter{name: "codex", stdout: body}
+	reg, err := adapter.NewRegistry(auditor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("codex", "kimi", "kimi")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	camp.AllowedPaths = []string{"internal", "cmd"}
+	h := &campaignHost{
+		repo: t.TempDir(), runID: "r-scope", name: "c", camp: camp, manifest: m,
+		adapters: reg, expectedHead: "unknown",
+	}
+	ev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1, auditcampaign.Evidence{})
+	if err != nil {
+		t.Fatalf("Audit: %v", err)
+	}
+	if len(ev.PathHints) != 2 {
+		t.Fatalf("path_hints = %v, want 2 in-scope", ev.PathHints)
+	}
+	for _, p := range ev.PathHints {
+		if p == "docs/out.md" {
+			t.Fatalf("out-of-scope path_hint survived: %v", ev.PathHints)
+		}
+	}
+	if !ev.HasReverifiableHandoff() {
+		t.Fatalf("in-scope path_hints must count as handoff: %+v", ev)
+	}
+}
+
+func TestCampaignHostOutOfScopeHintsOnlyLoseHandoff(t *testing.T) {
+	// Empty claim + only out-of-scope path_hints → after filter, no handoff.
+	body := []byte(`{"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"placeholder","cycle":0,"baseline_head":"placeholder","disposition":"candidate","finding_fingerprint":"fp-oos","finding_claim":"","path_hints":["docs/out.md"],"changed_path_ids":["p1"],"verifier_ref":"","progress":0}`)
+	auditor := &scriptedCampaignAdapter{name: "codex", stdout: body}
+	reg, err := adapter.NewRegistry(auditor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("codex", "kimi", "kimi")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	camp.AllowedPaths = []string{"internal"}
+	h := &campaignHost{
+		repo: t.TempDir(), runID: "r-oos", name: "c", camp: camp, manifest: m,
+		adapters: reg, expectedHead: "unknown",
+	}
+	ev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1, auditcampaign.Evidence{})
+	if err != nil {
+		t.Fatalf("Audit: %v", err)
+	}
+	if len(ev.PathHints) != 0 {
+		t.Fatalf("path_hints = %v, want empty after filter", ev.PathHints)
+	}
+	if ev.HasReverifiableHandoff() {
+		t.Fatalf("expected no handoff after dropping out-of-scope hints: %+v", ev)
+	}
+}
+
+func TestCampaignHostClaimOnlyKeepsHandoffAfterFilter(t *testing.T) {
+	body := []byte(`{"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"placeholder","cycle":0,"baseline_head":"placeholder","disposition":"candidate","finding_fingerprint":"fp-claim","finding_claim":"nil deref in path filter","path_hints":["docs/out.md"],"changed_path_ids":["p1"],"verifier_ref":"","progress":0}`)
+	auditor := &scriptedCampaignAdapter{name: "codex", stdout: body}
+	reg, err := adapter.NewRegistry(auditor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("codex", "kimi", "kimi")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	camp.AllowedPaths = []string{"internal"}
+	h := &campaignHost{
+		repo: t.TempDir(), runID: "r-claim", name: "c", camp: camp, manifest: m,
+		adapters: reg, expectedHead: "unknown",
+	}
+	ev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1, auditcampaign.Evidence{})
+	if err != nil {
+		t.Fatalf("Audit: %v", err)
+	}
+	if len(ev.PathHints) != 0 {
+		t.Fatalf("path_hints should be filtered: %v", ev.PathHints)
+	}
+	if !ev.HasReverifiableHandoff() || ev.FindingClaim == "" {
+		t.Fatalf("claim-only must remain handoff: %+v", ev)
 	}
 }
 

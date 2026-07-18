@@ -194,3 +194,71 @@ func TestEvidenceRejectsTooManyPathHints(t *testing.T) {
 		t.Fatalf("error = %v, want path_hints exceeds rejection", err)
 	}
 }
+
+func TestFilterPathHintsAllowlist(t *testing.T) {
+	tests := []struct {
+		name    string
+		hints   []string
+		allowed []string
+		want    []string
+	}{
+		{
+			name:    "empty allowlist passthrough",
+			hints:   []string{"docs/a.md", "internal/cli/x.go"},
+			allowed: nil,
+			want:    []string{"docs/a.md", "internal/cli/x.go"},
+		},
+		{
+			name:    "keep under prefix and exact allow",
+			hints:   []string{"internal/cli/x.go", "internal", "cmd/mivia-agent/main.go", "docs/a.md"},
+			allowed: []string{"internal", "cmd"},
+			want:    []string{"internal/cli/x.go", "internal", "cmd/mivia-agent/main.go"},
+		},
+		{
+			name:    "drop out of scope",
+			hints:   []string{"scripts/x.sh", "internal/../secret"},
+			allowed: []string{"internal"},
+			want:    nil, // "internal/../secret" does not match prefix rule after literal check
+		},
+		{
+			name:    "dedupe",
+			hints:   []string{"internal/a.go", "internal/a.go"},
+			allowed: []string{"internal"},
+			want:    []string{"internal/a.go"},
+		},
+		{
+			name:    "empty hints",
+			hints:   nil,
+			allowed: []string{"internal"},
+			want:    nil,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := FilterPathHints(tc.hints, tc.allowed)
+			if len(got) != len(tc.want) {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("got %v, want %v", got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+func TestCommitEligibleUnaffectedByMissingHandoff(t *testing.T) {
+	// Evidence API: CommitEligible stays confirmed+fp+paths+verifier only.
+	e := Evidence{
+		Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h",
+		Disposition: DispositionConfirmed, FindingFingerprint: "fpok",
+		ChangedPathIDs: []string{"p1"}, VerifierRef: "go-test",
+	}
+	if !e.CommitEligible() {
+		t.Fatal("CommitEligible must not require handoff fields")
+	}
+	if e.HasReverifiableHandoff() {
+		t.Fatal("expected no handoff")
+	}
+}

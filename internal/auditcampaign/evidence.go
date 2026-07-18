@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"path"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -181,6 +182,83 @@ func (e Evidence) HasReverifiableHandoff() bool {
 		}
 	}
 	return false
+}
+
+// FilterPathHints keeps only path hints under the campaign allowlist prefixes.
+// Empty allowed leaves shape-validated hints unfiltered. Matching rule:
+// hint == allow || strings.HasPrefix(hint, allow+"/").
+func FilterPathHints(hints, allowed []string) []string {
+	if len(hints) == 0 {
+		return nil
+	}
+	if len(allowed) == 0 {
+		out := make([]string, 0, len(hints))
+		for _, h := range hints {
+			h = strings.TrimSpace(h)
+			if h == "" {
+				continue
+			}
+			out = append(out, h)
+		}
+		if len(out) == 0 {
+			return nil
+		}
+		return out
+	}
+	// Normalize allow prefixes once.
+	allows := make([]string, 0, len(allowed))
+	for _, a := range allowed {
+		a = strings.TrimSpace(strings.ReplaceAll(a, "\\", "/"))
+		a = strings.Trim(a, "/")
+		if a == "" {
+			continue
+		}
+		allows = append(allows, a)
+	}
+	if len(allows) == 0 {
+		return FilterPathHints(hints, nil)
+	}
+	out := make([]string, 0, len(hints))
+	seen := map[string]struct{}{}
+	for _, h := range hints {
+		h = strings.TrimSpace(strings.ReplaceAll(h, "\\", "/"))
+		h = strings.TrimPrefix(h, "./")
+		if h == "" {
+			continue
+		}
+		// Clean collapses "a/../b" so allowlist prefix checks cannot be escaped.
+		h = path.Clean(h)
+		if h == "." || h == ".." || strings.HasPrefix(h, "../") {
+			continue
+		}
+		if !pathHintUnderAllowlist(h, allows) {
+			continue
+		}
+		if _, ok := seen[h]; ok {
+			continue
+		}
+		seen[h] = struct{}{}
+		out = append(out, h)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func pathHintUnderAllowlist(hint string, allows []string) bool {
+	for _, a := range allows {
+		if hint == a || strings.HasPrefix(hint, a+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+// ApplyPathHintAllowlist filters PathHints in place against allowed campaign paths.
+func (e Evidence) ApplyPathHintAllowlist(allowed []string) Evidence {
+	e.PathHints = FilterPathHints(e.PathHints, allowed)
+	return e
 }
 
 func isOpaqueID(s string) bool {

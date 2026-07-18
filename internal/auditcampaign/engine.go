@@ -117,6 +117,20 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 		}
 		snap.CleanStreak = 0
 
+		// Hard-require re-verifiable handoff before confirm: fingerprint-only
+		// candidates cannot be independently re-checked and thrash dogfood.
+		if !ev.HasReverifiableHandoff() {
+			fp := auditFindingFingerprint(ev)
+			if noteNoCommitProgress(&snap, fp, e.Campaign.NoProgressThreshold) {
+				return e.terminate(snap, TerminalNoProgress, "no commit progress (audit handoff missing)", commits, start, usedBefore)
+			}
+			e.persistDuration(&snap, start, usedBefore)
+			if err := e.setPhase(&snap, PhaseCompletedCycle); err != nil {
+				return e.terminate(snap, TerminalMalformedState, err.Error(), commits, start, usedBefore)
+			}
+			continue
+		}
+
 		// Non-clean findings always go through the independent confirmer.
 		// Candidates are the normal path; pre-confirmed audit evidence is re-checked.
 		if err := e.setPhase(&snap, PhaseConfirming); err != nil {
@@ -135,6 +149,21 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 			// Non-eligible confirm is no commit progress — even if codex invents a new fp each cycle.
 			if noteNoCommitProgress(&snap, fp, e.Campaign.NoProgressThreshold) {
 				return e.terminate(snap, TerminalNoProgress, "no commit progress (confirm not eligible)", commits, start, usedBefore)
+			}
+			e.persistDuration(&snap, start, usedBefore)
+			if err := e.setPhase(&snap, PhaseCompletedCycle); err != nil {
+				return e.terminate(snap, TerminalMalformedState, err.Error(), commits, start, usedBefore)
+			}
+			continue
+		}
+		// Confirmed + eligible still needs re-verifiable handoff for fix (may be carried from audit).
+		if !cev.HasReverifiableHandoff() {
+			fp := cev.FindingFingerprint
+			if fp == "" {
+				fp = auditFindingFingerprint(ev)
+			}
+			if noteNoCommitProgress(&snap, fp, e.Campaign.NoProgressThreshold) {
+				return e.terminate(snap, TerminalNoProgress, "no commit progress (confirm handoff missing)", commits, start, usedBefore)
 			}
 			e.persistDuration(&snap, start, usedBefore)
 			if err := e.setPhase(&snap, PhaseCompletedCycle); err != nil {
@@ -241,13 +270,13 @@ func (e *Engine) ensureSnapshot(maxCycles int, maxDur time.Duration) (Snapshot, 
 	snap, err := e.Store.Load()
 	if err != nil {
 		snap = Snapshot{
-			Schema:         StateSchema,
-			CampaignID:     e.Store.ID,
-			Phase:          PhaseCreated,
-			OwnerID:        e.Store.Owner,
-			MaxCycles:      maxCycles,
-			MaxDurationMS:  maxDur.Milliseconds(),
-			BaselineHead:   e.BaselineHead,
+			Schema:        StateSchema,
+			CampaignID:    e.Store.ID,
+			Phase:         PhaseCreated,
+			OwnerID:       e.Store.Owner,
+			MaxCycles:     maxCycles,
+			MaxDurationMS: maxDur.Milliseconds(),
+			BaselineHead:  e.BaselineHead,
 		}
 		if err := e.Store.Save(snap); err != nil {
 			return Snapshot{}, err

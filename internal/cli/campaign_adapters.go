@@ -210,7 +210,12 @@ func (h *campaignHost) loadFixture(phase auditcampaign.Phase, cycle int) (auditc
 	if err := ev.Validate(); err != nil {
 		return auditcampaign.Evidence{}, false, err
 	}
-	return ev, true, nil
+	return h.scopeHandoff(ev), true, nil
+}
+
+// scopeHandoff filters path_hints to campaign AllowedPaths when the allowlist is set.
+func (h *campaignHost) scopeHandoff(ev auditcampaign.Evidence) auditcampaign.Evidence {
+	return ev.ApplyPathHintAllowlist(h.camp.AllowedPaths)
 }
 
 // Audit produces audit-phase evidence from local fixtures or an orchestrable auditor.
@@ -234,7 +239,7 @@ func (h *campaignHost) Audit(ctx context.Context, phase auditcampaign.Phase, cyc
 			if err := h.assertHeadUnchanged(); err != nil {
 				return auditcampaign.Evidence{}, err
 			}
-			return ev, nil
+			return h.scopeHandoff(ev), nil
 		}
 		// Default: clean audit (no findings).
 		return h.baseEvidence(cycle), nil
@@ -246,7 +251,7 @@ func (h *campaignHost) Audit(ctx context.Context, phase auditcampaign.Phase, cyc
 	if err := h.assertHeadUnchanged(); err != nil {
 		return auditcampaign.Evidence{}, err
 	}
-	return ev, nil
+	return h.scopeHandoff(ev), nil
 }
 
 // Confirm produces confirmation evidence from local fixtures or an independent confirmer adapter.
@@ -276,7 +281,7 @@ func (h *campaignHost) Confirm(ctx context.Context, phase auditcampaign.Phase, c
 		if err := h.assertHeadUnchanged(); err != nil {
 			return auditcampaign.Evidence{}, err
 		}
-		return ev, nil
+		return h.normalizeCommitEvidence(ev, prior, auditcampaign.DispositionConfirmed), nil
 	}
 	// Independent confirmer is always a separate adapter invocation from audit.
 	ev, err := h.invokeOrchestrable(ctx, name, phase, cycle, prior)
@@ -335,9 +340,9 @@ func (h *campaignHost) Fix(ctx context.Context, phase auditcampaign.Phase, cycle
 			if prior.VerifierRef != "" {
 				base.VerifierRef = prior.VerifierRef
 			}
-			return base, nil
+			return h.normalizeCommitEvidence(base, prior, auditcampaign.DispositionFixed), nil
 		}
-		return ev, nil
+		return h.normalizeCommitEvidence(ev, prior, auditcampaign.DispositionFixed), nil
 	}
 	ev, err := h.invokeOrchestrable(ctx, fixName, phase, cycle, prior)
 	if err != nil {
@@ -380,6 +385,8 @@ func (h *campaignHost) normalizeCommitEvidence(ev, prior auditcampaign.Evidence,
 	if len(ev.PathHints) == 0 && len(prior.PathHints) > 0 {
 		ev.PathHints = append([]string(nil), prior.PathHints...)
 	}
+	// Drop path_hints outside campaign AllowedPaths (empty allowlist = no filter).
+	ev = h.scopeHandoff(ev)
 	if !h.camp.CommitEnabled {
 		return ev
 	}

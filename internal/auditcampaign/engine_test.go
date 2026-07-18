@@ -24,6 +24,17 @@ func testCampaign() config.Campaign {
 	return c
 }
 
+// withHandoff attaches minimal re-verifiable handoff so engine confirm path can run.
+func withHandoff(e Evidence) Evidence {
+	if strings.TrimSpace(e.FindingClaim) == "" {
+		e.FindingClaim = "test re-verifiable finding claim"
+	}
+	if len(e.PathHints) == 0 {
+		e.PathHints = []string{"internal/auditcampaign/engine.go"}
+	}
+	return e
+}
+
 func TestEngineTwoCleanAuditsStopWithoutCommit(t *testing.T) {
 	dir := t.TempDir()
 	store := NewStore(dir, "c1", "o1")
@@ -77,28 +88,28 @@ func TestEngineConfirmedFindingCommitsOnceAndReaudits(t *testing.T) {
 		Audit: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
 			audits++
 			if audits == 1 {
-				return Evidence{
+				return withHandoff(Evidence{
 					Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 					Disposition: DispositionConfirmed, FindingFingerprint: "fp1",
 					ChangedPathIDs: []string{"p1"}, VerifierRef: "go-test",
-				}, nil
+				}), nil
 			}
 			// subsequent clean
 			return Evidence{Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h2", Cycle: cycle}, nil
 		},
 		Confirm: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionConfirmed, FindingFingerprint: "fp1",
 				ChangedPathIDs: []string{"p1"}, VerifierRef: "go-test",
-			}, nil
+			}), nil
 		},
 		Fix: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionFixed, FindingFingerprint: "fp1",
 				ChangedPathIDs: []string{"p1"}, VerifierRef: "go-test",
-			}, nil
+			}), nil
 		},
 		Commit: func(ctx context.Context, e Evidence) (string, error) {
 			commits++
@@ -147,10 +158,10 @@ func TestEngineStopsNoProgressOnDuplicateFingerprint(t *testing.T) {
 		Store:                 NewStore(dir, "c4", "o"),
 		InteractiveContinuous: true,
 		Audit: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionCandidate, FindingFingerprint: "same",
-			}, nil
+			}), nil
 		},
 		Confirm: func(context.Context, Phase, int, Evidence) (Evidence, error) { return Evidence{}, nil },
 		Fix:     func(context.Context, Phase, int, Evidence) (Evidence, error) { return Evidence{}, nil },
@@ -178,10 +189,10 @@ func TestEngineStopsNoProgressOnUniqueFingerprintsWithoutCommit(t *testing.T) {
 		Store:    NewStore(dir, "c-thrash", "o"),
 		Audit: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
 			n++
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionCandidate, FindingFingerprint: "fp-unique-" + time.Now().Format("150405.000000000"),
-			}, nil
+			}), nil
 		},
 		Confirm: func(context.Context, Phase, int, Evidence) (Evidence, error) {
 			// Reject / non-eligible every time.
@@ -224,10 +235,10 @@ func TestEngineRespectsCycleAndDurationCaps(t *testing.T) {
 		Store:                 NewStore(dir, "c5", "o"),
 		InteractiveContinuous: true,
 		Audit: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionCandidate, FindingFingerprint: "fp" + time.Now().String(),
-			}, nil
+			}), nil
 		},
 		Confirm: func(context.Context, Phase, int, Evidence) (Evidence, error) { return Evidence{}, nil },
 		Fix:     func(context.Context, Phase, int, Evidence) (Evidence, error) { return Evidence{}, nil },
@@ -298,19 +309,19 @@ func TestEngineCandidateInvokesIndependentConfirm(t *testing.T) {
 		Store:    NewStore(dir, "c-cand", "o"),
 		Audit: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
 			if cycle == 1 {
-				return Evidence{
+				return withHandoff(Evidence{
 					Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 					Disposition: DispositionCandidate, FindingFingerprint: "fp-cand",
-				}, nil
+				}), nil
 			}
 			return Evidence{Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle}, nil
 		},
 		Confirm: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
 			confirms++
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionRejected, FindingFingerprint: "fp-cand",
-			}, nil
+			}), nil
 		},
 		Fix: func(context.Context, Phase, int, Evidence) (Evidence, error) {
 			t.Fatalf("fix must not run when commit_enabled=false")
@@ -348,19 +359,19 @@ func TestEngineCommitDisabledDoesNotFailOnConfirmed(t *testing.T) {
 		Store:    NewStore(dir, "c-nocommit", "o"),
 		Audit: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
 			if cycle <= 1 {
-				return Evidence{
+				return withHandoff(Evidence{
 					Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 					Disposition: DispositionCandidate, FindingFingerprint: "fp1",
-				}, nil
+				}), nil
 			}
 			return Evidence{Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle}, nil
 		},
 		Confirm: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionConfirmed, FindingFingerprint: "fp1",
 				ChangedPathIDs: []string{"p1"}, VerifierRef: "true",
-			}, nil
+			}), nil
 		},
 		Fix: func(context.Context, Phase, int, Evidence) (Evidence, error) {
 			fixes++
@@ -393,17 +404,17 @@ func TestEngineBareConfirmedWithoutPathsSkipsFix(t *testing.T) {
 		Campaign: testCampaign(),
 		Store:    NewStore(dir, "c-bare", "o"),
 		Audit: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionCandidate, FindingFingerprint: "fp-bare",
-			}, nil
+			}), nil
 		},
 		Confirm: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
 			// confirmed without paths/verifier is not CommitEligible
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionConfirmed, FindingFingerprint: "fp-bare",
-			}, nil
+			}), nil
 		},
 		Fix: func(context.Context, Phase, int, Evidence) (Evidence, error) {
 			fixes++
@@ -438,24 +449,24 @@ func TestEngineFixedWithoutPathsRejectsCommit(t *testing.T) {
 		Campaign: testCampaign(),
 		Store:    NewStore(dir, "c-fixbare", "o"),
 		Audit: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionCandidate, FindingFingerprint: "fp1",
-			}, nil
+			}), nil
 		},
 		Confirm: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionConfirmed, FindingFingerprint: "fp1",
 				ChangedPathIDs: []string{"p1"}, VerifierRef: "true",
-			}, nil
+			}), nil
 		},
 		Fix: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
 			// Fixed alone without paths/verifier
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionFixed, FindingFingerprint: "fp1",
-			}, nil
+			}), nil
 		},
 		Commit: func(context.Context, Evidence) (string, error) {
 			commits++
@@ -487,26 +498,26 @@ func TestEnginePassesAuditEvidenceToConfirmAndFix(t *testing.T) {
 			if cycle > 1 {
 				return Evidence{Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h2", Cycle: cycle}, nil
 			}
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionCandidate, FindingFingerprint: "fp-wire",
-			}, nil
+			}), nil
 		},
 		Confirm: func(ctx context.Context, phase Phase, cycle int, prior Evidence) (Evidence, error) {
 			confirmPrior = prior
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionConfirmed, FindingFingerprint: "fp-wire",
 				ChangedPathIDs: []string{"p1"}, VerifierRef: "go-test",
-			}, nil
+			}), nil
 		},
 		Fix: func(ctx context.Context, phase Phase, cycle int, prior Evidence) (Evidence, error) {
 			fixPrior = prior
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionFixed, FindingFingerprint: "fp-wire",
 				ChangedPathIDs: []string{"p1"}, VerifierRef: "go-test",
-			}, nil
+			}), nil
 		},
 		Commit: func(context.Context, Evidence) (string, error) { return "deadbeef", nil },
 	}
@@ -522,6 +533,105 @@ func TestEnginePassesAuditEvidenceToConfirmAndFix(t *testing.T) {
 	}
 	if res.Commits != 1 {
 		t.Fatalf("commits = %d, want 1; terminal=%s", res.Commits, res.Terminal)
+	}
+}
+
+func TestEngineStopsNoProgressWhenAuditHandoffMissing(t *testing.T) {
+	dir := t.TempDir()
+	confirms := 0
+	fixes := 0
+	c := testCampaign()
+	c.NoProgressThreshold = 2
+	c.MaxCycles = 6
+	c.CommitEnabled = true
+	eng := &Engine{
+		Campaign: c,
+		Store:    NewStore(dir, "c-handoff-miss", "o"),
+		Audit: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
+			// Non-clean candidate with fingerprint only — no re-verifiable handoff.
+			return Evidence{
+				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
+				Disposition: DispositionCandidate, FindingFingerprint: "fp-no-handoff",
+			}, nil
+		},
+		Confirm: func(context.Context, Phase, int, Evidence) (Evidence, error) {
+			confirms++
+			t.Fatalf("confirm must not run without audit handoff")
+			return Evidence{}, nil
+		},
+		Fix: func(context.Context, Phase, int, Evidence) (Evidence, error) {
+			fixes++
+			t.Fatalf("fix must not run without audit handoff")
+			return Evidence{}, nil
+		},
+		Commit: func(context.Context, Evidence) (string, error) {
+			t.Fatalf("commit must not run")
+			return "", nil
+		},
+	}
+	res, err := eng.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if res.Terminal != TerminalNoProgress {
+		t.Fatalf("terminal = %s, want no_progress", res.Terminal)
+	}
+	if !strings.Contains(res.Message, "audit handoff missing") {
+		t.Fatalf("message = %q, want audit handoff missing", res.Message)
+	}
+	if res.Cycles > c.NoProgressThreshold {
+		t.Fatalf("cycles = %d, want <= threshold %d", res.Cycles, c.NoProgressThreshold)
+	}
+	if confirms != 0 || fixes != 0 {
+		t.Fatalf("confirms=%d fixes=%d, want 0", confirms, fixes)
+	}
+}
+
+func TestEngineStopsNoProgressWhenConfirmHandoffMissing(t *testing.T) {
+	dir := t.TempDir()
+	fixes := 0
+	c := testCampaign()
+	c.NoProgressThreshold = 1
+	c.MaxCycles = 3
+	eng := &Engine{
+		Campaign: c,
+		Store:    NewStore(dir, "c-conf-handoff", "o"),
+		Audit: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
+			return withHandoff(Evidence{
+				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
+				Disposition: DispositionCandidate, FindingFingerprint: "fp-h1",
+			}), nil
+		},
+		Confirm: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
+			// Commit-eligible but deliberately no claim/path_hints and no carry from prior in this stub.
+			return Evidence{
+				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
+				Disposition: DispositionConfirmed, FindingFingerprint: "fp-h1",
+				ChangedPathIDs: []string{"p1"}, VerifierRef: "go-test",
+			}, nil
+		},
+		Fix: func(context.Context, Phase, int, Evidence) (Evidence, error) {
+			fixes++
+			t.Fatalf("fix must not run without confirm handoff")
+			return Evidence{}, nil
+		},
+		Commit: func(context.Context, Evidence) (string, error) {
+			t.Fatalf("commit must not run")
+			return "", nil
+		},
+	}
+	res, err := eng.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if res.Terminal != TerminalNoProgress {
+		t.Fatalf("terminal = %s, want no_progress", res.Terminal)
+	}
+	if !strings.Contains(res.Message, "confirm handoff missing") {
+		t.Fatalf("message = %q, want confirm handoff missing", res.Message)
+	}
+	if fixes != 0 {
+		t.Fatalf("fixes = %d", fixes)
 	}
 }
 
@@ -558,17 +668,17 @@ func TestEngineConfirmedFindingsOnlyNotCleanStop(t *testing.T) {
 		Store:    NewStore(dir, "c-cf", "o"),
 		Audit: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
 			// Schema-valid envelope with ConfirmedFindings but empty top-level disposition.
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				ConfirmedFindings: []FindingRef{{Fingerprint: "fp-list", Disposition: DispositionCandidate}},
-			}, nil
+			}), nil
 		},
 		Confirm: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
 			confirms++
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionRejected, FindingFingerprint: "fp-list",
-			}, nil
+			}), nil
 		},
 		Fix: func(context.Context, Phase, int, Evidence) (Evidence, error) {
 			t.Fatalf("fix must not run")
@@ -600,25 +710,25 @@ func TestEngineEmptyAuditFingerprintBlocksInventedConfirm(t *testing.T) {
 		Store:    NewStore(dir, "c-invent", "o"),
 		Audit: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
 			// Non-clean candidate with empty fingerprint — confirmer must not invent commit authority.
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionCandidate,
-			}, nil
+			}), nil
 		},
 		Confirm: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionConfirmed, FindingFingerprint: "invented-fp",
 				ChangedPathIDs: []string{"p1"}, VerifierRef: "true",
-			}, nil
+			}), nil
 		},
 		Fix: func(_ context.Context, _ Phase, cycle int, _ Evidence) (Evidence, error) {
 			fixes++
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionFixed, FindingFingerprint: "invented-fp",
 				ChangedPathIDs: []string{"p1"}, VerifierRef: "true",
-			}, nil
+			}), nil
 		},
 		Commit: func(context.Context, Evidence) (string, error) {
 			commits++
@@ -642,24 +752,24 @@ func TestEngineFixFingerprintMismatchRejectsCommit(t *testing.T) {
 		Campaign: testCampaign(),
 		Store:    NewStore(dir, "c-fixfp", "o"),
 		Audit: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionCandidate, FindingFingerprint: "audit-fp",
-			}, nil
+			}), nil
 		},
 		Confirm: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionConfirmed, FindingFingerprint: "audit-fp",
 				ChangedPathIDs: []string{"p1"}, VerifierRef: "true",
-			}, nil
+			}), nil
 		},
 		Fix: func(ctx context.Context, phase Phase, cycle int, _ Evidence) (Evidence, error) {
-			return Evidence{
+			return withHandoff(Evidence{
 				Schema: EvidenceSchema, CampaignRun: "r", BaselineHead: "h", Cycle: cycle,
 				Disposition: DispositionFixed, FindingFingerprint: "other-fp",
 				ChangedPathIDs: []string{"p1"}, VerifierRef: "true",
-			}, nil
+			}), nil
 		},
 		Commit: func(_ context.Context, e Evidence) (string, error) {
 			commits++

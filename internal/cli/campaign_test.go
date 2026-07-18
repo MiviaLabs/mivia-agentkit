@@ -143,7 +143,9 @@ func TestCampaignCLIBuiltBinaryScopedCommit(t *testing.T) {
   "cycle": 1,
   "baseline_head": "placeholder",
   "disposition": "candidate",
-  "finding_fingerprint": "fp-scoped-1"
+  "finding_fingerprint": "fp-scoped-1",
+  "finding_claim": "missing fixme content under allowlisted path",
+  "path_hints": ["fixme.txt"]
 }`
 	confirm1 := `{
   "schema": "mivia-agent-campaign-evidence/v1",
@@ -152,6 +154,8 @@ func TestCampaignCLIBuiltBinaryScopedCommit(t *testing.T) {
   "baseline_head": "placeholder",
   "disposition": "confirmed",
   "finding_fingerprint": "fp-scoped-1",
+  "finding_claim": "missing fixme content under allowlisted path",
+  "path_hints": ["fixme.txt"],
   "changed_path_ids": ["p1"],
   "verifier_ref": "true"
 }`
@@ -162,6 +166,8 @@ func TestCampaignCLIBuiltBinaryScopedCommit(t *testing.T) {
   "baseline_head": "placeholder",
   "disposition": "fixed",
   "finding_fingerprint": "fp-scoped-1",
+  "finding_claim": "missing fixme content under allowlisted path",
+  "path_hints": ["fixme.txt"],
   "changed_path_ids": ["p1"],
   "verifier_ref": "true"
 }`
