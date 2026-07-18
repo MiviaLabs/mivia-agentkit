@@ -198,6 +198,34 @@ func TestCommitScopedRejectsGlobAndSecretPaths(t *testing.T) {
 	}
 }
 
+func TestCommitScopedIgnoresUntrackedCampaignRunState(t *testing.T) {
+	// Campaign store writes .ai/runs/<id>/; without .gitignore that would block
+	// CommitScoped even though run state is never commit scope.
+	dir := initTempRepo(t)
+	if err := os.MkdirAll(filepath.Join(dir, ".ai", "runs", "camp-1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".ai", "runs", "camp-1", "campaign-state.json"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "a.go"), []byte("package a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	head, _ := Head(dir)
+	res, err := CommitScoped(context.Background(), CommitRequest{
+		Repo: dir, AllowedPaths: []string{"a.go"}, Message: "fix(quality): x", BaseHead: head,
+		Verifier:    []string{"true"},
+		StampCheck:  func(string, string, string, []string) error { return nil },
+		PolicyCheck: func(string, string, string) error { return nil },
+	})
+	if err != nil {
+		t.Fatalf("CommitScoped: %v", err)
+	}
+	if res.SHA == head {
+		t.Fatal("HEAD did not advance")
+	}
+}
+
 func TestCommitScopedRejectsStagedSecretUnderDirAllowlist(t *testing.T) {
 	dir := initTempRepo(t)
 	if err := os.MkdirAll(filepath.Join(dir, "internal"), 0o755); err != nil {

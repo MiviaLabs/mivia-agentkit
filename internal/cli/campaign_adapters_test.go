@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/adapter"
 	"github.com/MiviaLabs/mivia-agentkit/internal/auditcampaign"
@@ -472,6 +473,176 @@ func TestCampaignHostRealClaudeAdapterEnvelope(t *testing.T) {
 	}
 	if len(r.Calls) != 1 {
 		t.Fatalf("claude Run calls = %d, want 1", len(r.Calls))
+	}
+}
+
+// writingFixAdapter returns fixed evidence and writes a file under allowed_paths
+// during the fix prompt so CommitScoped has a real scoped diff.
+type writingFixAdapter struct {
+	scriptedCampaignAdapter
+	writeRel string
+	body     string
+}
+
+func (w *writingFixAdapter) Run(_ context.Context, req adapter.Request) (adapter.Result, error) {
+	w.mu.Lock()
+	w.calls++
+	w.prompts = append(w.prompts, req.Prompt)
+	stdout := w.stdout
+	if strings.Contains(req.Prompt, "campaign fixer") && w.writeRel != "" && req.Workdir != "" {
+		abs := filepath.Join(req.Workdir, filepath.FromSlash(w.writeRel))
+		_ = os.MkdirAll(filepath.Dir(abs), 0o755)
+		_ = os.WriteFile(abs, []byte(w.body), 0o644)
+		stdout = evidenceJSON("fixed", "fp-orch-1")
+	}
+	w.mu.Unlock()
+	if req.ArtifactOut != "" && len(stdout) > 0 {
+		_ = os.WriteFile(req.ArtifactOut, stdout, 0o644)
+	}
+	return adapter.Result{ExitCode: w.exit, Stdout: stdout}, nil
+}
+
+func TestCampaignHostEngineOrchestrableScopedCommit(t *testing.T) {
+	// Offline commit-capable path: codex audit candidate → zai confirm → zai fix writes → CommitScoped.
+	repo := t.TempDir()
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
+			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
+		)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+	run("init")
+	run("config", "user.email", "t@example.com")
+	run("config", "user.name", "t")
+	if err := os.MkdirAll(filepath.Join(repo, "internal"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "internal", "seed.go"), []byte("package internal\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run("add", "internal/seed.go")
+	run("commit", "-m", "init")
+	head, err := gitstate.Head(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	auditor := &scriptedCampaignAdapter{name: "codex", stdout: evidenceJSON("candidate", "fp-orch-1")}
+	// Confirmed without verifier_ref/paths — normalize must fill from campaign.
+	confirmer := &scriptedCampaignAdapter{
+		name:   "zai",
+		stdout: []byte(`{"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"placeholder","cycle":0,"baseline_head":"placeholder","disposition":"confirmed","finding_fingerprint":"fp-orch-1"}`),
+	}
+	fixer := &writingFixAdapter{
+		scriptedCampaignAdapter: scriptedCampaignAdapter{name: "zai-fix", stdout: evidenceJSON("fixed", "fp-orch-1")},
+		writeRel:                "internal/repair.go",
+		body:                    "package internal\n// repaired\n",
+	}
+	// Confirmer and fixer are both zai name for product; use distinct adapters by
+	// injecting a registry that maps "zai" once — host looks up by name, so one zai
+	// adapter must handle confirm then fix via prompt branching.
+	zaiBoth := &writingFixAdapter{
+		scriptedCampaignAdapter: scriptedCampaignAdapter{
+			name: "zai",
+			// default stdout for confirm path
+			stdout: []byte(`{"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"placeholder","cycle":0,"baseline_head":"placeholder","disposition":"confirmed","finding_fingerprint":"fp-orch-1"}`),
+		},
+		writeRel: "internal/repair.go",
+		body:     "package internal\n// repaired\n",
+	}
+	// Override Run to branch on phase.
+	// Use separate registration: confirmer name zai, fix producer must be zai — same Lookup.
+	// writingFixAdapter already switches on "campaign fixer" in prompt.
+	_ = confirmer
+	_ = fixer
+	reg, err := adapter.NewRegistry(auditor, zaiBoth)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("codex", "zai", "zai")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	camp.CommitEnabled = true
+	camp.VerifierProfile = "true"
+	camp.AllowedPaths = []string{"internal"}
+	camp.CommitMessageTemplate = "fix(quality): campaign scoped repair"
+	camp.MaxCycles = 4
+	camp.CleanPassThreshold = 2
+	camp.NoProgressThreshold = 2
+	h := &campaignHost{
+		repo: repo, runID: "orch-run", name: "deep-bug-audit-repair",
+		camp: camp, manifest: m, adapters: reg, expectedHead: head,
+		phaseTimeout: time.Minute,
+	}
+	// clean audits after first commit so engine can stop clean
+	auditN := 0
+	store := auditcampaign.NewStore(repo, "orch-run", "test")
+	eng := &auditcampaign.Engine{
+		Campaign:     camp,
+		Store:        store,
+		BaselineHead: head,
+		Audit: func(ctx context.Context, phase auditcampaign.Phase, cycle int, prior auditcampaign.Evidence) (auditcampaign.Evidence, error) {
+			auditN++
+			if auditN == 1 {
+				return h.Audit(ctx, phase, cycle, prior)
+			}
+			// subsequent cleans
+			return h.baseEvidence(cycle), nil
+		},
+		Confirm: h.Confirm,
+		Fix:     h.Fix,
+		// Drive real CommitScoped (allowlist staging, argv verifier). Stamp/policy
+		// hooks are explicit no-ops here so the test isolates host orchestrable
+		// evidence+write path; host.Commit stamp wiring is covered elsewhere.
+		Commit: func(ctx context.Context, e auditcampaign.Evidence) (string, error) {
+			cur, err := gitstate.Head(repo)
+			if err != nil {
+				return "", err
+			}
+			res, err := gitstate.CommitScoped(ctx, gitstate.CommitRequest{
+				Repo:         repo,
+				AllowedPaths: []string{"internal"},
+				Message:      "fix(quality): campaign scoped repair",
+				Verifier:     []string{"true"},
+				BaseHead:     cur,
+				StampCheck:   func(string, string, string, []string) error { return nil },
+				PolicyCheck:  func(string, string, string) error { return nil },
+			})
+			if err != nil {
+				return "", err
+			}
+			h.expectedHead = res.SHA
+			return res.SHA, nil
+		},
+	}
+	// First audit uses host which invokes codex scripted adapter.
+	res, err := eng.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if res.Commits != 1 {
+		t.Fatalf("commits = %d terminal=%s msg=%s, want 1", res.Commits, res.Terminal, res.Message)
+	}
+	after, err := gitstate.Head(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after == head {
+		t.Fatal("HEAD did not advance")
+	}
+	if _, err := os.Stat(filepath.Join(repo, "internal", "repair.go")); err != nil {
+		t.Fatalf("repair file missing: %v", err)
+	}
+	// Confirm prompt must include prior audit fingerprint.
+	if zaiBoth.callCount() < 2 {
+		t.Fatalf("zai calls = %d, want >=2 (confirm+fix)", zaiBoth.callCount())
+	}
+	if !strings.Contains(zaiBoth.prompts[0], "fp-orch-1") {
+		t.Fatalf("confirm prompt missing prior fp: %q", zaiBoth.prompts[0])
 	}
 }
 

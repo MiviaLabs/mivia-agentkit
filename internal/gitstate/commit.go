@@ -268,6 +268,14 @@ func assertCleanOwnedWorktree(repo string, allowed []string) error {
 		if path == "" {
 			continue
 		}
+		// Coordinator-owned run state is never commit scope and must not block
+		// CommitScoped even when a target repo lacks .gitignore entries.
+		if path == ".ai/runs" || strings.HasPrefix(path, ".ai/runs/") {
+			continue
+		}
+		if path == ".ai/campaign-fixtures" || strings.HasPrefix(path, ".ai/campaign-fixtures/") {
+			continue
+		}
 		if _, ok := allow[path]; ok {
 			continue
 		}
