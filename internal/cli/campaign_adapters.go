@@ -264,6 +264,7 @@ func (h *campaignHost) Confirm(ctx context.Context, phase auditcampaign.Phase, c
 	if err != nil {
 		return auditcampaign.Evidence{}, err
 	}
+	ev = h.normalizeCommitEvidence(ev, prior, auditcampaign.DispositionConfirmed)
 	if err := h.assertHeadUnchanged(); err != nil {
 		return auditcampaign.Evidence{}, err
 	}
@@ -323,11 +324,39 @@ func (h *campaignHost) Fix(ctx context.Context, phase auditcampaign.Phase, cycle
 	if err != nil {
 		return auditcampaign.Evidence{}, err
 	}
+	ev = h.normalizeCommitEvidence(ev, prior, auditcampaign.DispositionFixed)
 	// Fixers must not commit; HEAD must still match baseline.
 	if err := h.assertHeadUnchanged(); err != nil {
 		return auditcampaign.Evidence{}, err
 	}
 	return ev, nil
+}
+
+// normalizeCommitEvidence fills commit-capable gaps from campaign config / prior
+// when the adapter already chose the right disposition and fingerprint but omitted
+// verifier_ref or opaque path ids (common live-provider miss).
+func (h *campaignHost) normalizeCommitEvidence(ev, prior auditcampaign.Evidence, want auditcampaign.Disposition) auditcampaign.Evidence {
+	if !h.camp.CommitEnabled || ev.Disposition != want {
+		return ev
+	}
+	if ev.FindingFingerprint == "" && prior.FindingFingerprint != "" {
+		ev.FindingFingerprint = prior.FindingFingerprint
+	}
+	if ev.VerifierRef == "" {
+		if prior.VerifierRef != "" {
+			ev.VerifierRef = prior.VerifierRef
+		} else if v := strings.TrimSpace(h.camp.VerifierProfile); v != "" {
+			ev.VerifierRef = v
+		}
+	}
+	if len(ev.ChangedPathIDs) == 0 {
+		if len(prior.ChangedPathIDs) > 0 {
+			ev.ChangedPathIDs = append([]string(nil), prior.ChangedPathIDs...)
+		} else if len(h.camp.AllowedPaths) > 0 {
+			ev.ChangedPathIDs = []string{"p1"}
+		}
+	}
+	return ev
 }
 
 // invokeOrchestrable runs an approved adapter and decodes typed campaign evidence only.

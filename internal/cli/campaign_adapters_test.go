@@ -475,6 +475,36 @@ func TestCampaignHostRealClaudeAdapterEnvelope(t *testing.T) {
 	}
 }
 
+func TestNormalizeCommitEvidenceFillsVerifierAndPaths(t *testing.T) {
+	h := &campaignHost{
+		camp: config.Campaign{
+			CommitEnabled:   true,
+			VerifierProfile: "go-test",
+			AllowedPaths:    []string{"internal"},
+		},
+	}
+	prior := auditcampaign.Evidence{
+		Disposition:        auditcampaign.DispositionCandidate,
+		FindingFingerprint: "fp-n1",
+	}
+	got := h.normalizeCommitEvidence(auditcampaign.Evidence{
+		Disposition:        auditcampaign.DispositionConfirmed,
+		FindingFingerprint: "fp-n1",
+	}, prior, auditcampaign.DispositionConfirmed)
+	if got.VerifierRef != "go-test" || len(got.ChangedPathIDs) != 1 || got.ChangedPathIDs[0] != "p1" {
+		t.Fatalf("got = %+v", got)
+	}
+	// Non-commit campaigns must not invent fields.
+	h.camp.CommitEnabled = false
+	got = h.normalizeCommitEvidence(auditcampaign.Evidence{
+		Disposition:        auditcampaign.DispositionConfirmed,
+		FindingFingerprint: "fp-n1",
+	}, prior, auditcampaign.DispositionConfirmed)
+	if got.VerifierRef != "" || len(got.ChangedPathIDs) != 0 {
+		t.Fatalf("non-commit normalize leaked fields: %+v", got)
+	}
+}
+
 func TestCampaignPhasePromptIncludesPriorFinding(t *testing.T) {
 	camp := config.CampaignDefaults()
 	camp.AllowedPaths = []string{"internal"}
