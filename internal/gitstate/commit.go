@@ -98,26 +98,32 @@ func CommitScoped(ctx context.Context, req CommitRequest) (CommitResult, error) 
 		return CommitResult{}, fmt.Errorf("%w: git add: %v", ErrScopedCommit, err)
 	}
 
+	// Post-stage: reject any staged path that is a secret or outside the literal allowlist.
+	if err := assertStagedPathsSafe(ctx, repo, paths); err != nil {
+		return CommitResult{}, err
+	}
+
 	indexHash, err := indexTreeHash(ctx, repo)
 	if err != nil {
 		return CommitResult{}, err
 	}
 
-	// Verifier as argv only; empty verifier is allowed only when caller opts into true-profile.
-	if len(req.Verifier) > 0 {
-		timeout := req.VerifierTimeout
-		if timeout <= 0 {
-			timeout = 2 * time.Minute
-		}
-		vctx, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
-		cmd := exec.CommandContext(vctx, req.Verifier[0], req.Verifier[1:]...)
-		cmd.Dir = repo
-		cmd.Env = safeEnv()
-		if _, err := cmd.CombinedOutput(); err != nil {
-			// Do not embed raw verifier stdout/stderr (may contain secrets).
-			return CommitResult{}, fmt.Errorf("%w: verifier failed", ErrScopedCommit)
-		}
+	// Verifier as argv only; empty verifier fails closed.
+	if len(req.Verifier) == 0 {
+		return CommitResult{}, fmt.Errorf("%w: verifier required", ErrScopedCommit)
+	}
+	timeout := req.VerifierTimeout
+	if timeout <= 0 {
+		timeout = 2 * time.Minute
+	}
+	vctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	cmd := exec.CommandContext(vctx, req.Verifier[0], req.Verifier[1:]...)
+	cmd.Dir = repo
+	cmd.Env = safeEnv()
+	if _, err := cmd.CombinedOutput(); err != nil {
+		// Do not embed raw verifier stdout/stderr (may contain secrets).
+		return CommitResult{}, fmt.Errorf("%w: verifier failed", ErrScopedCommit)
 	}
 
 	if err := req.StampCheck(repo, head, indexHash, paths); err != nil {
@@ -149,6 +155,39 @@ func CommitScoped(ctx context.Context, req CommitRequest) (CommitResult, error) 
 		return CommitResult{}, fmt.Errorf("%w: head did not advance", ErrScopedCommit)
 	}
 	return CommitResult{SHA: newHead, IndexHash: indexHash, StagedPaths: paths}, nil
+}
+
+// assertStagedPathsSafe ensures every staged file is under a literal allowlisted
+// path and is not a secret-like path (.env, secrets/**, private keys).
+func assertStagedPathsSafe(ctx context.Context, repo string, allowed []string) error {
+	out, err := exec.CommandContext(ctx, "git", "-C", repo, "diff", "--cached", "--name-only", "-z").Output()
+	if err != nil {
+		return fmt.Errorf("%w: list staged: %v", ErrScopedCommit, err)
+	}
+	allow := map[string]struct{}{}
+	for _, a := range allowed {
+		allow[a] = struct{}{}
+	}
+	for _, raw := range strings.Split(string(out), "\x00") {
+		if raw == "" {
+			continue
+		}
+		p := filepath.ToSlash(raw)
+		covered := false
+		for a := range allow {
+			if p == a || strings.HasPrefix(p, a+"/") {
+				covered = true
+				break
+			}
+		}
+		if !covered {
+			return fmt.Errorf("%w: staged path %q outside allowlist", ErrScopedCommit, p)
+		}
+		if _, err := normalizeScopedPath(p); err != nil {
+			return fmt.Errorf("%w: staged path %q: %v", ErrScopedCommit, p, err)
+		}
+	}
+	return nil
 }
 
 func normalizeScopedPath(p string) (string, error) {

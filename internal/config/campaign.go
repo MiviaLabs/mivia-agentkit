@@ -241,6 +241,7 @@ func validateCampaignPath(name, p string) error {
 
 // validateVerifierProfile rejects multi-word free-form profiles that would
 // otherwise be shell-expanded or silently no-op. Named profiles and single PATH tokens only.
+// Relative path tokens (./script, ../x) are rejected so a fix cannot plant a verifier binary.
 func validateVerifierProfile(name, profile string) error {
 	profile = strings.TrimSpace(profile)
 	if profile == "" {
@@ -255,6 +256,9 @@ func validateVerifierProfile(name, profile string) error {
 	}
 	if strings.ContainsAny(profile, "*?[]{}") {
 		return fmt.Errorf("campaign %q verifier_profile %q contains metacharacters", name, profile)
+	}
+	if strings.ContainsAny(profile, `/\`) || strings.HasPrefix(profile, ".") {
+		return fmt.Errorf("campaign %q verifier_profile %q must be a bare command name, not a path", name, profile)
 	}
 	return nil
 }

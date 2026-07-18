@@ -634,6 +634,9 @@ func verifierArgv(profile string) ([]string, error) {
 		if strings.ContainsAny(profile, "*?[]{}") {
 			return nil, fmt.Errorf("verifier_profile %q contains shell/glob metacharacters", profile)
 		}
+		if strings.ContainsAny(profile, `/\`) || strings.HasPrefix(profile, ".") {
+			return nil, fmt.Errorf("verifier_profile %q must be a bare command name, not a path", profile)
+		}
 		return []string{profile}, nil
 	}
 }

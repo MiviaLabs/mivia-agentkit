@@ -133,8 +133,12 @@ func (e Evidence) Validate() error {
 }
 
 // CommitEligible reports whether evidence can drive a commit-capable fix.
+// Requires confirmed disposition, opaque fingerprint, path IDs, and verifier ref.
 func (e Evidence) CommitEligible() bool {
 	if e.Disposition != DispositionConfirmed {
+		return false
+	}
+	if e.FindingFingerprint == "" || !isOpaqueID(e.FindingFingerprint) {
 		return false
 	}
 	if e.VerifierRef == "" || len(e.ChangedPathIDs) == 0 {

@@ -47,6 +47,7 @@ func TestCommitScopedSuccess(t *testing.T) {
 		AllowedPaths: []string{"a.go"},
 		Message:      "fix(quality): scoped",
 		BaseHead:     head,
+		Verifier:     []string{"true"},
 		StampCheck:   func(string, string, string, []string) error { return nil },
 		PolicyCheck:  func(string, string, string) error { return nil },
 	})
@@ -65,6 +66,7 @@ func TestCommitScopedRejectsDirtyUnrelated(t *testing.T) {
 	head, _ := Head(dir)
 	_, err := CommitScoped(context.Background(), CommitRequest{
 		Repo: dir, AllowedPaths: []string{"a.go"}, Message: "fix(quality): x", BaseHead: head,
+		Verifier:    []string{"true"},
 		StampCheck:  func(string, string, string, []string) error { return nil },
 		PolicyCheck: func(string, string, string) error { return nil },
 	})
@@ -77,6 +79,7 @@ func TestCommitScopedRejectsDeniedPaths(t *testing.T) {
 	dir := initTempRepo(t)
 	_, err := CommitScoped(context.Background(), CommitRequest{
 		Repo: dir, AllowedPaths: []string{".ai/runs/x"}, Message: "fix(quality): x",
+		Verifier:    []string{"true"},
 		StampCheck:  func(string, string, string, []string) error { return nil },
 		PolicyCheck: func(string, string, string) error { return nil },
 	})
@@ -103,6 +106,7 @@ func TestCommitScopedRejectsStaleStampAndPolicyDenial(t *testing.T) {
 	head, _ := Head(dir)
 	_, err := CommitScoped(context.Background(), CommitRequest{
 		Repo: dir, AllowedPaths: []string{"a.go"}, Message: "fix(quality): x", BaseHead: head,
+		Verifier:    []string{"true"},
 		StampCheck:  func(string, string, string, []string) error { return errorsNew("stale stamp") },
 		PolicyCheck: func(string, string, string) error { return nil },
 	})
@@ -111,6 +115,7 @@ func TestCommitScopedRejectsStaleStampAndPolicyDenial(t *testing.T) {
 	}
 	_, err = CommitScoped(context.Background(), CommitRequest{
 		Repo: dir, AllowedPaths: []string{"a.go"}, Message: "fix(quality): x", BaseHead: head,
+		Verifier:    []string{"true"},
 		StampCheck:  func(string, string, string, []string) error { return nil },
 		PolicyCheck: func(string, string, string) error { return errorsNew("policy denied") },
 	})
@@ -125,6 +130,7 @@ func TestCommitScopedRejectsMissingStampAndPolicyHooks(t *testing.T) {
 	head, _ := Head(dir)
 	_, err := CommitScoped(context.Background(), CommitRequest{
 		Repo: dir, AllowedPaths: []string{"a.go"}, Message: "fix(quality): x", BaseHead: head,
+		Verifier:    []string{"true"},
 		PolicyCheck: func(string, string, string) error { return nil },
 	})
 	if err == nil || !strings.Contains(err.Error(), "stamp check required") {
@@ -132,10 +138,25 @@ func TestCommitScopedRejectsMissingStampAndPolicyHooks(t *testing.T) {
 	}
 	_, err = CommitScoped(context.Background(), CommitRequest{
 		Repo: dir, AllowedPaths: []string{"a.go"}, Message: "fix(quality): x", BaseHead: head,
+		Verifier:   []string{"true"},
 		StampCheck: func(string, string, string, []string) error { return nil },
 	})
 	if err == nil || !strings.Contains(err.Error(), "policy check required") {
 		t.Fatalf("error = %v, want policy check required", err)
+	}
+}
+
+func TestCommitScopedRejectsEmptyVerifier(t *testing.T) {
+	dir := initTempRepo(t)
+	_ = os.WriteFile(filepath.Join(dir, "a.go"), []byte("package a\n"), 0o644)
+	head, _ := Head(dir)
+	_, err := CommitScoped(context.Background(), CommitRequest{
+		Repo: dir, AllowedPaths: []string{"a.go"}, Message: "fix(quality): x", BaseHead: head,
+		StampCheck:  func(string, string, string, []string) error { return nil },
+		PolicyCheck: func(string, string, string) error { return nil },
+	})
+	if err == nil || !strings.Contains(err.Error(), "verifier required") {
+		t.Fatalf("error = %v, want verifier required", err)
 	}
 }
 
@@ -159,6 +180,7 @@ func TestCommitScopedRejectsGlobAndSecretPaths(t *testing.T) {
 	head, _ := Head(dir)
 	_, err := CommitScoped(context.Background(), CommitRequest{
 		Repo: dir, AllowedPaths: []string{"*.go"}, Message: "fix(quality): x", BaseHead: head,
+		Verifier:    []string{"true"},
 		StampCheck:  func(string, string, string, []string) error { return nil },
 		PolicyCheck: func(string, string, string) error { return nil },
 	})
@@ -167,11 +189,35 @@ func TestCommitScopedRejectsGlobAndSecretPaths(t *testing.T) {
 	}
 	_, err = CommitScoped(context.Background(), CommitRequest{
 		Repo: dir, AllowedPaths: []string{".env"}, Message: "fix(quality): x", BaseHead: head,
+		Verifier:    []string{"true"},
 		StampCheck:  func(string, string, string, []string) error { return nil },
 		PolicyCheck: func(string, string, string) error { return nil },
 	})
 	if err == nil || !strings.Contains(err.Error(), "denied") {
 		t.Fatalf("error = %v, want denied secret path", err)
+	}
+}
+
+func TestCommitScopedRejectsStagedSecretUnderDirAllowlist(t *testing.T) {
+	dir := initTempRepo(t)
+	if err := os.MkdirAll(filepath.Join(dir, "internal"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "internal", "ok.go"), []byte("package internal\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "internal", ".env"), []byte("SECRET=1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	head, _ := Head(dir)
+	_, err := CommitScoped(context.Background(), CommitRequest{
+		Repo: dir, AllowedPaths: []string{"internal"}, Message: "fix(quality): x", BaseHead: head,
+		Verifier:    []string{"true"},
+		StampCheck:  func(string, string, string, []string) error { return nil },
+		PolicyCheck: func(string, string, string) error { return nil },
+	})
+	if err == nil || !strings.Contains(err.Error(), "denied") {
+		t.Fatalf("error = %v, want denied staged secret under dir allowlist", err)
 	}
 }
 

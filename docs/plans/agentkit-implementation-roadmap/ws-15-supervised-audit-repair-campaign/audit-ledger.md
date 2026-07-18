@@ -12,6 +12,7 @@ Rules: no raw prompts, raw model output, secrets, absolute paths, or `.ai/runs/*
 | 4–6 | a51238b..HEAD | implementation+suite | tests; correctness self-check; security self-check | PASS; PASS; PASS | live dual-CLI install not exercised in CI (wiring covered by fakes) | this-commit | local + orchestrable adapters + scoped commit + built-binary |
 | adapters | prior..HEAD | orchestrable wiring | tests; correctness self-check | PASS; PASS | live dual-CLI install not exercised in CI | this-commit | codex/claude/etc. invoke path + typed evidence; local fixtures retained |
 | phase1-audit-fix | prior..HEAD | independent deep-bug-audit cycle 1 | correctness; security; evidence; tests; docs + independent confirm | PASS after fix | live dual-CLI not in CI; dedicated campaign worktree deferred (commits in --repo + allowlist); mid-phase resume restarts at audit boundary | this-commit | candidate→confirm gate; commit_enabled=false; multi-word verifier fail-closed; pathpolicy+globs; non-zero exit on fail; resume re-runs engine |
+| phase1-audit-fix-2 | prior..HEAD | independent deep-bug-audit cycle 2 | correctness; security; evidence/tests; docs + confirm | PASS after residual fix | live dual-CLI not in CI; worktree deferred; opaque path-id→path map not yet binding (stages allowlist ∩ actual staged; secrets under dir deny); MaxRepairAttempts unused (cycle/no_progress caps still bound) | this-commit | cumulative DurationUsedMS; confirm fingerprint bind; path-like verifier reject; staged secret under dir allowlist; verifier required |
 
 ## Phase 0 entry
 

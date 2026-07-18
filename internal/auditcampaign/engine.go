@@ -103,6 +103,7 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 		}
 		if isCleanEvidence(ev) {
 			snap.CleanStreak++
+			e.persistDuration(&snap, start, usedBefore)
 			if snap.CleanStreak >= cleanNeed {
 				return e.terminate(snap, TerminalClean, "two consecutive clean audits", commits, start, usedBefore)
 			}
@@ -122,7 +123,7 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 		if err != nil {
 			return e.terminate(snap, classifyAdapterErr(err), err.Error(), commits, start, usedBefore)
 		}
-		// Confirm must be fully commit-eligible; bare confirmed without paths/verifier stops the cycle.
+		// Confirm must be fully commit-eligible; bare confirmed without paths/verifier/fingerprint stops.
 		if !cev.CommitEligible() {
 			fp := cev.FindingFingerprint
 			if fp == "" {
@@ -133,14 +134,20 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 					return e.terminate(snap, TerminalNoProgress, "duplicate fingerprint", commits, start, usedBefore)
 				}
 			}
+			e.persistDuration(&snap, start, usedBefore)
 			if err := e.setPhase(&snap, PhaseCompletedCycle); err != nil {
 				return e.terminate(snap, TerminalMalformedState, err.Error(), commits, start, usedBefore)
 			}
 			continue
 		}
-		// Bind confirmer finding to audit fingerprint when both present.
-		if ev.FindingFingerprint != "" && cev.FindingFingerprint != "" &&
-			ev.FindingFingerprint != cev.FindingFingerprint {
+		// Bind confirmer finding to audit fingerprint: empty confirm fp or mismatch rejects.
+		if ev.FindingFingerprint != "" && cev.FindingFingerprint != ev.FindingFingerprint {
+			if RecordFingerprint(&snap, ev.FindingFingerprint) {
+				if snap.NoProgressCount >= e.Campaign.NoProgressThreshold {
+					return e.terminate(snap, TerminalNoProgress, "duplicate fingerprint", commits, start, usedBefore)
+				}
+			}
+			e.persistDuration(&snap, start, usedBefore)
 			if err := e.setPhase(&snap, PhaseCompletedCycle); err != nil {
 				return e.terminate(snap, TerminalMalformedState, err.Error(), commits, start, usedBefore)
 			}
@@ -149,6 +156,7 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 
 		// Audit/confirm-only campaigns: do not fix or commit; do not fail closed as commit_failed.
 		if !e.Campaign.CommitEnabled {
+			e.persistDuration(&snap, start, usedBefore)
 			if err := e.setPhase(&snap, PhaseCompletedCycle); err != nil {
 				return e.terminate(snap, TerminalMalformedState, err.Error(), commits, start, usedBefore)
 			}
@@ -193,12 +201,18 @@ func (e *Engine) Run(ctx context.Context) (Result, error) {
 		commits++
 		snap.LastCommitSHA = sha
 		snap.BaselineHead = sha
+		e.persistDuration(&snap, start, usedBefore)
 		if err := e.setPhase(&snap, PhaseCompletedCycle); err != nil {
 			return e.terminate(snap, TerminalMalformedState, err.Error(), commits, start, usedBefore)
 		}
 		// schedule next audit only after recorded commit (loop continues)
 	}
 	return e.terminate(snap, TerminalCycleCap, "cycle cap", commits, start, usedBefore)
+}
+
+// persistDuration records cumulative wall time so resume budgets are honest.
+func (e *Engine) persistDuration(snap *Snapshot, start time.Time, usedBefore time.Duration) {
+	snap.DurationUsedMS = (usedBefore + e.now().Sub(start)).Milliseconds()
 }
 
 func (e *Engine) ensureSnapshot(maxCycles int, maxDur time.Duration) (Snapshot, error) {
@@ -289,10 +303,13 @@ func isCleanEvidence(e Evidence) bool {
 	}
 }
 
-// fixCommitReady requires fixed/confirmed disposition plus path IDs and verifier ref.
+// fixCommitReady requires fixed disposition plus fingerprint, path IDs, and verifier ref.
 // DispositionFixed alone is not sufficient (no path/verifier proof).
 func fixCommitReady(e Evidence) bool {
-	if e.Disposition != DispositionFixed && e.Disposition != DispositionConfirmed {
+	if e.Disposition != DispositionFixed {
+		return false
+	}
+	if e.FindingFingerprint == "" || !isOpaqueID(e.FindingFingerprint) {
 		return false
 	}
 	return e.VerifierRef != "" && len(e.ChangedPathIDs) > 0
