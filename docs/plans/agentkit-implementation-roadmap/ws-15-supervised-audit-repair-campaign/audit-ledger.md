@@ -16,6 +16,7 @@ Rules: no raw prompts, raw model output, secrets, absolute paths, or `.ai/runs/*
 | phase1-stop-clean | 570afb1 | cycles 3+4 independent audit+confirm | multi-lens + independent confirmers | PASS; PASS | live dual-CLI cost/flakiness; worktree deferred; path-id map; MaxRepairAttempts unused under caps | 570afb1 | two consecutive empty full-scope rounds |
 | phase2-live | 570afb1 | live dual-CLI finite run | operator + product fail-closed | PASS (fail-closed evidence) | providers may not emit schema-valid evidence; cost/flaky; dogfood left disabled | n/a product | codex+claude approved; terminal verification_failed unknown field; self-confirm misconfig exit 2; dogfood disabled |
 | skeptic-repair | prior..HEAD | skeptic fail-open repair | tests + independent re-audit | PASS after fix | accepted residual unchanged | this-commit | ConfirmedFindings not clean; invent-confirm blocked; fix fp must match confirm |
+| gap-closure | prior..HEAD | live thrash + commit path gaps | tests + offline orch commit | PASS | live dual-CLI may still reject findings; worktree deferred | bf7718a | no_progress on unique fps; prior evidence; normalize; ignore .ai/runs dirt |
 
 ## Phase 0 entry
 
