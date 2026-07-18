@@ -11,8 +11,8 @@ adapters:
     role: orchestrable
     effort: medium
   claude:
-    enabled: false
-    role: guidance
+    enabled: true
+    role: orchestrable
   copilot:
     enabled: true
     role: guidance
@@ -80,15 +80,33 @@ governance:
   provider: noop
   audit_log: .ai/audit.jsonl
 
-# Supervised audit-repair campaigns are disabled by default.
-# Operator launch only: mivia-agent campaign run --repo . --campaign deep-bug-audit-repair
+# Supervised audit-repair campaign (operator-enabled for live dual-CLI run).
+# Launch: mivia-agent campaign run --repo . --campaign deep-bug-audit-repair --json
 # Commit-capable mode requires independent auditor/confirmer and explicit allowed_paths.
+loops:
+  bug-audit-loop:
+    bound: iterations
+    max_iterations: 2
+    steps:
+      - id: audit
+        producer: codex
+  fix-loop:
+    bound: iterations
+    max_iterations: 1
+    steps:
+      - id: fix
+        producer: codex
+
 campaigns:
   deep-bug-audit-repair:
-    enabled: false
+    enabled: true
+    audit_workflow: bug-audit-loop
+    fix_workflow: fix-loop
+    auditor: codex
+    confirmer: claude
     clean_pass_threshold: 2
-    max_cycles: 10
-    max_duration: 2h
+    max_cycles: 4
+    max_duration: 30m
     max_repair_attempts: 3
     no_progress_threshold: 2
     commit_enabled: false
