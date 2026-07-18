@@ -55,7 +55,7 @@ Strict-profile loops that end in a protected action must use `majority` or `unan
 
 Steps that should trigger the hook governance gate before execution use `approval: protect:<kind>`:
 
-- `protect:commit` — producer step requires a fresh quality stamp before `git commit`.
+- `protect:commit` — stamp/policy gate only (not a coordinator Git commit). Requires a fresh quality stamp before a producer step that intends `git commit`.
 - `protect:push` — requires stamp before `git push`.
 - `protect:pr` — requires stamp before pull request creation.
 - `protect:release` — requires stamp before release.
@@ -76,6 +76,27 @@ steps:
 `protected_action` loops exit successfully after the protect step executes. Review steps that fail before the protect step (with `on_fail: fail` or `on_fail: iterate`) prevent the protect step from running in that iteration.
 
 Strict-profile protect-bound loops require `majority` or `unanimous` consensus and at least 2 reviewers; `first-pass` and `min_reviewers: 1` are rejected at validation time.
+
+## Supervised Campaigns (Not Loops)
+
+`config.Loop` remains the bounded `mivia-agent run` surface. Supervised audit-repair campaigns are a separate, disabled-by-default contract under `campaigns:` in `mivia-agent.yaml`.
+
+```bash
+./mivia-agent campaign run --repo . --campaign deep-bug-audit-repair --json
+./mivia-agent campaign status --repo . --run <id> --json
+./mivia-agent campaign resume --repo . --run <id> --json
+```
+
+Operator rules:
+
+- Finite cycles, duration caps, and no-progress stops; never an unbounded self-loop.
+- `--continuous` is interactive TTY only; CI/noninteractive environments are rejected.
+- Ordinary deep-bug-audit and the host audit-loop hook stay **report-only** and do not commit.
+- Commit-capable campaigns require an independently configured confirmer different from the auditor. A one-adapter self-hosted setup fails closed.
+- Candidates always go through the independent confirmer; `commit_enabled: false` is audit→confirm only (no fix/commit failure).
+- Only the coordinator performs scoped commits (`CommitScoped`) on literal `allowed_paths` in the `--repo` worktree; no auto-push, force, reset, clean, or PR. Multi-word `verifier_profile` values fail closed (`true` / `go-test` / single PATH token only).
+- `campaign resume --run <id>` continues a non-terminal run with remaining budget from the next audit boundary; it is not inspect-only status.
+- Local fixture adapters (`local`, `local-*`) support offline integration tests. Configured orchestrable adapters (codex, claude, and other approved runtime adapters) are invoked for campaign auditor/confirmer/fix and must return typed `mivia-agent-campaign-evidence/v1`; missing, unapproved, or non-evidence outputs fail closed.
 
 ## Consensus Modes
 

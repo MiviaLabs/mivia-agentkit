@@ -299,3 +299,102 @@ func validLoop() Loop {
 		}},
 	}
 }
+
+func TestManifestParsesCampaigns(t *testing.T) {
+	got, err := Parse([]byte(`
+version: "1"
+profile: standard
+adapters:
+  codex:
+    enabled: true
+    role: orchestrable
+  claude:
+    enabled: true
+    role: orchestrable
+loops:
+  bug-audit-loop:
+    bound: iterations
+    max_iterations: 2
+    steps:
+      - id: audit
+        producer: codex
+  fix-loop:
+    bound: iterations
+    max_iterations: 1
+    steps:
+      - id: fix
+        producer: codex
+campaigns:
+  deep-bug-audit-repair:
+    enabled: false
+    audit_workflow: bug-audit-loop
+    fix_workflow: fix-loop
+    auditor: codex
+    confirmer: claude
+    clean_pass_threshold: 2
+    max_cycles: 5
+    max_duration: 1h
+`))
+	if err != nil {
+		t.Fatalf("Parse() error = %v, want nil", err)
+	}
+	c, ok := got.Campaigns["deep-bug-audit-repair"]
+	if !ok {
+		t.Fatalf("Campaigns missing deep-bug-audit-repair")
+	}
+	if c.Enabled {
+		t.Fatalf("Enabled = true, want false")
+	}
+	if c.Auditor != "codex" || c.Confirmer != "claude" {
+		t.Fatalf("auditor/confirmer = %q/%q", c.Auditor, c.Confirmer)
+	}
+}
+
+func TestManifestRejectsInvalidCampaign(t *testing.T) {
+	_, err := Parse([]byte(`
+version: "1"
+profile: standard
+adapters:
+  codex:
+    enabled: true
+    role: orchestrable
+loops:
+  bug-audit-loop:
+    bound: iterations
+    max_iterations: 2
+    steps:
+      - id: audit
+        producer: codex
+campaigns:
+  deep-bug-audit-repair:
+    enabled: true
+    audit_workflow: bug-audit-loop
+    fix_workflow: bug-audit-loop
+    auditor: codex
+    confirmer: codex
+    commit_enabled: true
+    verifier_profile: go-test
+    allowed_paths: ["internal/config"]
+    commit_message_template: "fix(quality): campaign repair"
+`))
+	if err == nil || !strings.Contains(err.Error(), "independent confirmer") {
+		t.Fatalf("Parse() error = %v, want independent confirmer rejection", err)
+	}
+}
+
+func TestManifestAbsentCampaignsOK(t *testing.T) {
+	got, err := Parse([]byte(`
+version: "1"
+profile: standard
+adapters:
+  codex:
+    enabled: true
+    role: orchestrable
+`))
+	if err != nil {
+		t.Fatalf("Parse() error = %v, want nil", err)
+	}
+	if len(got.Campaigns) != 0 {
+		t.Fatalf("Campaigns = %#v, want empty", got.Campaigns)
+	}
+}

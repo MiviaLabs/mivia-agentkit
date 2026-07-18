@@ -10,8 +10,10 @@ import sys
 import tempfile
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+import agent_contract_lib as contracts  # noqa: E402
+
 VALIDATOR = ROOT / "scripts" / "validate_agent_plan.py"
 SCHEMA = ROOT / ".ai" / "schemas" / "agent-plan-v1.schema.json"
 TEMPLATE = ROOT / ".ai" / "templates" / "agent-plan-v1.json"
@@ -340,6 +342,123 @@ def test_agentkit_plan_nodes_have_existing_task_dirs() -> None:
             raise AssertionError(f"node {node['id']} task_dir has no tasks.md: {node['task_dir']}")
 
 
+SUPERVISED_PLAN = MACHINE_PLAN_ROOT / "supervised-deep-bug-audit-repair-campaign.plan.json"
+
+
+def test_supervised_campaign_plan_files_edit_covers_declared_test_paths() -> None:
+    if not SUPERVISED_PLAN.is_file():
+        raise AssertionError("missing supervised-deep-bug-audit-repair-campaign.plan.json")
+    parsed = json.loads(SUPERVISED_PLAN.read_text(encoding="utf-8"))
+    for node in parsed["dag"]["nodes"]:
+        files_edit = set(node.get("files_edit") or [])
+        for test_ref in node.get("tests") or []:
+            # tests entries may be path::name or package paths
+            path_part = str(test_ref).split("::", 1)[0]
+            if path_part.endswith(".go") and path_part not in files_edit:
+                raise AssertionError(
+                    f"node {node['id']} declares test {test_ref!r} but files_edit omits {path_part!r}"
+                )
+
+
+def test_supervised_campaign_plan_files_edit_subset_of_scope_in() -> None:
+    failures = contracts.check_supervised_plan_allowlist(SUPERVISED_PLAN)
+    if failures:
+        raise AssertionError("; ".join(failures))
+
+
+def test_supervised_campaign_plan_phase5_template_tree_allowlist() -> None:
+    if not SUPERVISED_PLAN.is_file():
+        raise AssertionError("missing supervised-deep-bug-audit-repair-campaign.plan.json")
+    parsed = json.loads(SUPERVISED_PLAN.read_text(encoding="utf-8"))
+    nodes = {n["id"]: n for n in parsed["dag"]["nodes"]}
+    phase5 = nodes.get("ws15-phase5-parity")
+    if not phase5:
+        raise AssertionError("missing ws15-phase5-parity node")
+    files_edit = set(phase5.get("files_edit") or [])
+    for required in [
+        "templates/**",
+        "internal/templates/source/**",
+        "internal/templates/templates.go",
+        "internal/templates/templates_test.go",
+    ]:
+        if required not in files_edit:
+            raise AssertionError(f"phase5 files_edit missing {required}")
+    if "templates/core" in files_edit or "internal/templates/source" in files_edit:
+        raise AssertionError("phase5 must not use bare directory paths without tree markers")
+
+
+def test_supervised_campaign_plan_files_edit_matches_human_phase_contract() -> None:
+    if not SUPERVISED_PLAN.is_file():
+        raise AssertionError("missing supervised-deep-bug-audit-repair-campaign.plan.json")
+    parsed = json.loads(SUPERVISED_PLAN.read_text(encoding="utf-8"))
+    required = {
+        "ws15-phase0-contracts": [
+            "docs/plans/agentkit-implementation-roadmap/_conventions.md",
+            "scripts/test_report_telemetry_contracts.py",
+            "scripts/git-hooks/pre-commit",
+        ],
+        "ws15-phase1-config": [
+            "internal/config/campaign.go",
+            "internal/config/campaign_test.go",
+        ],
+        "ws15-phase2-evidence-state": [
+            "internal/auditcampaign/evidence.go",
+            "internal/auditcampaign/evidence_test.go",
+            "internal/auditcampaign/metrics.go",
+            "internal/auditcampaign/metrics_test.go",
+            "internal/auditcampaign/state.go",
+            "internal/auditcampaign/state_test.go",
+            "internal/runstore/runstore.go",
+            "internal/adapter/adapter.go",
+        ],
+        "ws15-phase3-commit-scoped": [
+            "internal/gitstate/commit.go",
+            "internal/gitstate/commit_test.go",
+            "internal/preflight/stamp.go",
+            "internal/policy/policy.go",
+            "internal/hooks/hooks.go",
+        ],
+        "ws15-phase4-engine-cli": [
+            "internal/auditcampaign/engine.go",
+            "internal/auditcampaign/engine_test.go",
+            "internal/cli/campaign.go",
+            "internal/cli/campaign_test.go",
+            "internal/cli/root.go",
+            "internal/orchestrator/engine.go",
+        ],
+        "ws15-phase5-parity": [
+            "templates/**",
+            "internal/templates/source/**",
+            "internal/templates/templates.go",
+            "internal/templates/templates_test.go",
+            ".ai/skills/deep-bug-audit/SKILL.md",
+            "scripts/audit_loop_guard.py",
+        ],
+        "ws15-phase6-docs-closure": [
+            "docs/loop-authoring.md",
+            "docs/agent-hooks.md",
+            "docs/plans/agentkit-implementation-roadmap/ws-15-supervised-audit-repair-campaign/tasks.md",
+            "docs/plans/agentkit-implementation-roadmap/ws-15-supervised-audit-repair-campaign/audit-ledger.md",
+            "docs/plans/agentkit-implementation-roadmap/00-overview.md",
+        ],
+    }
+    nodes = {n["id"]: n for n in parsed["dag"]["nodes"]}
+    for node_id, paths in required.items():
+        if node_id not in nodes:
+            raise AssertionError(f"missing plan node {node_id}")
+        files_edit = set(nodes[node_id].get("files_edit") or [])
+        for path in paths:
+            if path not in files_edit:
+                raise AssertionError(f"node {node_id} files_edit missing required path {path}")
+
+
+def test_main_invokes_all_tests() -> None:
+    content = Path(__file__).read_text(encoding="utf-8")
+    missing = contracts.missing_main_test_calls(content)
+    if missing:
+        raise AssertionError(f"main() missing real AST calls for: {', '.join(missing)}")
+
+
 def main() -> int:
     test_valid_plan_passes()
     test_cycle_rejected()
@@ -355,6 +474,11 @@ def main() -> int:
     test_committed_machine_plan_artifacts_are_real_and_validated()
     test_agentkit_implementation_plan_is_named_and_referenced()
     test_agentkit_plan_nodes_have_existing_task_dirs()
+    test_supervised_campaign_plan_files_edit_covers_declared_test_paths()
+    test_supervised_campaign_plan_files_edit_matches_human_phase_contract()
+    test_supervised_campaign_plan_files_edit_subset_of_scope_in()
+    test_supervised_campaign_plan_phase5_template_tree_allowlist()
+    test_main_invokes_all_tests()
     print("agent plan contract tests passed")
     return 0
 

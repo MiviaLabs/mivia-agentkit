@@ -240,6 +240,21 @@ func TestZaiRunRespectsTimeout(t *testing.T) {
 	}
 }
 
+func TestZaiRunFailsClosedOnAuthErrorExitZero(t *testing.T) {
+	// Live zai 401: exit 0 with role JSONL user echo + assistant auth error.
+	example := `{"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"r","cycle":1,"baseline_head":"h","disposition":"confirmed","finding_fingerprint":"fp-ex","changed_path_ids":["p1"],"verifier_ref":"go-test","progress":1}`
+	raw := []byte(`{"role":"user","content":"examples ` + example + `"}` + "\n" +
+		`{"role":"assistant","content":"Z.ai API error: 401 Authentication Failed"}`)
+	r := zaiRunner(raw, nil)
+	got, err := (Zai{Runner: r}).Run(context.Background(), Request{Prompt: "x", Approval: "never", ArtifactOut: t.TempDir() + "/out.json"})
+	if err == nil || !strings.Contains(err.Error(), "provider failure") {
+		t.Fatalf("Run() error = %v, want provider failure", err)
+	}
+	if got.ExitCode != 1 {
+		t.Fatalf("ExitCode = %d, want 1", got.ExitCode)
+	}
+}
+
 func TestZaiRunScrubsSecretsFromStdout(t *testing.T) {
 	token := "Bearer " + strings.Repeat("a", 16)
 	got, err := (Zai{Runner: zaiRunner([]byte(token), nil)}).Run(context.Background(), Request{Prompt: "x", Approval: "never"})

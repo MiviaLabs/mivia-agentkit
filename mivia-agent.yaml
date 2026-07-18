@@ -23,8 +23,13 @@ adapters:
     enabled: false
     role: guidance
   zai:
+    enabled: false
+    role: orchestrable
+  kimi:
     enabled: true
     role: orchestrable
+    # Highspeed model keeps confirm/fix under campaign timeouts (max thinking thrash).
+    model: kimi-code/kimi-for-coding-highspeed
 
 routing:
   default_producer: codex
@@ -79,6 +84,48 @@ paths:
 governance:
   provider: noop
   audit_log: .ai/audit.jsonl
+
+# Supervised audit-repair campaign (operator-enabled for live dual-CLI run).
+# auditor=codex finds bugs; confirmer=kimi independently confirms; fixer=kimi codes repairs.
+# (zai/crush blocked on dead Z.ai API keys as of 2026-07-18; kimi is the working independent CLI.)
+# Launch: mivia-agent campaign run --repo . --campaign deep-bug-audit-repair --json
+# Commit-capable mode requires independent auditor/confirmer and explicit allowed_paths.
+loops:
+  bug-audit-loop:
+    bound: iterations
+    max_iterations: 2
+    steps:
+      - id: audit
+        producer: codex
+  fix-loop:
+    bound: iterations
+    max_iterations: 1
+    steps:
+      - id: fix
+        producer: kimi
+
+campaigns:
+  deep-bug-audit-repair:
+    enabled: true
+    audit_workflow: bug-audit-loop
+    fix_workflow: fix-loop
+    auditor: codex
+    confirmer: kimi
+    clean_pass_threshold: 2
+    max_cycles: 6
+    max_duration: 45m
+    max_repair_attempts: 3
+    no_progress_threshold: 2
+    # Scoped commits: codex finds, kimi confirms, kimi codes, coordinator CommitScoped only.
+    commit_enabled: true
+    verifier_profile: go-test
+    allowed_paths:
+      - internal
+      - cmd
+      - scripts
+      - docs
+    commit_message_template: "fix(quality): campaign scoped repair"
+    on_exhausted: fail
 
 global:
   layer: ~/.agents

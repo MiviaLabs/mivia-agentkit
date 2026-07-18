@@ -30,6 +30,7 @@ type Manifest struct {
 	Adapters         map[string]AdapterConfig `yaml:"adapters"`
 	Routing          Routing                  `yaml:"routing"`
 	Loops            map[string]Loop          `yaml:"loops"`
+	Campaigns        map[string]Campaign      `yaml:"campaigns"`
 	Commands         map[string]string        `yaml:"commands"`
 	ProtectedActions []string                 `yaml:"protected_actions"`
 	Quality          Quality                  `yaml:"quality"`
@@ -205,6 +206,7 @@ func (m *Manifest) Validate() error {
 			enabled[name] = adapter.Role
 		}
 	}
+	knownWorkflows := map[string]struct{}{}
 	for name, loop := range m.Loops {
 		if loop.Bound == "" {
 			return fmt.Errorf("loop %q has no bound", name)
@@ -216,6 +218,13 @@ func (m *Manifest) Validate() error {
 			return fmt.Errorf("loop %q: %w", name, err)
 		}
 		m.Loops[name] = loop
+		knownWorkflows[name] = struct{}{}
+	}
+	for name, campaign := range m.Campaigns {
+		if err := campaign.Validate(name, enabled, knownWorkflows); err != nil {
+			return err
+		}
+		m.Campaigns[name] = campaign
 	}
 	return nil
 }

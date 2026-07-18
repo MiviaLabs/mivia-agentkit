@@ -23,7 +23,7 @@ type adapterStatus struct {
 }
 
 var runtimeAdapters = func() []adapter.Adapter {
-	return []adapter.Adapter{adapter.Codex{}, adapter.Claude{}, adapter.Antigravity{}, adapter.Crush{}, adapter.Zai{}}
+	return []adapter.Adapter{adapter.Codex{}, adapter.Claude{}, adapter.Antigravity{}, adapter.Crush{}, adapter.Zai{}, adapter.Kimi{}}
 }
 
 func newAdaptersCommand() *cobra.Command {

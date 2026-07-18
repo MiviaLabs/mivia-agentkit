@@ -64,6 +64,8 @@ Severity never gates approval. A low-severity row with an open gap still keeps t
 
 State is stored at `.git/mivia-agent-audit-loop-state.json` by default. Tests can override it with `MIVIA_AUDIT_LOOP_STATE`. The state stores counters and hashes only, not raw prompts or raw reports.
 
+This host audit loop is **report-only**. It must not stage, commit, push, open a PR, or start a supervised campaign. Commit-capable repair requires an explicit operator-launched `mivia-agent campaign run` with independent confirmation.
+
 ## Planning Guard
 
 Policy: `.ai/policy/agent-plan.json`

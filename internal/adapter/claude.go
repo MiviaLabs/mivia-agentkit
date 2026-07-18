@@ -11,6 +11,7 @@ package adapter
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/MiviaLabs/mivia-agentkit/internal/config"
@@ -45,6 +46,8 @@ func (c Claude) Run(ctx context.Context, req Request) (Result, error) {
 		defer cancel()
 	}
 	res, err := c.runRaw(runCtx, req)
+	// Claude --output-format json nests assistant text in result; capture before sanitize.
+	materializeArtifactOut(req.ArtifactOut, res.Stdout)
 	return Result{
 		ExitCode:     res.ExitCode,
 		Stdout:       truncate(sanitizeProviderOutput(res.Stdout)),
@@ -103,6 +106,19 @@ func (c Claude) runRaw(ctx context.Context, req Request) (RunResult, error) {
 	}
 	if req.MaxTurns > 0 {
 		args = append(args, "--max-turns", toString(req.MaxTurns))
+	}
+	// Claude Code: --json-schema takes inline JSON Schema (not a path). Prefer
+	// provider-enforced structured_output over prompt-hoped free-form JSON.
+	if path := strings.TrimSpace(req.OutputSchema); path != "" {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return RunResult{}, fmt.Errorf("claude output schema: %w", err)
+		}
+		schema := strings.TrimSpace(string(b))
+		if schema == "" {
+			return RunResult{}, fmt.Errorf("claude output schema is empty")
+		}
+		args = append(args, "--json-schema", schema)
 	}
 	args = append(args, req.Prompt)
 	return c.runner().Run(ctx, args, nil, req.Workdir)

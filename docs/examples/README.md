@@ -10,7 +10,7 @@ example that matches the **kind of work**, because that decides two things:
 
 1. **Does the step need to write files?** Production work (patching code,
    generating artifacts, scaffolding) needs a producer with file-write tools and
-   a committed artifact. Pure review or research does not — it reads code and
+   a named run artifact. Pure review or research does not — it reads code and
    returns a verdict or notes, and should not be given a write target.
 2. **Which adapter and model?** The `zai` adapter (Z.ai GLM models) is the
    default covered here. Other adapters (`codex`, `claude`, `crush`) follow the
@@ -20,19 +20,21 @@ example that matches the **kind of work**, because that decides two things:
 
 | Step role | Writes files? | Typical adapter flags | Artifact |
 |---|---|---|---|
-| **Producer** (implement / patch / scaffold) | **Yes** | producer step, `approval: commit` when it must persist to the repo | required (`artifact: <name>.md`) |
+| **Producer** (implement / patch / scaffold) | **Yes** | producer step; use `approval: protect:commit` when the step needs the stamp/policy gate | required (`artifact: <name>.md`) |
 | **Reviewer** | No | reviewer step, read-only | the artifact under review |
 | **Researcher** | No | producer step, **no** write tools, short max-turns | notes artifact only |
 
-**Default assumption: a producer step writes files.** Configure it with a real
-`artifact` and, when the change must land in the repo, `approval: commit` (a
-protected action — `mivia-agent` gates it behind a fresh quality stamp). Only
-drop the write surface when the step is explicitly review or research; then keep
-`max_turns` low and do not set `approval: commit`.
+**Default assumption: a producer step may write run artifacts.** Configure it
+with a real `artifact`. When the step is a protected write path, set
+`approval: protect:commit` so `mivia-agent` runs a fresh quality stamp plus
+policy decision **before the adapter runs**. That field is a stamp/policy gate
+only and is **not a Git commit**: ordinary `run` workflows do not stage or
+`git commit`. Only drop write tools when the step is explicitly review or
+research; then keep `max_turns` low and do not set `approval: protect:commit`.
 
 Agents: if a task says "fix", "implement", "refactor", or "scaffold", it is a
 **write** step. If it says "review", "audit", "investigate", or "summarize", it
-is **read-only** — do not grant it `approval: commit`.
+is **read-only** — do not grant it `approval: protect:commit`.
 
 ## Examples
 

@@ -17,11 +17,15 @@ type Request struct {
 	Workdir     string
 	Approval    string
 	ArtifactOut string
-	Model       string
-	Effort      string
-	Params      map[string]string
-	Timeout     time.Duration
-	MaxTurns    int
+	// OutputSchema is an optional path to a JSON Schema file for adapters that
+	// support provider-enforced structured final responses (e.g. codex --output-schema).
+	// Empty means the adapter falls back to free-form last-message / stdout extraction.
+	OutputSchema string
+	Model        string
+	Effort       string
+	Params       map[string]string
+	Timeout      time.Duration
+	MaxTurns     int
 }
 
 // Validate rejects unsafe or incomplete requests.
