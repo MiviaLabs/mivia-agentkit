@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -823,8 +824,8 @@ type headAdvancingAdapter struct {
 	stdout []byte
 }
 
-func (a *headAdvancingAdapter) Name() string                  { return a.name }
-func (a *headAdvancingAdapter) Role() config.AdapterRole      { return config.AdapterRoleOrchestrable }
+func (a *headAdvancingAdapter) Name() string             { return a.name }
+func (a *headAdvancingAdapter) Role() config.AdapterRole { return config.AdapterRoleOrchestrable }
 func (a *headAdvancingAdapter) Detect(context.Context) (adapter.Detection, error) {
 	return adapter.Detection{Name: a.name, Version: "test", HeadlessCapable: true}, nil
 }
@@ -850,6 +851,71 @@ func (a *headAdvancingAdapter) Run(_ context.Context, req adapter.Request) (adap
 }
 func (a *headAdvancingAdapter) Review(context.Context, adapter.Request) (adapter.Verdict, error) {
 	return adapter.Verdict{Adapter: a.name, Pass: true}, nil
+}
+
+func TestCampaignHostClaudePassesJSONSchema(t *testing.T) {
+	body := evidenceJSON("candidate", "fp-claude-schema")
+	// Claude envelope with structured_output (schema path).
+	env, _ := json.Marshal(map[string]any{
+		"type":              "result",
+		"structured_output": json.RawMessage(body),
+		"result":            "ignored prose",
+	})
+	r := &adapter.FakeRunner{Scripts: map[string]adapter.FakeResponse{
+		"claude": {Result: adapter.RunResult{ExitCode: 0, Stdout: env}},
+	}}
+	reg, err := adapter.NewRegistry(adapter.Claude{Runner: r})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("claude", "codex", "claude")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	camp.Auditor = "claude"
+	h := &campaignHost{
+		repo: t.TempDir(), runID: "r-cl-schema", name: "c", camp: camp, manifest: m,
+		adapters: reg, expectedHead: "unknown",
+	}
+	ev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1, auditcampaign.Evidence{})
+	if err != nil {
+		t.Fatalf("Audit: %v", err)
+	}
+	if ev.FindingFingerprint != "fp-claude-schema" {
+		t.Fatalf("ev = %+v", ev)
+	}
+	if len(r.Calls) != 1 {
+		t.Fatalf("claude calls = %d", len(r.Calls))
+	}
+	args := strings.Join(r.Calls[0].Args, " ")
+	if !strings.Contains(args, "--json-schema") {
+		t.Fatalf("claude args missing --json-schema: %s", args)
+	}
+	if !strings.Contains(args, "mivia-agent-campaign-evidence/v1") {
+		t.Fatalf("claude --json-schema missing campaign schema body: %s", args)
+	}
+}
+
+func TestSupportsCampaignOutputSchema(t *testing.T) {
+	if !supportsCampaignOutputSchema("codex") || !supportsCampaignOutputSchema("claude") {
+		t.Fatal("codex and claude must support schema")
+	}
+	if supportsCampaignOutputSchema("zai") || supportsCampaignOutputSchema("crush") || supportsCampaignOutputSchema("antigravity") {
+		t.Fatal("zai/crush/antigravity must not claim schema support")
+	}
+}
+
+func TestCampaignEvidenceSchemaTwinsMatch(t *testing.T) {
+	// Prevent drift between package-local schema copies.
+	cliSchema := campaignEvidenceJSONSchema
+	other, err := os.ReadFile(filepath.Join("..", "auditcampaign", "evidence_schema.json"))
+	if err != nil {
+		t.Fatalf("read auditcampaign schema: %v", err)
+	}
+	if string(cliSchema) != string(other) {
+		t.Fatal("cli/campaign_evidence_schema.json and auditcampaign/evidence_schema.json diverged")
+	}
+	if !bytes.Contains(cliSchema, []byte(`"required"`)) {
+		t.Fatal("schema missing required (OpenAI strict needs all properties required)")
+	}
 }
 
 func TestCampaignHostCodexPassesOutputSchema(t *testing.T) {

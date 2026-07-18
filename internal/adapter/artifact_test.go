@@ -28,6 +28,25 @@ func campaignEvidenceBody(disposition, fingerprint string) []byte {
 	return []byte(`{"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"r","cycle":1,"baseline_head":"h"` + disp + fp + extra + `}`)
 }
 
+func TestExtractLastMessageFromClaudeStructuredOutput(t *testing.T) {
+	inner := campaignEvidenceBody("confirmed", "fp-so")
+	raw, err := json.Marshal(map[string]any{
+		"type":              "result",
+		"result":            "prose that must not win",
+		"structured_output": json.RawMessage(inner),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := extractLastMessage(raw)
+	if !bytes.Contains(got, []byte(`"fp-so"`)) {
+		t.Fatalf("got = %s, want structured_output evidence", got)
+	}
+	if bytes.Contains(got, []byte("prose that must not win")) {
+		t.Fatalf("got prose result instead of structured_output: %s", got)
+	}
+}
+
 func TestExtractLastMessageFromZaiRoleEnvelope(t *testing.T) {
 	inner := campaignEvidenceBody("confirmed", "fp-zai")
 	enc, err := json.Marshal(string(inner))

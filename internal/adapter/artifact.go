@@ -57,6 +57,19 @@ func extractLastMessage(raw []byte) []byte {
 	}
 	// Provider envelopes: Claude {"result":"..."}, Codex NDJSON, etc.
 	for _, payload := range decodeProviderPayloads(trimmed) {
+		// Claude --json-schema places validated body in structured_output.
+		if so, ok := payload["structured_output"]; ok {
+			if b, err := json.Marshal(so); err == nil && len(bytes.TrimSpace(b)) > 0 {
+				if bytes.Contains(b, []byte(campaignEvidenceSchema)) {
+					return b
+				}
+				// Still prefer structured_output when present (schema-validated).
+				if msg, ok := extractJSONObjectWithMarker(b, campaignEvidenceSchema); ok {
+					return msg
+				}
+				return b
+			}
+		}
 		if msg, ok := extractJSONObjectWithMarker(mustMarshal(payload), campaignEvidenceSchema); ok {
 			return msg
 		}

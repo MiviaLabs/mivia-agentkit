@@ -23,10 +23,22 @@ import (
 )
 
 // campaignEvidenceJSONSchema is provider-enforced for adapters that support
-// structured final responses (Codex --output-schema). Zai has no schema flag.
+// structured final responses (Codex --output-schema, Claude --json-schema).
+// Zai/Crush/Antigravity have no schema flag.
 //
 //go:embed campaign_evidence_schema.json
 var campaignEvidenceJSONSchema []byte
+
+// supportsCampaignOutputSchema reports whether the adapter CLI can enforce a
+// final-response JSON Schema for campaign evidence.
+func supportsCampaignOutputSchema(name string) bool {
+	switch strings.TrimSpace(name) {
+	case "codex", "claude":
+		return true
+	default:
+		return false
+	}
+}
 
 // campaignHost wires campaign phase adapters and coordinator-only scoped commits.
 // Local adapters (local / local-*) read typed evidence from
@@ -452,9 +464,11 @@ func (h *campaignHost) invokeOrchestrable(ctx context.Context, name string, phas
 	_ = tmp.Close()
 	defer func() { _ = os.Remove(tmpPath) }()
 	req.ArtifactOut = tmpPath
-	// Provider-enforced structured output where supported (Codex --output-schema).
-	// Prefer this over prompt-only JSON hoping; still DecodeEvidence fail-closed.
-	if name == "codex" && len(campaignEvidenceJSONSchema) > 0 {
+	// Provider-enforced structured output where the CLI supports it:
+	//   codex  → --output-schema <file>
+	//   claude → --json-schema <inline JSON> (adapter reads file)
+	// zai/crush/antigravity have no schema flag → prompt + extract only.
+	if supportsCampaignOutputSchema(name) && len(campaignEvidenceJSONSchema) > 0 {
 		schemaFile, err := os.CreateTemp("", "mivia-campaign-schema-*.json")
 		if err != nil {
 			return auditcampaign.Evidence{}, err
@@ -524,13 +538,14 @@ func campaignPhasePrompt(phase auditcampaign.Phase, campaign, runID string, cycl
 		"Do not invent telemetry numbers. Do not stage, commit, push, open a PR, or rewrite git history.",
 		fmt.Sprintf("campaign=%s campaign_run=%s cycle=%s baseline_head=%s", campaign, runID, cycleS, head),
 		"Use opaque finding_fingerprint and changed_path_ids only (no raw filesystem paths or secrets in those fields).",
-		`Clean example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"` + runID + `","cycle":` + cycleS + `,"baseline_head":"` + head + `"}`,
+		// OpenAI/Claude structured outputs require all property keys present (empty string/[] ok).
+		`Clean example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"` + runID + `","cycle":` + cycleS + `,"baseline_head":"` + head + `","finding_fingerprint":"","disposition":"","changed_path_ids":[],"verifier_ref":"","progress":0}`,
 	}
 	// Phase-specific examples avoid teaching the wrong disposition/fingerprint.
 	switch phase {
 	case auditcampaign.PhaseAuditing:
 		base = append(base,
-			`Candidate example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"candidate","finding_fingerprint":"`+fpEx+`"}`,
+			`Candidate example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"candidate","finding_fingerprint":"`+fpEx+`","changed_path_ids":[],"verifier_ref":"","progress":0}`,
 		)
 		return strings.Join(append([]string{
 			"You are the campaign auditor for supervised deep-bug-audit repair.",
@@ -541,8 +556,8 @@ func campaignPhasePrompt(phase auditcampaign.Phase, campaign, runID string, cycl
 		}, base...), "\n")
 	case auditcampaign.PhaseConfirming:
 		base = append(base,
-			`Confirmed example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"confirmed","finding_fingerprint":"`+fpEx+`","changed_path_ids":["p1"],"verifier_ref":"`+strings.TrimSpace(camp.VerifierProfile)+`"}`,
-			`Rejected example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"rejected","finding_fingerprint":"`+fpEx+`"}`,
+			`Confirmed example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"confirmed","finding_fingerprint":"`+fpEx+`","changed_path_ids":["p1"],"verifier_ref":"`+strings.TrimSpace(camp.VerifierProfile)+`","progress":1}`,
+			`Rejected example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"rejected","finding_fingerprint":"`+fpEx+`","changed_path_ids":[],"verifier_ref":"","progress":0}`,
 		)
 		lines := []string{
 			"You are the independent confirmer for supervised deep-bug-audit repair (separate invocation from the auditor).",
@@ -572,7 +587,7 @@ func campaignPhasePrompt(phase auditcampaign.Phase, campaign, runID string, cycl
 			vref = "true"
 		}
 		base = append(base,
-			`Fixed example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"fixed","finding_fingerprint":"`+fpEx+`","changed_path_ids":["p1"],"verifier_ref":"`+vref+`"}`,
+			`Fixed example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"fixed","finding_fingerprint":"`+fpEx+`","changed_path_ids":["p1"],"verifier_ref":"`+vref+`","progress":1}`,
 		)
 		lines := []string{
 			"You are the campaign fixer for supervised deep-bug-audit repair.",
