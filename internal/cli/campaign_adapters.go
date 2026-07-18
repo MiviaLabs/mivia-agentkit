@@ -5,6 +5,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -20,6 +21,12 @@ import (
 	"github.com/MiviaLabs/mivia-agentkit/internal/policy"
 	"github.com/MiviaLabs/mivia-agentkit/internal/preflight"
 )
+
+// campaignEvidenceJSONSchema is provider-enforced for adapters that support
+// structured final responses (Codex --output-schema). Zai has no schema flag.
+//
+//go:embed campaign_evidence_schema.json
+var campaignEvidenceJSONSchema []byte
 
 // campaignHost wires campaign phase adapters and coordinator-only scoped commits.
 // Local adapters (local / local-*) read typed evidence from
@@ -445,6 +452,23 @@ func (h *campaignHost) invokeOrchestrable(ctx context.Context, name string, phas
 	_ = tmp.Close()
 	defer func() { _ = os.Remove(tmpPath) }()
 	req.ArtifactOut = tmpPath
+	// Provider-enforced structured output where supported (Codex --output-schema).
+	// Prefer this over prompt-only JSON hoping; still DecodeEvidence fail-closed.
+	if name == "codex" && len(campaignEvidenceJSONSchema) > 0 {
+		schemaFile, err := os.CreateTemp("", "mivia-campaign-schema-*.json")
+		if err != nil {
+			return auditcampaign.Evidence{}, err
+		}
+		schemaPath := schemaFile.Name()
+		if _, err := schemaFile.Write(campaignEvidenceJSONSchema); err != nil {
+			_ = schemaFile.Close()
+			_ = os.Remove(schemaPath)
+			return auditcampaign.Evidence{}, err
+		}
+		_ = schemaFile.Close()
+		defer func() { _ = os.Remove(schemaPath) }()
+		req.OutputSchema = schemaPath
+	}
 
 	if v, ok := a.(adapter.RequestValidator); ok {
 		if err := v.ValidateRequest(req); err != nil {

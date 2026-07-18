@@ -852,6 +852,41 @@ func (a *headAdvancingAdapter) Review(context.Context, adapter.Request) (adapter
 	return adapter.Verdict{Adapter: a.name, Pass: true}, nil
 }
 
+func TestCampaignHostCodexPassesOutputSchema(t *testing.T) {
+	// Provider-enforced structured output: host must pass --output-schema for codex.
+	body := evidenceJSON("candidate", "fp-schema")
+	r := &adapter.FakeRunner{Scripts: map[string]adapter.FakeResponse{
+		"codex": {Result: adapter.RunResult{ExitCode: 0, Stdout: body}},
+	}}
+	reg, err := adapter.NewRegistry(adapter.Codex{Runner: r})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testManifestWithAdapters("codex", "zai", "zai")
+	camp := m.Campaigns["deep-bug-audit-repair"]
+	h := &campaignHost{
+		repo: t.TempDir(), runID: "r-schema", name: "c", camp: camp, manifest: m,
+		adapters: reg, expectedHead: "unknown",
+	}
+	ev, err := h.Audit(context.Background(), auditcampaign.PhaseAuditing, 1, auditcampaign.Evidence{})
+	if err != nil {
+		t.Fatalf("Audit: %v", err)
+	}
+	if ev.FindingFingerprint != "fp-schema" {
+		t.Fatalf("ev = %+v", ev)
+	}
+	if len(r.Calls) != 1 {
+		t.Fatalf("codex calls = %d", len(r.Calls))
+	}
+	args := strings.Join(r.Calls[0].Args, " ")
+	if !strings.Contains(args, "--output-schema") {
+		t.Fatalf("codex args missing --output-schema: %s", args)
+	}
+	if !strings.Contains(args, "--output-last-message") {
+		t.Fatalf("codex args missing --output-last-message: %s", args)
+	}
+}
+
 // TestCampaignHostRealCodexAndClaudeIndependentConfirm drives real Codex+Claude adapters
 // with FakeRunner envelopes end-to-end through Audit then Confirm (distinct invocations).
 func TestCampaignHostRealCodexAndClaudeIndependentConfirm(t *testing.T) {

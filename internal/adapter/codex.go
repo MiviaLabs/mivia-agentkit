@@ -114,6 +114,11 @@ func (c Codex) runRaw(ctx context.Context, req Request) (RunResult, error) {
 	if req.ArtifactOut != "" {
 		args = append(args, "--output-last-message", req.ArtifactOut)
 	}
+	// Prefer provider-enforced structured final response over prompt-hoped JSON.
+	// Docs: codex exec --output-schema <file> constrains the last message to a schema.
+	if path := strings.TrimSpace(req.OutputSchema); path != "" {
+		args = append(args, "--output-schema", path)
+	}
 	args = append(args, req.Prompt)
 	return c.runner().Run(ctx, args, nil, req.Workdir)
 }
