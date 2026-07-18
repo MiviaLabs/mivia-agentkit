@@ -3,35 +3,35 @@
   "title": "mivia-agent-campaign-evidence/v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "campaign_run", "cycle", "baseline_head"],
+  "required": [
+    "schema",
+    "campaign_run",
+    "cycle",
+    "baseline_head",
+    "finding_fingerprint",
+    "disposition",
+    "changed_path_ids",
+    "verifier_ref",
+    "progress"
+  ],
   "properties": {
     "schema": {
       "type": "string",
       "enum": ["mivia-agent-campaign-evidence/v1"]
     },
-    "campaign_run": { "type": "string", "minLength": 1 },
+    "campaign_run": { "type": "string" },
     "cycle": { "type": "integer", "minimum": 0 },
-    "baseline_head": { "type": "string", "minLength": 1 },
+    "baseline_head": { "type": "string" },
     "finding_fingerprint": { "type": "string" },
     "disposition": {
       "type": "string",
-      "enum": ["candidate", "confirmed", "duplicate", "fixed", "rejected"]
+      "enum": ["candidate", "confirmed", "duplicate", "fixed", "rejected", ""]
     },
     "changed_path_ids": {
       "type": "array",
-      "items": { "type": "string", "minLength": 1 }
+      "items": { "type": "string" }
     },
     "verifier_ref": { "type": "string" },
-    "progress": { "type": "integer" },
-    "token_source": {
-      "type": "string",
-      "enum": ["provider", "unavailable"]
-    },
-    "timing_source": {
-      "type": "string",
-      "enum": ["runtime", "NOT_MEASURED"]
-    },
-    "measured_elapsed_ms": { "type": "integer", "minimum": 0 },
-    "provider_tokens": { "type": "integer", "minimum": 0 }
+    "progress": { "type": "integer" }
   }
 }
