@@ -333,14 +333,28 @@ func (h *campaignHost) Fix(ctx context.Context, phase auditcampaign.Phase, cycle
 }
 
 // normalizeCommitEvidence fills commit-capable gaps from campaign config / prior
-// when the adapter already chose the right disposition and fingerprint but omitted
-// verifier_ref or opaque path ids (common live-provider miss).
+// when the adapter already chose the right disposition but omitted verifier_ref,
+// path ids, or copied a placeholder fingerprint from the prompt examples.
 func (h *campaignHost) normalizeCommitEvidence(ev, prior auditcampaign.Evidence, want auditcampaign.Disposition) auditcampaign.Evidence {
-	if !h.camp.CommitEnabled || ev.Disposition != want {
+	// Rejected: bind prior fingerprint for tracking only.
+	if ev.Disposition == auditcampaign.DispositionRejected && prior.FindingFingerprint != "" {
+		if ev.FindingFingerprint == "" || isPlaceholderFingerprint(ev.FindingFingerprint) {
+			ev.FindingFingerprint = prior.FindingFingerprint
+		}
 		return ev
 	}
-	if ev.FindingFingerprint == "" && prior.FindingFingerprint != "" {
-		ev.FindingFingerprint = prior.FindingFingerprint
+	if ev.Disposition != want {
+		return ev
+	}
+	// Confirmed/fixed must keep the prior finding identity (blocks example-fp1 drift).
+	if prior.FindingFingerprint != "" {
+		if ev.FindingFingerprint == "" || isPlaceholderFingerprint(ev.FindingFingerprint) ||
+			ev.FindingFingerprint != prior.FindingFingerprint {
+			ev.FindingFingerprint = prior.FindingFingerprint
+		}
+	}
+	if !h.camp.CommitEnabled {
+		return ev
 	}
 	if ev.VerifierRef == "" {
 		if prior.VerifierRef != "" {
@@ -357,6 +371,15 @@ func (h *campaignHost) normalizeCommitEvidence(ev, prior auditcampaign.Evidence,
 		}
 	}
 	return ev
+}
+
+func isPlaceholderFingerprint(fp string) bool {
+	switch strings.TrimSpace(fp) {
+	case "", "fp1", "OPAQUE_FP", "opaque_fp", "fingerprint":
+		return true
+	default:
+		return false
+	}
 }
 
 // invokeOrchestrable runs an approved adapter and decodes typed campaign evidence only.
@@ -465,38 +488,54 @@ func campaignPhasePrompt(phase auditcampaign.Phase, campaign, runID string, cycl
 	if head == "" {
 		head = "unknown"
 	}
+	// Never put a literal "fp1" example when prior has a real fingerprint — models copy examples.
+	fpEx := "OPAQUE_FP"
+	if prior.FindingFingerprint != "" {
+		fpEx = prior.FindingFingerprint
+	}
+	cycleS := fmt.Sprintf("%d", cycle)
 	base := []string{
 		"CRITICAL: Your entire final response must be exactly one JSON object. No Markdown fences, no prose before/after.",
 		`Schema must be exactly: "mivia-agent-campaign-evidence/v1"`,
 		"Do not invent telemetry numbers. Do not stage, commit, push, open a PR, or rewrite git history.",
-		fmt.Sprintf("campaign=%s campaign_run=%s cycle=%d baseline_head=%s", campaign, runID, cycle, head),
+		fmt.Sprintf("campaign=%s campaign_run=%s cycle=%s baseline_head=%s", campaign, runID, cycleS, head),
 		"Use opaque finding_fingerprint and changed_path_ids only (no raw filesystem paths or secrets in those fields).",
-		`Clean example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"` + runID + `","cycle":` + fmt.Sprintf("%d", cycle) + `,"baseline_head":"` + head + `"}`,
-		`Candidate example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"` + runID + `","cycle":` + fmt.Sprintf("%d", cycle) + `,"baseline_head":"` + head + `","disposition":"candidate","finding_fingerprint":"fp1"}`,
-		`Confirmed example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"` + runID + `","cycle":` + fmt.Sprintf("%d", cycle) + `,"baseline_head":"` + head + `","disposition":"confirmed","finding_fingerprint":"fp1","changed_path_ids":["p1"],"verifier_ref":"go-test"}`,
-		`Fixed example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"` + runID + `","cycle":` + fmt.Sprintf("%d", cycle) + `,"baseline_head":"` + head + `","disposition":"fixed","finding_fingerprint":"fp1","changed_path_ids":["p1"],"verifier_ref":"go-test"}`,
+		`Clean example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"` + runID + `","cycle":` + cycleS + `,"baseline_head":"` + head + `"}`,
 	}
+	// Phase-specific examples avoid teaching the wrong disposition/fingerprint.
 	switch phase {
 	case auditcampaign.PhaseAuditing:
+		base = append(base,
+			`Candidate example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"candidate","finding_fingerprint":"`+fpEx+`"}`,
+		)
 		return strings.Join(append([]string{
 			"You are the campaign auditor for supervised deep-bug-audit repair.",
 			"Inspect the repository for one concrete, high-confidence bug if present.",
 			"If no concrete finding: emit the clean example (omit disposition, empty fingerprint).",
-			"If a finding is present: disposition candidate with opaque finding_fingerprint (and optional path ids).",
+			"If a finding is present: disposition candidate with a unique opaque finding_fingerprint (do not use placeholder text like OPAQUE_FP literally if you invent one — mint a short opaque id).",
 			"Prefer real correctness/security bugs in allowed product code; skip style-only nits.",
 		}, base...), "\n")
 	case auditcampaign.PhaseConfirming:
+		base = append(base,
+			`Confirmed example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"confirmed","finding_fingerprint":"`+fpEx+`","changed_path_ids":["p1"],"verifier_ref":"`+strings.TrimSpace(camp.VerifierProfile)+`"}`,
+			`Rejected example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"rejected","finding_fingerprint":"`+fpEx+`"}`,
+		)
 		lines := []string{
 			"You are the independent confirmer for supervised deep-bug-audit repair (separate invocation from the auditor).",
-			"Independently re-check the candidate below against the live repo. Do not rubber-stamp.",
-			"If verified: disposition confirmed with the SAME finding_fingerprint, opaque changed_path_ids, and verifier_ref.",
-			"If not verified: disposition rejected with the same finding_fingerprint when known.",
+			"Independently re-check the PRIOR_AUDIT finding against the live repo.",
+			"If the finding is real: disposition confirmed. finding_fingerprint MUST equal PRIOR_AUDIT finding_fingerprint exactly.",
+			"Also set changed_path_ids (opaque) and verifier_ref (use the campaign verifier name when unsure).",
+			"If not real: disposition rejected with the SAME finding_fingerprint as PRIOR_AUDIT.",
+			"Do not invent a new finding_fingerprint. Do not copy unrelated example ids.",
 		}
 		if prior.FindingFingerprint != "" || prior.Disposition != "" {
 			lines = append(lines, fmt.Sprintf(
 				"PRIOR_AUDIT disposition=%s finding_fingerprint=%s changed_path_ids=%s",
 				prior.Disposition, prior.FindingFingerprint, strings.Join(prior.ChangedPathIDs, ","),
 			))
+			if prior.FindingFingerprint != "" {
+				lines = append(lines, "REQUIRED_FINDING_FINGERPRINT="+prior.FindingFingerprint)
+			}
 		}
 		return strings.Join(append(lines, base...), "\n")
 	case auditcampaign.PhaseFixing:
@@ -504,18 +543,29 @@ func campaignPhasePrompt(phase auditcampaign.Phase, campaign, runID string, cycl
 		if paths == "" {
 			paths = "(none)"
 		}
+		vref := strings.TrimSpace(camp.VerifierProfile)
+		if vref == "" {
+			vref = "true"
+		}
+		base = append(base,
+			`Fixed example: {"schema":"mivia-agent-campaign-evidence/v1","campaign_run":"`+runID+`","cycle":`+cycleS+`,"baseline_head":"`+head+`","disposition":"fixed","finding_fingerprint":"`+fpEx+`","changed_path_ids":["p1"],"verifier_ref":"`+vref+`"}`,
+		)
 		lines := []string{
 			"You are the campaign fixer for supervised deep-bug-audit repair.",
 			"Apply a minimal scoped code repair using your tools. Write real file changes under allowed paths only.",
 			fmt.Sprintf("allowed_paths=%s verifier_profile=%s", paths, camp.VerifierProfile),
-			"Do not git commit (coordinator commits). After editing files, emit Fixed evidence with the SAME finding_fingerprint.",
-			"Set disposition fixed with opaque finding_fingerprint, changed_path_ids, and verifier_ref.",
+			"Do not git commit (coordinator commits). After editing files, emit Fixed evidence.",
+			"finding_fingerprint MUST equal PRIOR_CONFIRM finding_fingerprint exactly.",
+			"Set disposition fixed with changed_path_ids and verifier_ref.",
 		}
 		if prior.FindingFingerprint != "" || prior.Disposition != "" {
 			lines = append(lines, fmt.Sprintf(
 				"PRIOR_CONFIRM disposition=%s finding_fingerprint=%s changed_path_ids=%s verifier_ref=%s",
 				prior.Disposition, prior.FindingFingerprint, strings.Join(prior.ChangedPathIDs, ","), prior.VerifierRef,
 			))
+			if prior.FindingFingerprint != "" {
+				lines = append(lines, "REQUIRED_FINDING_FINGERPRINT="+prior.FindingFingerprint)
+			}
 		}
 		return strings.Join(append(lines, base...), "\n")
 	default:

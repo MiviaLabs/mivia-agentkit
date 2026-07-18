@@ -665,7 +665,23 @@ func TestNormalizeCommitEvidenceFillsVerifierAndPaths(t *testing.T) {
 	if got.VerifierRef != "go-test" || len(got.ChangedPathIDs) != 1 || got.ChangedPathIDs[0] != "p1" {
 		t.Fatalf("got = %+v", got)
 	}
-	// Non-commit campaigns must not invent fields.
+	// Placeholder fp1 from prompt examples rebinds to prior.
+	got = h.normalizeCommitEvidence(auditcampaign.Evidence{
+		Disposition:        auditcampaign.DispositionConfirmed,
+		FindingFingerprint: "fp1",
+	}, prior, auditcampaign.DispositionConfirmed)
+	if got.FindingFingerprint != "fp-n1" {
+		t.Fatalf("placeholder fp not rebound: %+v", got)
+	}
+	// Confirmed with a different non-placeholder still rebinds to prior chain id.
+	got = h.normalizeCommitEvidence(auditcampaign.Evidence{
+		Disposition:        auditcampaign.DispositionConfirmed,
+		FindingFingerprint: "fp-other-invented",
+	}, prior, auditcampaign.DispositionConfirmed)
+	if got.FindingFingerprint != "fp-n1" {
+		t.Fatalf("confirm fp must rebind to prior: %+v", got)
+	}
+	// Non-commit campaigns must not invent verifier/path fields.
 	h.camp.CommitEnabled = false
 	got = h.normalizeCommitEvidence(auditcampaign.Evidence{
 		Disposition:        auditcampaign.DispositionConfirmed,
